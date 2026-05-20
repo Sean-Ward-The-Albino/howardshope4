@@ -1,0 +1,34 @@
+{
+  "properties": [
+    {
+      "name": "cors.allowed-origins",
+      "type": "java.lang.String",
+      "description": "Allowed origins for CORS policy configuration."
+    },
+    {
+      "name": "stripe.api.key",
+      "type": "java.lang.String",
+      "description": "API Key for Stripe SDK integration."
+    },
+    {
+      "name": "stripe.webhook.secret",
+      "type": "java.lang.String",
+      "description": "Webhook signing secret for Stripe event checks."
+    },
+    {
+      "name": "paypal.client.id",
+      "type": "java.lang.String",
+      "description": "Client ID for PayPal orders SDK."
+    },
+    {
+      "name": "paypal.client.secret",
+      "type": "java.lang.String",
+      "description": "Client Secret for PayPal orders SDK."
+    },
+    {
+      "name": "paypal.mode",
+      "type": "java.lang.String",
+      "description": "PayPal execution mode (sandbox or live)."
+    }
+  ]
+}
