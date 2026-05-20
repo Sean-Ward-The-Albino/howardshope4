@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Howards 4 Hope | Restoring Hope & Rebuilding Lives</title>
+  <meta name="description" content="To restore hope and enhance lives by empowering, supporting, and uplifting youth, caregivers of individuals with disabilities, and single parents with limited income.">
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Modern SVG Icons library via FontAwesome Free CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <div id="app-shell">
+    
+    <!-- --- MODERN RESPONSIVE HEADER --- -->
+    <header class="navbar" id="main-navbar">
+      <a href="#/" class="logo-container">
+        <div class="logo-icon">H</div>
+        <div class="logo-text">Howards 4 <span>Hope</span></div>
+      </a>
+      
+      <!-- Consolidated 5-Link Navigation -->
+      <nav>
+        <ul class="nav-links" id="navbar-links">
+          <li><a href="#/" class="nav-link active" data-route="home">Home</a></li>
+          <li><a href="#/about" class="nav-link" data-route="about">About</a></li>
+          <li><a href="#/programs" class="nav-link" data-route="programs">Programs & Resources</a></li>
+          <li><a href="#/events" class="nav-link" data-route="events">Events & Calendar</a></li>
+          <li><a href="#/get-involved" class="nav-link" data-route="get-involved">Get Involved</a></li>
+        </ul>
+      </nav>
+      
+      <!-- Primary Actions -->
+      <div class="nav-actions">
+        <a href="#/donate" class="btn btn-donate"><i class="fa-solid fa-heart"></i> Donate</a>
+        
+        <!-- User Menu (Toggled dynamically by Auth state) -->
+        <div class="user-menu" id="user-menu-container">
+          <button class="btn btn-primary" id="login-trigger-btn"><i class="fa-solid fa-user-lock"></i> Login</button>
+          
+          <div class="user-dropdown" id="user-dropdown-menu">
+            <div style="padding: 10px 16px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted);" id="user-display-email">user@email.com</div>
+            <div class="dropdown-divider"></div>
+            <a href="#/dashboard" class="dropdown-item" id="dashboard-link">
+              <i class="fa-solid fa-gauge"></i> My Dashboard
+            </a>
+            <a href="#/my-tickets" class="dropdown-item" id="my-tickets-link">
+              <i class="fa-solid fa-ticket"></i> My Tickets
+            </a>
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-item" id="logout-btn" style="color: var(--danger);">
+              <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </div>
+          </div>
+        </div>
+        
+        <!-- Mobile Toggle Button -->
+        <button class="cal-btn" id="mobile-menu-toggle" style="display: none; width: 44px; height: 44px; font-size: 1.25rem;">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </header>
+    
+    <!-- --- MOBILE ROUTING DRAWER --- -->
+    <div class="modal" id="mobile-drawer" style="justify-content: flex-end; padding: 0;">
+      <div class="modal-content" style="height: 100%; border-radius: 0; max-width: 320px; display: flex; flex-direction: column; justify-content: space-between;">
+        <span class="modal-close" id="mobile-drawer-close">&times;</span>
+        <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 1.5rem;">
+          <div class="logo-container" style="margin-bottom: 20px;">
+            <div class="logo-icon">H</div>
+            <div style="font-size: 1.15rem;">Howards 4 <span>Hope</span></div>
+          </div>
+          <a href="#/" class="nav-link" style="font-size: 1.2rem;" data-route="home">Home</a>
+          <a href="#/about" class="nav-link" style="font-size: 1.2rem;" data-route="about">About</a>
+          <a href="#/programs" class="nav-link" style="font-size: 1.2rem;" data-route="programs">Programs & Resources</a>
+          <a href="#/events" class="nav-link" style="font-size: 1.2rem;" data-route="events">Events & Calendar</a>
+          <a href="#/get-involved" class="nav-link" style="font-size: 1.2rem;" data-route="get-involved">Get Involved</a>
+          <a href="#/donate" class="btn btn-donate" style="margin-top: 20px; text-align: center;"><i class="fa-solid fa-heart"></i> Donate Now</a>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding-bottom: 20px;">
+          501(c)(3) Non-Profit | EIN 86-1910919
+        </div>
+      </div>
+    </div>
+
+    <!-- --- MAIN DYNAMIC RUNTIME CONTENT VIEWPORT --- -->
+    <main id="app-content">
+      <!-- Loaded dynamically by app.js -->
+      <div style="display: flex; align-items: center; justify-content: center; height: 60vh;">
+        <div class="stat-num" style="font-size: 1.5rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Hope...</div>
+      </div>
+    </main>
+
+    <!-- --- AUTHENTICATION POPUP DIALOG --- -->
+    <div class="modal" id="auth-modal">
+      <div class="modal-content">
+        <span class="modal-close" id="auth-modal-close">&times;</span>
+        <h3 class="modal-title" id="auth-title">Welcome Back</h3>
+        
+        <!-- Google Oauth Auth Button -->
+        <button class="auth-social-btn" id="google-login-btn">
+          <img src="https://lh3.googleusercontent.com/COxitqgJr1sIC5cmd778ZWtI5chEDD1BR19K13e1J6S50q42g1Cu8wzs3HRgmqn-OIU" alt="Google" style="width: 20px; height: 20px;">
+          Continue with Google
+        </button>
+        
+        <div class="auth-divider">Or use your email</div>
+        
+        <!-- Traditional Auth Forms -->
+        <form id="auth-form">
+          <div class="form-group">
+            <label class="form-label" for="auth-email">Email Address</label>
+            <input type="email" class="form-control" id="auth-email" required placeholder="name@domain.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="auth-password">Password</label>
+            <input type="password" class="form-control" id="auth-password" required placeholder="••••••••">
+          </div>
+          <button class="btn btn-primary" style="width: 100%; height: 48px; margin-top: 10px;" type="submit" id="auth-submit-btn">
+            <i class="fa-solid fa-right-to-bracket"></i> Login
+          </button>
+        </form>
+        
+        <div class="modal-switch" id="auth-toggle">
+          Don't have an account? <span id="auth-toggle-link">Sign Up</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- --- STUNNING 4-COLUMN FOOTER --- -->
+    <footer>
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h4>Howards 4 Hope</h4>
+          <p>Restoring hope and enhancing lives by empowering, supporting, and uplifting youth, caregivers, and single parents in Long Beach.</p>
+          <div class="footer-socials">
+            <a href="#" class="social-circle"><i class="fa-brands fa-facebook-f"></i></a>
+            <a href="#" class="social-circle"><i class="fa-brands fa-instagram"></i></a>
+            <a href="#" class="social-circle"><i class="fa-brands fa-linkedin-in"></i></a>
+            <a href="#" class="social-circle"><i class="fa-brands fa-twitter"></i></a>
+          </div>
+        </div>
+        
+        <div class="footer-col">
+          <h5>Quick Links</h5>
+          <ul class="footer-links">
+            <li><a href="#/">Home</a></li>
+            <li><a href="#/about">Our Philosophy</a></li>
+            <li><a href="#/programs">Programs & Resources</a></li>
+            <li><a href="#/events">Calendar & Events</a></li>
+            <li><a href="#/get-involved">Get Involved</a></li>
+          </ul>
+        </div>
+        
+        <div class="footer-col">
+          <h5>Programs</h5>
+          <ul class="footer-links">
+            <li><a href="#/programs">Youth Empowerment</a></li>
+            <li><a href="#/programs">Caregivers Support</a></li>
+            <li><a href="#/programs">Single Parents navigation</a></li>
+            <li><a href="#/programs">Links of Hope</a></li>
+          </ul>
+        </div>
+        
+        <div class="footer-col">
+          <h5>Contact Us</h5>
+          <div class="footer-contact-info">
+            <p><i class="fa-solid fa-location-dot" style="color: var(--accent); margin-right: 8px;"></i> 3711 Long Beach Blvd, #4055 Long Beach, CA 90807</p>
+            <p><i class="fa-solid fa-envelope" style="color: var(--accent); margin-right: 8px;"></i> <a href="mailto:info@howards4hope.org">info@howards4hope.org</a></p>
+            <p><i class="fa-solid fa-circle-info" style="color: var(--accent); margin-right: 8px;"></i> 501(c)(3) Non-Profit organization</p>
+            <p><i class="fa-solid fa-id-card" style="color: var(--accent); margin-right: 8px;"></i> EIN # 86-1910919</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <p>&copy; 2026 Howards 4 Hope. All rights reserved.</p>
+        <div class="footer-bottom-links">
+          <a href="#/terms">Terms of Use</a>
+          <a href="#/privacy">Privacy Policy</a>
+        </div>
+      </div>
+    </footer>
+    
+  </div>
+
+  <!-- --- FIREBASE SDKS BINDING --- -->
+  <!-- Firebase App (the core Firebase SDK) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <!-- Firebase Auth -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  
+  <!-- --- APPLICATION ENTRY SCRIPT --- -->
+  <script src="app.js"></script>
+</body>
+</html>

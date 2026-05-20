@@ -1,0 +1,24 @@
+# --- MAVEN BUILD TARGETS ---
+backend/target/
+**/target/
+*.class
+
+# --- LOCAL DATABASE persistence ---
+*.db
+howards4hope_db.*
+
+# --- DEVELOPMENT IDE METADATA ---
+.idea/
+.vscode/
+*.iml
+*.log
+
+# --- FIREBASE SYSTEM LOGS ---
+.firebase/
+firebase-debug.log
+ui-debug.log
+
+# --- OPERATING SYSTEM FLUFF ---
+Thumbs.db
+Desktop.ini
+.DS_Store
