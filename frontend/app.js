@@ -239,7 +239,7 @@ function toggleAuthMode(isSignup) {
   } else {
     title.innerText = "Welcome Back";
     submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Login';
-    toggleText.innerHTML = "Don't have an account? <span id="auth-toggle-link">Sign Up</span>";
+    toggleText.innerHTML = "Don't have an account? <span id='auth-toggle-link'>Sign Up</span>";
   }
   // Re-bind click listener to dynamically generated span
   document.getElementById('auth-toggle-link').addEventListener('click', () => {
