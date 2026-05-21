@@ -1,7 +1,9 @@
 package org.howards4hope.config;
 
 import org.howards4hope.model.Event;
+import org.howards4hope.model.BlogPost;
 import org.howards4hope.repository.EventRepository;
+import org.howards4hope.repository.BlogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -11,6 +13,9 @@ public class EventDataSeeder implements CommandLineRunner {
 
     @Autowired
     private EventRepository eventRepository;
+
+    @Autowired
+    private BlogRepository blogRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -62,6 +67,30 @@ public class EventDataSeeder implements CommandLineRunner {
             ));
 
             System.out.println(">>> Event seeding complete. " + eventRepository.count() + " events available.");
+        }
+
+        if (blogRepository.count() == 0) {
+            System.out.println(">>> Seeding database with high-fidelity template blog posts...");
+
+            blogRepository.save(new BlogPost(
+                    "Empowering Our Youth: Key Takeaways from Our Latest Seminar",
+                    "Last week, Howards 4 Hope hosted the inaugural 'Me, Myself & Why' Youth Empowerment Seminar. Over 45 local Long Beach youth attended, engaging in interactive confidence-building exercises, resume building, and leadership roadmaps. The energy was electric, and we are inspired by the resilience and vision of our next generation. Thank you to our mentors and sponsors who made this possible!",
+                    "Founder Sean Ward",
+                    "2026-05-15",
+                    "Youth Milestones",
+                    "https://images.unsplash.com/photo-1544531516-a5e34b27ccb8?auto=format&fit=crop&q=80&w=1000"
+            ));
+
+            blogRepository.save(new BlogPost(
+                    "New Funding Secured to Support Special-Needs Caregivers",
+                    "We are thrilled to announce that Howards 4 Hope has been awarded a generous community grant to expand our Caregivers Respite Support Network. This funding will allow us to double the capacity of our monthly Links of Hope Support Summits, providing emergency emotional relief, respite child care, and mental health workshops for dedicated caregivers. Together, we rise by lifting others.",
+                    "Caregiver Director",
+                    "2026-05-18",
+                    "Caregiver Summits",
+                    "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=1000"
+            ));
+
+            System.out.println(">>> Blog seeding complete. " + blogRepository.count() + " blog posts seeded.");
         }
     }
 }

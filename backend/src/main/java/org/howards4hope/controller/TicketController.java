@@ -26,11 +26,22 @@ public class TicketController {
     @Autowired
     private EventRepository eventRepository;
 
+    @Autowired
+    private org.howards4hope.service.EmailService emailService;
+
     // Request payload structure for booking
     public static class TicketRequest {
         public Long eventId;
         public int quantity;
         public String paymentMethod;
+    }
+
+    public static class GuestTicketRequest {
+        public Long eventId;
+        public int quantity;
+        public String paymentMethod;
+        public String guestEmail;
+        public String guestName;
     }
 
     // --- SECURED TICKETING ENDPOINTS ---
@@ -57,6 +68,7 @@ public class TicketController {
         }
 
         double pricePaid = event.getPrice() * request.quantity;
+        String ticketId = "H4H-MEMBER-" + System.currentTimeMillis();
         
         Ticket ticket = new Ticket(
                 request.eventId,
@@ -71,7 +83,81 @@ public class TicketController {
         );
 
         Ticket savedTicket = ticketRepository.save(ticket);
+
+        // Dispatch Email confirmation
+        emailService.sendTicketConfirmationEmail(
+            userEmail,
+            userEmail.split("@")[0], // Simple fallback for name
+            event.getTitle(),
+            event.getDate(),
+            request.quantity,
+            ticketId,
+            pricePaid
+        );
+
         return ResponseEntity.ok(savedTicket);
+    }
+
+    // --- PUBLIC TICKETING ENDPOINTS FOR GUEST REGISTRATION ---
+
+    @PostMapping("/tickets/book-guest")
+    public ResponseEntity<?> bookTicketGuest(@RequestBody GuestTicketRequest request) {
+        if (request.guestEmail == null || request.guestEmail.isEmpty()) {
+            return ResponseEntity.badRequest().body("Guest email is required.");
+        }
+        if (request.guestName == null || request.guestName.isEmpty()) {
+            return ResponseEntity.badRequest().body("Guest name is required.");
+        }
+
+        Optional<Event> optionalEvent = eventRepository.findById(request.eventId);
+        if (optionalEvent.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Event not found.");
+        }
+
+        Event event = optionalEvent.get();
+
+        if (event.getPrice() > 0 && "FREE".equalsIgnoreCase(request.paymentMethod)) {
+            return ResponseEntity.badRequest().body("This is a paid event. Payment method cannot be FREE.");
+        }
+
+        double pricePaid = event.getPrice() * request.quantity;
+        String ticketId = "H4H-GUEST-" + System.currentTimeMillis();
+
+        Ticket ticket = new Ticket(
+                request.eventId,
+                event.getTitle(),
+                event.getDate(),
+                request.guestEmail,
+                request.quantity,
+                pricePaid,
+                request.paymentMethod,
+                "CONFIRMED",
+                LocalDate.now().toString()
+        );
+
+        Ticket savedTicket = ticketRepository.save(ticket);
+
+        // Dispatch Email confirmation
+        emailService.sendTicketConfirmationEmail(
+            request.guestEmail,
+            request.guestName,
+            event.getTitle(),
+            event.getDate(),
+            request.quantity,
+            ticketId,
+            pricePaid
+        );
+
+        return ResponseEntity.ok(savedTicket);
+    }
+
+    @GetMapping("/tickets/guest-tickets")
+    public ResponseEntity<?> getGuestTickets(@RequestParam String email) {
+        if (email == null || email.isEmpty()) {
+            return ResponseEntity.badRequest().body("Email query parameter is required.");
+        }
+        List<Ticket> tickets = ticketRepository.findByUserEmailIgnoreCase(email);
+        return ResponseEntity.ok(tickets);
     }
 
     @GetMapping("/tickets/my-tickets")
