@@ -68,7 +68,7 @@
     <div class="modal" id="mobile-drawer" style="justify-content: flex-end; padding: 0;">
       <div class="modal-content" style="height: 100%; border-radius: 0; max-width: 320px; display: flex; flex-direction: column; justify-content: space-between;">
         <span class="modal-close" id="mobile-drawer-close">&times;</span>
-        <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 1.5rem;">
+        <div id="mobile-drawer-links" style="margin-top: 40px; display: flex; flex-direction: column; gap: 1.5rem;">
           <div class="logo-container" style="margin-bottom: 20px;">
             <div class="logo-icon">H</div>
             <div style="font-size: 1.15rem;">Howards 4 <span>Hope</span></div>
@@ -103,7 +103,7 @@
         
         <!-- Google Oauth Auth Button -->
         <button class="auth-social-btn" id="google-login-btn">
-          <img src="https://lh3.googleusercontent.com/COxitqgJr1sIC5cmd778ZWtI5chEDD1BR19K13e1J6S50q42g1Cu8wzs3HRgmqn-OIU" alt="Google" style="width: 20px; height: 20px;">
+          <i class="fa-brands fa-google" style="color: #4285F4; margin-right: 8px; font-size: 1.1rem;"></i>
           Continue with Google
         </button>
         
@@ -118,6 +118,10 @@
           <div class="form-group">
             <label class="form-label" for="auth-password">Password</label>
             <input type="password" class="form-control" id="auth-password" required placeholder="••••••••">
+          </div>
+          <div class="form-group" id="auth-confirm-group" style="display: none;">
+            <label class="form-label" for="auth-confirm-password">Confirm Password</label>
+            <input type="password" class="form-control" id="auth-confirm-password" placeholder="••••••••">
           </div>
           <button class="btn btn-primary" style="width: 100%; height: 48px; margin-top: 10px;" type="submit" id="auth-submit-btn">
             <i class="fa-solid fa-right-to-bracket"></i> Login

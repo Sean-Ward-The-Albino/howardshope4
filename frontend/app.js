@@ -23,6 +23,46 @@ let mockAuthState = {
   listeners: []
 };
 
+// Database simulator in localStorage for mock test accounts
+const MOCK_DB = {
+  getUsers() {
+    const data = localStorage.getItem('h4h_mock_users');
+    if (data) return JSON.parse(data);
+    // Seed default accounts
+    const defaults = [
+      { email: 'avlorycorp@gmail.com', password: 'password', isAdmin: true },
+      { email: 'admin@howards4hope.org', password: 'password', isAdmin: true },
+      { email: 'user@howards4hope.org', password: 'password', isAdmin: false }
+    ];
+    localStorage.setItem('h4h_mock_users', JSON.stringify(defaults));
+    return defaults;
+  },
+  saveUser(email, password) {
+    const users = this.getUsers();
+    const cleanEmail = email.trim().toLowerCase();
+    if (users.some(u => u.email === cleanEmail)) return false;
+    users.push({
+      email: cleanEmail,
+      password,
+      isAdmin: cleanEmail.includes('admin') || cleanEmail === 'avlorycorp@gmail.com'
+    });
+    localStorage.setItem('h4h_mock_users', JSON.stringify(users));
+    return true;
+  },
+  validateUser(email, password) {
+    const users = this.getUsers();
+    const cleanEmail = email.trim().toLowerCase();
+    const found = users.find(u => u.email === cleanEmail);
+    if (!found) {
+      throw new Error("auth/user-not-found: There is no user record corresponding to this identifier. The user may have been deleted.");
+    }
+    if (found.password !== password) {
+      throw new Error("auth/wrong-password: The password is invalid or the user does not have a password.");
+    }
+    return found;
+  }
+};
+
 // Add standard provider definitions to firebase.auth namespace so they don't throw errors
 if (typeof firebase !== 'undefined') {
   if (!firebase.auth) {
@@ -41,7 +81,6 @@ firebase.auth = function() {
     return {
       onAuthStateChanged(callback) {
         mockAuthState.listeners.push(callback);
-        // Call immediately with current mock user
         setTimeout(() => callback(mockAuthState.user), 10);
         return () => {
           mockAuthState.listeners = mockAuthState.listeners.filter(l => l !== callback);
@@ -51,8 +90,12 @@ firebase.auth = function() {
         return mockAuthState.user;
       },
       async createUserWithEmailAndPassword(email, password) {
+        const success = MOCK_DB.saveUser(email, password);
+        if (!success) {
+          throw new Error("auth/email-already-in-use: The email address is already in use by another account.");
+        }
         const user = {
-          email,
+          email: email.trim().toLowerCase(),
           uid: "mock-uid-" + Date.now(),
           async getIdToken() {
             return "mock-jwt-token";
@@ -63,8 +106,9 @@ firebase.auth = function() {
         return { user };
       },
       async signInWithEmailAndPassword(email, password) {
+        const found = MOCK_DB.validateUser(email, password);
         const user = {
-          email,
+          email: found.email,
           uid: "mock-uid-" + Date.now(),
           async getIdToken() {
             return "mock-jwt-token";
@@ -75,7 +119,6 @@ firebase.auth = function() {
         return { user };
       },
       async signInWithPopup(provider) {
-        // Log in as admin by default to allow testing the dashboard
         const user = {
           email: "avlorycorp@gmail.com",
           uid: "mock-uid-google",
@@ -111,8 +154,9 @@ firebase.auth = function() {
         return await originalSignIn.call(authInstance, email, password);
       } catch (err) {
         console.warn("Live Firebase Auth failed, falling back to mock authentication", err);
+        const found = MOCK_DB.validateUser(email, password);
         const user = {
-          email,
+          email: found.email,
           uid: "mock-uid-" + Date.now(),
           async getIdToken() { return "mock-jwt-token"; }
         };
@@ -128,8 +172,12 @@ firebase.auth = function() {
         return await originalCreate.call(authInstance, email, password);
       } catch (err) {
         console.warn("Live Firebase Auth failed, falling back to mock registration", err);
+        const success = MOCK_DB.saveUser(email, password);
+        if (!success) {
+          throw new Error("auth/email-already-in-use: The email address is already in use by another account.");
+        }
         const user = {
-          email,
+          email: email.trim().toLowerCase(),
           uid: "mock-uid-" + Date.now(),
           async getIdToken() { return "mock-jwt-token"; }
         };
@@ -198,8 +246,12 @@ firebase.auth = function() {
         return mockAuthState.user;
       },
       async createUserWithEmailAndPassword(email, password) {
+        const success = MOCK_DB.saveUser(email, password);
+        if (!success) {
+          throw new Error("auth/email-already-in-use: The email address is already in use by another account.");
+        }
         const user = {
-          email,
+          email: email.trim().toLowerCase(),
           uid: "mock-uid-" + Date.now(),
           async getIdToken() { return "mock-jwt-token"; }
         };
@@ -208,8 +260,9 @@ firebase.auth = function() {
         return { user };
       },
       async signInWithEmailAndPassword(email, password) {
+        const found = MOCK_DB.validateUser(email, password);
         const user = {
-          email,
+          email: found.email,
           uid: "mock-uid-" + Date.now(),
           async getIdToken() { return "mock-jwt-token"; }
         };
@@ -234,6 +287,15 @@ firebase.auth = function() {
     };
   }
 };
+
+// Copy all static properties (such as GoogleAuthProvider) from originalAuth to the new firebase.auth function
+if (originalAuth) {
+  for (const prop in originalAuth) {
+    if (Object.prototype.hasOwnProperty.call(originalAuth, prop)) {
+      firebase.auth[prop] = originalAuth[prop];
+    }
+  }
+}
 
 // Global App State
 const state = {
@@ -527,6 +589,50 @@ firebase.auth().onAuthStateChanged(user => {
       dashboardLink.style.display = 'none';
     }
     
+    // Render highly visible Admin Panel Link in navbar links
+    let adminNavLink = document.getElementById('navbar-admin-link-li');
+    if (state.isAdmin) {
+      if (!adminNavLink) {
+        const navLinksUl = document.getElementById('navbar-links');
+        if (navLinksUl) {
+          adminNavLink = document.createElement('li');
+          adminNavLink.id = 'navbar-admin-link-li';
+          adminNavLink.innerHTML = `<a href="#/dashboard" class="nav-link" data-route="dashboard" style="color: var(--secondary); font-weight: 700;"><i class="fa-solid fa-gauge-high"></i> Admin Panel</a>`;
+          navLinksUl.appendChild(adminNavLink);
+        }
+      }
+    } else {
+      if (adminNavLink) adminNavLink.remove();
+    }
+
+    // Render highly visible Admin Panel Link in mobile drawer links
+    let mobileAdminNavLink = document.getElementById('mobile-admin-link-li');
+    if (state.isAdmin) {
+      if (!mobileAdminNavLink) {
+        const mobileLinksDiv = document.getElementById('mobile-drawer-links');
+        if (mobileLinksDiv) {
+          mobileAdminNavLink = document.createElement('a');
+          mobileAdminNavLink.id = 'mobile-admin-link-li';
+          mobileAdminNavLink.href = '#/dashboard';
+          mobileAdminNavLink.className = 'nav-link';
+          mobileAdminNavLink.style.fontSize = '1.2rem';
+          mobileAdminNavLink.style.color = 'var(--secondary)';
+          mobileAdminNavLink.style.fontWeight = '700';
+          mobileAdminNavLink.setAttribute('data-route', 'dashboard');
+          mobileAdminNavLink.innerHTML = `<i class="fa-solid fa-gauge-high"></i> Admin Panel`;
+          // Insert it right before the Donate Now button if present
+          const donateBtn = mobileLinksDiv.querySelector('.btn-donate');
+          if (donateBtn) {
+            mobileLinksDiv.insertBefore(mobileAdminNavLink, donateBtn);
+          } else {
+            mobileLinksDiv.appendChild(mobileAdminNavLink);
+          }
+        }
+      }
+    } else {
+      if (mobileAdminNavLink) mobileAdminNavLink.remove();
+    }
+    
     // Toggle dropdown UI binding
     const trigger = document.createElement('div');
     trigger.id = 'user-avatar-trigger';
@@ -552,6 +658,12 @@ firebase.auth().onAuthStateChanged(user => {
     const oldTrigger = document.getElementById('user-avatar-trigger');
     if (oldTrigger) oldTrigger.remove();
     document.getElementById('user-dropdown-menu').classList.remove('active');
+
+    // Remove admin navigation links if present
+    const adminNavLink = document.getElementById('navbar-admin-link-li');
+    if (adminNavLink) adminNavLink.remove();
+    const mobileAdminNavLink = document.getElementById('mobile-admin-link-li');
+    if (mobileAdminNavLink) mobileAdminNavLink.remove();
   }
   
   // Refresh page shell context
@@ -598,15 +710,24 @@ function toggleAuthMode(isSignup) {
   const submitBtn = document.getElementById('auth-submit-btn');
   const title = document.getElementById('auth-title');
   const toggleText = document.getElementById('auth-toggle');
+  const confirmGroup = document.getElementById('auth-confirm-group');
+  const confirmInput = document.getElementById('auth-confirm-password');
   
   if (isSignup) {
     title.innerText = "Create Account";
     submitBtn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Sign Up';
     toggleText.innerHTML = 'Already have an account? <span id="auth-toggle-link">Login</span>';
+    if (confirmGroup) confirmGroup.style.display = 'block';
+    if (confirmInput) confirmInput.setAttribute('required', 'true');
   } else {
     title.innerText = "Welcome Back";
     submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Login';
     toggleText.innerHTML = "Don't have an account? <span id='auth-toggle-link'>Sign Up</span>";
+    if (confirmGroup) confirmGroup.style.display = 'none';
+    if (confirmInput) {
+      confirmInput.removeAttribute('required');
+      confirmInput.value = '';
+    }
   }
   // Re-bind click listener to dynamically generated span
   document.getElementById('auth-toggle-link').addEventListener('click', () => {
@@ -624,6 +745,11 @@ if (authForm) {
     
     try {
       if (isSignupMode) {
+        const confirmPassword = document.getElementById('auth-confirm-password').value;
+        if (password !== confirmPassword) {
+          alert("Passwords do not match! Please verify your password confirmation.");
+          return;
+        }
         await firebase.auth().createUserWithEmailAndPassword(email, password);
         alert("Account created successfully!");
       } else {
