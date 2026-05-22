@@ -45,7 +45,13 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             } else {
                 // MOCK AUTHENTICATION FALLBACK (For rapid local developer testing without service-account.json!)
                 // Decodes standard mock token formats
-                if (token.startsWith("mock-admin")) {
+                if (token.startsWith("mock-admin:")) {
+                    email = token.substring("mock-admin:".length());
+                    isAdmin = true;
+                } else if (token.startsWith("mock-user:")) {
+                    email = token.substring("mock-user:".length());
+                    isAdmin = false;
+                } else if (token.startsWith("mock-admin")) {
                     email = "admin@howards4hope.org";
                     isAdmin = true;
                 } else if (token.startsWith("mock-user")) {
