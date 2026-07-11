@@ -1,315 +1,20 @@
 /* --- APPLICATION STATE & ROUTING ENGINE --- */
 
-// Fallback configuration if Firebase credentials are not yet initialized on staging
+// Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyFakeKeyForLocalDevelopmentOnly",
+  apiKey: "AIzaSyC3-DGil68vpD99I2CQMGVZSeRJ8PN8yLk",
   authDomain: "howards4hope-b06f6.firebaseapp.com",
   projectId: "howards4hope-b06f6",
-  storageBucket: "howards4hope-b06f6.appspot.com",
+  storageBucket: "howards4hope-b06f6.firebasestorage.app",
   messagingSenderId: "1055785276298",
-  appId: "1:1055785276298:web:fakeappid"
+  appId: "1:1055785276298:web:2bd4ff6900196413ccae73",
+  measurementId: "G-2GTV0TFP3V"
 };
 
 // Initialize Firebase
-try {
-  firebase.initializeApp(firebaseConfig);
-} catch (e) {
-  console.log("Firebase already initialized or running locally.");
-}
+firebase.initializeApp(firebaseConfig);
 
-// Initialize Mock Firebase Auth wrapper if fake key is used or live initialize fails
-let mockAuthState = {
-  user: null,
-  listeners: []
-};
-
-// Database simulator in localStorage for mock test accounts
-const MOCK_DB = {
-  getUsers() {
-    const data = localStorage.getItem('h4h_mock_users');
-    if (data) return JSON.parse(data);
-    // Seed default accounts
-    const defaults = [
-      { email: 'avlorycorp@gmail.com', password: 'password', isAdmin: true },
-      { email: 'admin@howards4hope.org', password: 'password', isAdmin: true },
-      { email: 'user@howards4hope.org', password: 'password', isAdmin: false }
-    ];
-    localStorage.setItem('h4h_mock_users', JSON.stringify(defaults));
-    return defaults;
-  },
-  saveUser(email, password) {
-    const users = this.getUsers();
-    const cleanEmail = email.trim().toLowerCase();
-    if (users.some(u => u.email === cleanEmail)) return false;
-    users.push({
-      email: cleanEmail,
-      password,
-      isAdmin: cleanEmail.includes('admin') || cleanEmail === 'avlorycorp@gmail.com'
-    });
-    localStorage.setItem('h4h_mock_users', JSON.stringify(users));
-    return true;
-  },
-  validateUser(email, password) {
-    const users = this.getUsers();
-    const cleanEmail = email.trim().toLowerCase();
-    const found = users.find(u => u.email === cleanEmail);
-    if (!found) {
-      throw new Error("auth/user-not-found: There is no user record corresponding to this identifier. The user may have been deleted.");
-    }
-    if (found.password !== password) {
-      throw new Error("auth/wrong-password: The password is invalid or the user does not have a password.");
-    }
-    return found;
-  }
-};
-
-// Add standard provider definitions to firebase.auth namespace so they don't throw errors
-if (typeof firebase !== 'undefined') {
-  if (!firebase.auth) {
-    firebase.auth = function() {};
-  }
-  if (!firebase.auth.GoogleAuthProvider) {
-    firebase.auth.GoogleAuthProvider = function() {};
-  }
-}
-
-const originalAuth = firebase.auth;
-
-firebase.auth = function() {
-  // If we want to use the live Firebase auth, but it is a fake key, we use mock auth.
-  if (firebaseConfig.apiKey.includes("FakeKey") || !originalAuth) {
-    return {
-      onAuthStateChanged(callback) {
-        mockAuthState.listeners.push(callback);
-        setTimeout(() => callback(mockAuthState.user), 10);
-        return () => {
-          mockAuthState.listeners = mockAuthState.listeners.filter(l => l !== callback);
-        };
-      },
-      get currentUser() {
-        return mockAuthState.user;
-      },
-      async createUserWithEmailAndPassword(email, password) {
-        const success = MOCK_DB.saveUser(email, password);
-        if (!success) {
-          throw new Error("auth/email-already-in-use: The email address is already in use by another account.");
-        }
-        const user = {
-          email: email.trim().toLowerCase(),
-          uid: "mock-uid-" + Date.now(),
-          async getIdToken() {
-            const clean = email.trim().toLowerCase();
-            const isAdmin = clean.includes('admin') || clean === 'avlorycorp@gmail.com';
-            return isAdmin ? `mock-admin:${clean}` : `mock-user:${clean}`;
-          }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      },
-      async signInWithEmailAndPassword(email, password) {
-        const found = MOCK_DB.validateUser(email, password);
-        const user = {
-          email: found.email,
-          uid: "mock-uid-" + Date.now(),
-          async getIdToken() {
-            const clean = found.email.trim().toLowerCase();
-            const isAdmin = clean.includes('admin') || clean === 'avlorycorp@gmail.com';
-            return isAdmin ? `mock-admin:${clean}` : `mock-user:${clean}`;
-          }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      },
-      async signInWithPopup(provider) {
-        const user = {
-          email: "avlorycorp@gmail.com",
-          uid: "mock-uid-google",
-          async getIdToken() {
-            return "mock-admin:avlorycorp@gmail.com";
-          }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      },
-      async signOut() {
-        mockAuthState.user = null;
-        mockAuthState.listeners.forEach(l => l(null));
-      }
-    };
-  }
-  
-  // Otherwise, return original auth but wrapped to fallback on failure
-  try {
-    const authInstance = originalAuth();
-    const wrapped = {};
-    for (const key in authInstance) {
-      if (typeof authInstance[key] === 'function') {
-        wrapped[key] = authInstance[key].bind(authInstance);
-      }
-    }
-    
-    // Intercept auth methods
-    const originalSignIn = authInstance.signInWithEmailAndPassword;
-    wrapped.signInWithEmailAndPassword = async function(email, password) {
-      try {
-        return await originalSignIn.call(authInstance, email, password);
-      } catch (err) {
-        console.warn("Live Firebase Auth failed, falling back to mock authentication", err);
-        const found = MOCK_DB.validateUser(email, password);
-        const user = {
-          email: found.email,
-          uid: "mock-uid-" + Date.now(),
-          async getIdToken() {
-            const clean = found.email.trim().toLowerCase();
-            const isAdmin = clean.includes('admin') || clean === 'avlorycorp@gmail.com';
-            return isAdmin ? `mock-admin:${clean}` : `mock-user:${clean}`;
-          }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      }
-    };
-    
-    const originalCreate = authInstance.createUserWithEmailAndPassword;
-    wrapped.createUserWithEmailAndPassword = async function(email, password) {
-      try {
-        return await originalCreate.call(authInstance, email, password);
-      } catch (err) {
-        console.warn("Live Firebase Auth failed, falling back to mock registration", err);
-        const success = MOCK_DB.saveUser(email, password);
-        if (!success) {
-          throw new Error("auth/email-already-in-use: The email address is already in use by another account.");
-        }
-        const user = {
-          email: email.trim().toLowerCase(),
-          uid: "mock-uid-" + Date.now(),
-          async getIdToken() {
-            const clean = email.trim().toLowerCase();
-            const isAdmin = clean.includes('admin') || clean === 'avlorycorp@gmail.com';
-            return isAdmin ? `mock-admin:${clean}` : `mock-user:${clean}`;
-          }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      }
-    };
-
-    const originalPopup = authInstance.signInWithPopup;
-    wrapped.signInWithPopup = async function(provider) {
-      try {
-        return await originalPopup.call(authInstance, provider);
-      } catch (err) {
-        console.warn("Live Google Auth failed, falling back to mock Google Sign-In", err);
-        const user = {
-          email: "avlorycorp@gmail.com",
-          uid: "mock-uid-google",
-          async getIdToken() { return "mock-admin:avlorycorp@gmail.com"; }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      }
-    };
-
-    const originalSignOut = authInstance.signOut;
-    wrapped.signOut = async function() {
-      if (mockAuthState.user) {
-        mockAuthState.user = null;
-        mockAuthState.listeners.forEach(l => l(null));
-      }
-      try {
-        await originalSignOut.call(authInstance);
-      } catch(e) {}
-    };
-
-    const originalOnState = authInstance.onAuthStateChanged;
-    wrapped.onAuthStateChanged = function(callback) {
-      mockAuthState.listeners.push(callback);
-      originalOnState.call(authInstance, (user) => {
-        if (user) {
-          mockAuthState.user = user;
-          callback(user);
-        } else if (!mockAuthState.user) {
-          callback(null);
-        }
-      });
-      return () => {
-        mockAuthState.listeners = mockAuthState.listeners.filter(l => l !== callback);
-      };
-    };
-
-    return wrapped;
-  } catch (e) {
-    console.error("Firebase auth initialization failed, fallback to mock mode", e);
-    return {
-      onAuthStateChanged(callback) {
-        mockAuthState.listeners.push(callback);
-        setTimeout(() => callback(mockAuthState.user), 10);
-        return () => {
-          mockAuthState.listeners = mockAuthState.listeners.filter(l => l !== callback);
-        };
-      },
-      get currentUser() {
-        return mockAuthState.user;
-      },
-      async createUserWithEmailAndPassword(email, password) {
-        const success = MOCK_DB.saveUser(email, password);
-        if (!success) {
-          throw new Error("auth/email-already-in-use: The email address is already in use by another account.");
-        }
-        const user = {
-          email: email.trim().toLowerCase(),
-          uid: "mock-uid-" + Date.now(),
-          async getIdToken() { return "mock-jwt-token"; }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      },
-      async signInWithEmailAndPassword(email, password) {
-        const found = MOCK_DB.validateUser(email, password);
-        const user = {
-          email: found.email,
-          uid: "mock-uid-" + Date.now(),
-          async getIdToken() { return "mock-jwt-token"; }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      },
-      async signInWithPopup(provider) {
-        const user = {
-          email: "avlorycorp@gmail.com",
-          uid: "mock-uid-google",
-          async getIdToken() { return "mock-jwt-token"; }
-        };
-        mockAuthState.user = user;
-        mockAuthState.listeners.forEach(l => l(user));
-        return { user };
-      },
-      async signOut() {
-        mockAuthState.user = null;
-        mockAuthState.listeners.forEach(l => l(null));
-      }
-    };
-  }
-};
-
-// Copy all static properties (such as GoogleAuthProvider) from originalAuth to the new firebase.auth function
-if (originalAuth) {
-  for (const prop in originalAuth) {
-    if (Object.prototype.hasOwnProperty.call(originalAuth, prop)) {
-      firebase.auth[prop] = originalAuth[prop];
-    }
-  }
-}
-
-// Global App State
+// Global App State, this is currently test data
 const state = {
   user: null,
   isAdmin: false,
@@ -583,14 +288,20 @@ const API = {
 };
 
 /* --- FIREBASE AUTHENTICATION LISTENERS --- */
-firebase.auth().onAuthStateChanged(user => {
+firebase.auth().onAuthStateChanged(async (user) => {
   const userMenu = document.getElementById('user-menu-container');
   const loginBtn = document.getElementById('login-trigger-btn');
   
   if (user) {
     state.user = user;
-    // Check if user is admin (using simple custom email rule for high-fidelity showcase, or custom claims)
-    state.isAdmin = user.email.includes('admin') || user.email === 'avlorycorp@gmail.com';
+    // Check admin status via Firebase Custom Claims (secure RBAC)
+    try {
+      const tokenResult = await user.getIdTokenResult();
+      state.isAdmin = tokenResult.claims.admin === true;
+    } catch (e) {
+      console.error('Failed to check admin claims:', e);
+      state.isAdmin = false;
+    }
     
     document.getElementById('user-display-email').innerText = user.email;
     
@@ -766,6 +477,11 @@ if (authForm) {
         const confirmPassword = document.getElementById('auth-confirm-password').value;
         if (password !== confirmPassword) {
           alert("Passwords do not match! Please verify your password confirmation.");
+          return;
+        }
+        // Password strength validation (NIST SP 800-63B minimum requirement)
+        if (password.length < 8) {
+          alert("Password must be at least 8 characters long.");
           return;
         }
         await firebase.auth().createUserWithEmailAndPassword(email, password);

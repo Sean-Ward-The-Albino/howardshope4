@@ -18,6 +18,12 @@ howards4hope_db.*
 firebase-debug.log
 ui-debug.log
 
+# --- FIREBASE SERVICE ACCOUNT CREDENTIALS (NEVER COMMIT) ---
+**/firebase-service-account.json
+
+# --- NODE DEPENDENCIES ---
+**/node_modules/
+
 # --- OPERATING SYSTEM FLUFF ---
 Thumbs.db
 Desktop.ini

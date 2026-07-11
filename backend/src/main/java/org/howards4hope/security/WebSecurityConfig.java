@@ -37,8 +37,14 @@ public class WebSecurityConfig {
             // 2. Disable CSRF for stateless REST APIs using Bearer JWTs
             .csrf(csrf -> csrf.disable())
             
-            // 3. Keep H2 Console working with frames
-            .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+            // 3. Security headers (H2 Console frame compatibility + HSTS for production)
+            .headers(headers -> headers
+                .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
+                .httpStrictTransportSecurity(hsts -> hsts
+                    .includeSubDomains(true)
+                    .maxAgeInSeconds(31536000)
+                )
+            )
             
             // 4. Session policy: completely stateless
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

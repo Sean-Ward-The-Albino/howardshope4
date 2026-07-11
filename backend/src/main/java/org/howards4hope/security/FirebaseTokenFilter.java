@@ -36,29 +36,22 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             String email = null;
             boolean isAdmin = false;
 
-            // If Firebase was initialized successfully, verify the real JWT token
-            if (!FirebaseApp.getApps().isEmpty()) {
-                FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(token);
-                email = decodedToken.getEmail();
-                // Simple email rule or custom claim check for administrative roles
-                isAdmin = email != null && (email.contains("admin") || email.equals("avlorycorp@gmail.com"));
-            } else {
-                // MOCK AUTHENTICATION FALLBACK (For rapid local developer testing without service-account.json!)
-                // Decodes standard mock token formats
-                if (token.startsWith("mock-admin:")) {
-                    email = token.substring("mock-admin:".length());
-                    isAdmin = true;
-                } else if (token.startsWith("mock-user:")) {
-                    email = token.substring("mock-user:".length());
-                    isAdmin = false;
-                } else if (token.startsWith("mock-admin")) {
-                    email = "admin@howards4hope.org";
-                    isAdmin = true;
-                } else if (token.startsWith("mock-user")) {
-                    email = "user@gmail.com";
-                    isAdmin = false;
-                }
+            // Verify Firebase Admin SDK is initialized
+            if (FirebaseApp.getApps().isEmpty()) {
+                logger.error("Firebase Admin SDK not initialized — cannot verify JWT token. "
+                        + "Ensure firebase-service-account.json is on the classpath.");
+                filterChain.doFilter(request, response);
+                return;
             }
+
+            // Verify the real Firebase JWT token (RS256 signature verification)
+            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(token);
+            email = decodedToken.getEmail();
+
+            // Use Firebase Custom Claims for secure role-based access control
+            // Admin claims are set via the set-admin.js script using Firebase Admin SDK
+            Object adminClaim = decodedToken.getClaims().get("admin");
+            isAdmin = Boolean.TRUE.equals(adminClaim);
 
             if (email != null) {
                 List<SimpleGrantedAuthority> authorities = new ArrayList<>();
