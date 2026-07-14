@@ -397,6 +397,10 @@ firebase.auth().onAuthStateChanged(async (user) => {
   
   // Refresh page shell context
   router();
+  
+  // Fade out loader after auth state resolves
+  const authLoader = document.getElementById('auth-loader');
+  if (authLoader) authLoader.classList.remove('active');
 });
 
 // Close dropdown on click outside
@@ -471,6 +475,7 @@ if (authForm) {
     e.preventDefault();
     const email = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
+    const authLoader = document.getElementById('auth-loader');
     
     try {
       if (isSignupMode) {
@@ -484,13 +489,16 @@ if (authForm) {
           alert("Password must be at least 8 characters long.");
           return;
         }
+        if (authLoader) authLoader.classList.add('active');
         await firebase.auth().createUserWithEmailAndPassword(email, password);
         alert("Account created successfully!");
       } else {
+        if (authLoader) authLoader.classList.add('active');
         await firebase.auth().signInWithEmailAndPassword(email, password);
       }
       authModal.classList.remove('active');
     } catch (err) {
+      if (authLoader) authLoader.classList.remove('active');
       alert(err.message);
     }
   });
@@ -501,10 +509,14 @@ const googleBtn = document.getElementById('google-login-btn');
 if (googleBtn) {
   googleBtn.addEventListener('click', async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
+    const authLoader = document.getElementById('auth-loader');
+    
     try {
+      if (authLoader) authLoader.classList.add('active');
       await firebase.auth().signInWithPopup(provider);
       authModal.classList.remove('active');
     } catch (err) {
+      if (authLoader) authLoader.classList.remove('active');
       alert(err.message);
     }
   });
@@ -514,6 +526,9 @@ if (googleBtn) {
 const logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
   logoutBtn.addEventListener('click', async () => {
+    const authLoader = document.getElementById('auth-loader');
+    if (authLoader) authLoader.classList.add('active');
+    
     await firebase.auth().signOut();
     window.location.hash = '#/';
   });

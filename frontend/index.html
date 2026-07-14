@@ -21,38 +21,45 @@
         <div class="logo-text">Howards 4 <span>Hope</span></div>
       </a>
       
-      <!-- Consolidated 5-Link Navigation -->
+      <!-- Consolidated 4-Link Navigation with Dropdown -->
       <nav>
         <ul class="nav-links" id="navbar-links">
           <li><a href="#/" class="nav-link active" data-route="home">Home</a></li>
           <li><a href="#/about" class="nav-link" data-route="about">About</a></li>
-          <li><a href="#/programs" class="nav-link" data-route="programs">Programs & Resources</a></li>
-          <li><a href="#/events" class="nav-link" data-route="events">Events & Calendar</a></li>
-          <li><a href="#/blog" class="nav-link" data-route="blog">News & Blog</a></li>
-          <li><a href="#/get-involved" class="nav-link" data-route="get-involved">Get Involved</a></li>
+          <li><a href="#/programs" class="nav-link" data-route="programs">Programs</a></li>
+          <li class="nav-item-dropdown">
+            <a class="nav-link">More <i class="fa-solid fa-chevron-down" style="font-size: 0.8em; margin-left: 4px;"></i></a>
+            <div class="nav-dropdown-content">
+              <a href="#/events" class="nav-dropdown-link" data-route="events"><i class="fa-regular fa-calendar" style="margin-right: 8px;"></i> Events</a>
+              <a href="#/blog" class="nav-dropdown-link" data-route="blog"><i class="fa-solid fa-newspaper" style="margin-right: 8px;"></i> News</a>
+              <a href="#/get-involved" class="nav-dropdown-link" data-route="get-involved"><i class="fa-solid fa-handshake-angle" style="margin-right: 8px;"></i> Get Involved</a>
+            </div>
+          </li>
         </ul>
       </nav>
       
-      <!-- Primary Actions -->
+      <!-- Primary Actions Grouping -->
       <div class="nav-actions">
-        <a href="#/donate" class="btn btn-donate"><i class="fa-solid fa-heart"></i> Donate</a>
-        
-        <!-- User Menu (Toggled dynamically by Auth state) -->
-        <div class="user-menu" id="user-menu-container">
-          <button class="btn btn-primary" id="login-trigger-btn"><i class="fa-solid fa-user-lock"></i> Login</button>
+        <div class="nav-group-actions">
+          <a href="#/donate" class="btn btn-donate"><i class="fa-solid fa-heart"></i> Donate</a>
           
-          <div class="user-dropdown" id="user-dropdown-menu">
-            <div style="padding: 10px 16px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted);" id="user-display-email">user@email.com</div>
-            <div class="dropdown-divider"></div>
-            <a href="#/dashboard" class="dropdown-item" id="dashboard-link">
-              <i class="fa-solid fa-gauge"></i> My Dashboard
-            </a>
-            <a href="#/my-tickets" class="dropdown-item" id="my-tickets-link">
-              <i class="fa-solid fa-ticket"></i> My Tickets
-            </a>
-            <div class="dropdown-divider"></div>
-            <div class="dropdown-item" id="logout-btn" style="color: var(--danger);">
-              <i class="fa-solid fa-right-from-bracket"></i> Logout
+          <!-- User Menu -->
+          <div class="user-menu" id="user-menu-container">
+            <button class="btn btn-primary" id="login-trigger-btn" style="border-radius: 100px;"><i class="fa-solid fa-user-lock"></i> Login</button>
+            
+            <div class="user-dropdown" id="user-dropdown-menu">
+              <div style="padding: 10px 16px; font-weight: 600; font-size: 0.85rem; color: var(--text-muted);" id="user-display-email">user@email.com</div>
+              <div class="dropdown-divider"></div>
+              <a href="#/dashboard" class="dropdown-item" id="dashboard-link">
+                <i class="fa-solid fa-gauge"></i> My Dashboard
+              </a>
+              <a href="#/my-tickets" class="dropdown-item" id="my-tickets-link">
+                <i class="fa-solid fa-ticket"></i> My Tickets
+              </a>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-item" id="logout-btn" style="color: var(--danger);">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+              </div>
             </div>
           </div>
         </div>
@@ -63,6 +70,12 @@
         </button>
       </div>
     </header>
+    
+    <!-- --- GLOBAL AUTH LOADER --- -->
+    <div id="auth-loader">
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Authenticating...</div>
+    </div>
     
     <!-- --- MOBILE ROUTING DRAWER --- -->
     <div class="modal" id="mobile-drawer" style="justify-content: flex-end; padding: 0;">
