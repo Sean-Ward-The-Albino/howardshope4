@@ -149,6 +149,8 @@ main {
   font-family: 'Outfit', sans-serif;
   font-size: 1.35rem;
   color: var(--primary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .logo-icon {
@@ -1201,13 +1203,35 @@ footer {
   }
 }
 
+@media (max-width: 1050px) {
+  .nav-links {
+    display: none !important;
+  }
+  #mobile-menu-toggle {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 900px) {
+  #user-menu-container {
+    display: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   .navbar {
     padding: 0 6%;
+    justify-content: center;
+    /* Removed position: relative to maintain fixed header behavior and fix the white gap */
   }
   
-  .nav-links {
-    display: none; /* Will be toggled by mobile drawer icon */
+  .nav-actions {
+    position: absolute;
+    right: 6%;
+  }
+
+  .nav-group-actions {
+    display: none !important;
   }
   
   .hero-title {

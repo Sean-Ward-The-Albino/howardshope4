@@ -540,7 +540,6 @@ const mobileDrawer = document.getElementById('mobile-drawer');
 const mobileClose = document.getElementById('mobile-drawer-close');
 
 if (mobileMenuBtn) {
-  mobileMenuBtn.style.display = 'block';
   mobileMenuBtn.addEventListener('click', () => {
     mobileDrawer.classList.add('active');
   });
