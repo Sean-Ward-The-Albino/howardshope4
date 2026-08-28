@@ -59,6 +59,8 @@ public class WebSecurityConfig {
                 .requestMatchers("/api/tickets/book-guest").permitAll()
                 .requestMatchers("/api/tickets/guest-tickets").permitAll()
                 .requestMatchers("/api/blog/**").permitAll()
+                .requestMatchers("/api/analytics/track").permitAll()
+                .requestMatchers("/api/newsletter/subscribe").permitAll()
                 
                 // Secure Admin routes
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

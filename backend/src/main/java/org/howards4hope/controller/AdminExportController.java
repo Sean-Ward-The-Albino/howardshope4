@@ -4,7 +4,7 @@ import org.howards4hope.model.Event;
 import org.howards4hope.model.Ticket;
 import org.howards4hope.repository.EventRepository;
 import org.howards4hope.repository.TicketRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,11 +19,13 @@ import java.util.Optional;
 @CrossOrigin(origins = "*", allowedHeaders = "*")
 public class AdminExportController {
 
-    @Autowired
-    private TicketRepository ticketRepository;
+    private final TicketRepository ticketRepository;
+    private final EventRepository eventRepository;
 
-    @Autowired
-    private EventRepository eventRepository;
+    public AdminExportController(TicketRepository ticketRepository, EventRepository eventRepository) {
+        this.ticketRepository = ticketRepository;
+        this.eventRepository = eventRepository;
+    }
 
     @GetMapping("/tickets/export/{eventId}")
     public ResponseEntity<byte[]> exportAttendeesToCSV(@PathVariable Long eventId) {

@@ -13,6 +13,10 @@ public class Ticket {
     @Column(nullable = false)
     private Long eventId;
 
+    @Column(unique = true)
+    private String ticketId;
+
+    private String guestName;
     private String eventTitle;
     private String eventDate;
 
@@ -25,8 +29,20 @@ public class Ticket {
     private String status; // CONFIRMED, CANCELLED
     private String purchaseDate;
 
+    // Secure Verification Token (prevents guest ticket enumeration)
+    private String confirmationToken;
+
+    // Installment Plan & Payment Splitting tracking
+    private String paymentPlanType = "FULL"; // "FULL" or "INSTALLMENT"
+    private int installmentCycles = 1;
+    private int installmentsPaid = 1;
+    private double remainingBalance = 0.0;
+
     // Default constructor
-    public Ticket() {}
+    public Ticket() {
+        this.ticketId = "H4H-TKT-" + System.currentTimeMillis() + "-" + (int)(Math.random() * 900 + 100);
+        this.confirmationToken = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
 
     // Convenience constructor
     public Ticket(Long eventId, String eventTitle, String eventDate, String userEmail, int quantity, double pricePaid, String paymentMethod, String status, String purchaseDate) {
@@ -39,6 +55,24 @@ public class Ticket {
         this.paymentMethod = paymentMethod;
         this.status = status;
         this.purchaseDate = purchaseDate;
+        this.confirmationToken = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    public Ticket(Long eventId, String eventTitle, String eventDate, String userEmail, int quantity, double pricePaid, String paymentMethod, String status, String purchaseDate, String paymentPlanType, int installmentCycles, int installmentsPaid, double remainingBalance) {
+        this.eventId = eventId;
+        this.eventTitle = eventTitle;
+        this.eventDate = eventDate;
+        this.userEmail = userEmail;
+        this.quantity = quantity;
+        this.pricePaid = pricePaid;
+        this.paymentMethod = paymentMethod;
+        this.status = status;
+        this.purchaseDate = purchaseDate;
+        this.paymentPlanType = paymentPlanType;
+        this.installmentCycles = installmentCycles;
+        this.installmentsPaid = installmentsPaid;
+        this.remainingBalance = remainingBalance;
+        this.confirmationToken = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     // Getters and Setters
@@ -56,6 +90,22 @@ public class Ticket {
 
     public void setEventId(Long eventId) {
         this.eventId = eventId;
+    }
+
+    public String getTicketId() {
+        return ticketId;
+    }
+
+    public void setTicketId(String ticketId) {
+        this.ticketId = ticketId;
+    }
+
+    public String getGuestName() {
+        return guestName;
+    }
+
+    public void setGuestName(String guestName) {
+        this.guestName = guestName;
     }
 
     public String getEventTitle() {
@@ -120,5 +170,45 @@ public class Ticket {
 
     public void setPurchaseDate(String purchaseDate) {
         this.purchaseDate = purchaseDate;
+    }
+
+    public String getConfirmationToken() {
+        return confirmationToken;
+    }
+
+    public void setConfirmationToken(String confirmationToken) {
+        this.confirmationToken = confirmationToken;
+    }
+
+    public String getPaymentPlanType() {
+        return paymentPlanType;
+    }
+
+    public void setPaymentPlanType(String paymentPlanType) {
+        this.paymentPlanType = paymentPlanType;
+    }
+
+    public int getInstallmentCycles() {
+        return installmentCycles;
+    }
+
+    public void setInstallmentCycles(int installmentCycles) {
+        this.installmentCycles = installmentCycles;
+    }
+
+    public int getInstallmentsPaid() {
+        return installmentsPaid;
+    }
+
+    public void setInstallmentsPaid(int installmentsPaid) {
+        this.installmentsPaid = installmentsPaid;
+    }
+
+    public double getRemainingBalance() {
+        return remainingBalance;
+    }
+
+    public void setRemainingBalance(double remainingBalance) {
+        this.remainingBalance = remainingBalance;
     }
 }

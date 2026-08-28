@@ -4,7 +4,7 @@ import org.howards4hope.model.Event;
 import org.howards4hope.model.Ticket;
 import org.howards4hope.repository.EventRepository;
 import org.howards4hope.repository.TicketRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.howards4hope.service.EmailService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -20,28 +20,32 @@ import java.util.Optional;
 @CrossOrigin(origins = "*", allowedHeaders = "*")
 public class TicketController {
 
-    @Autowired
-    private TicketRepository ticketRepository;
+    private final TicketRepository ticketRepository;
+    private final EventRepository eventRepository;
+    private final EmailService emailService;
 
-    @Autowired
-    private EventRepository eventRepository;
+    public TicketController(TicketRepository ticketRepository, EventRepository eventRepository, EmailService emailService) {
+        this.ticketRepository = ticketRepository;
+        this.eventRepository = eventRepository;
+        this.emailService = emailService;
+    }
 
-    @Autowired
-    private org.howards4hope.service.EmailService emailService;
-
-    // Request payload structure for booking
     public static class TicketRequest {
         public Long eventId;
-        public int quantity;
-        public String paymentMethod;
+        public int quantity = 1;
+        public String paymentMethod = "FREE";
+        public String paymentPlanType = "FULL"; // "FULL" or "INSTALLMENT"
+        public int installmentCycles = 1;
     }
 
     public static class GuestTicketRequest {
         public Long eventId;
-        public int quantity;
-        public String paymentMethod;
+        public int quantity = 1;
+        public String paymentMethod = "FREE";
         public String guestEmail;
         public String guestName;
+        public String paymentPlanType = "FULL"; // "FULL" or "INSTALLMENT"
+        public int installmentCycles = 1;
     }
 
     // --- SECURED TICKETING ENDPOINTS ---
@@ -53,7 +57,7 @@ public class TicketController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not authenticated.");
         }
         
-        String userEmail = auth.getName(); // Extracts email from Firebase JWT security token
+        String userEmail = auth.getName();
         
         Optional<Event> optionalEvent = eventRepository.findById(request.eventId);
         if (optionalEvent.isEmpty()) {
@@ -62,37 +66,44 @@ public class TicketController {
 
         Event event = optionalEvent.get();
         
-        // Verify payment validation requirements
         if (event.getPrice() > 0 && "FREE".equalsIgnoreCase(request.paymentMethod)) {
             return ResponseEntity.badRequest().body("This is a paid event. Payment method cannot be FREE.");
         }
 
-        double pricePaid = event.getPrice() * request.quantity;
-        String ticketId = "H4H-MEMBER-" + System.currentTimeMillis();
-        
+        double totalPrice = event.getPrice() * request.quantity;
+        boolean isInstallment = "INSTALLMENT".equalsIgnoreCase(request.paymentPlanType) && request.installmentCycles > 1;
+        int cycles = isInstallment ? request.installmentCycles : 1;
+        double firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
+        double remainingBalance = isInstallment ? (totalPrice - firstPayment) : 0.0;
+
         Ticket ticket = new Ticket(
                 request.eventId,
                 event.getTitle(),
                 event.getDate(),
                 userEmail,
                 request.quantity,
-                pricePaid,
+                firstPayment,
                 request.paymentMethod,
                 "CONFIRMED",
-                LocalDate.now().toString()
+                LocalDate.now().toString(),
+                isInstallment ? "INSTALLMENT" : "FULL",
+                cycles,
+                1,
+                remainingBalance
         );
+        ticket.setGuestName(userEmail.split("@")[0]);
 
         Ticket savedTicket = ticketRepository.save(ticket);
 
         // Dispatch Email confirmation
         emailService.sendTicketConfirmationEmail(
             userEmail,
-            userEmail.split("@")[0], // Simple fallback for name
+            savedTicket.getGuestName(),
             event.getTitle(),
             event.getDate(),
             request.quantity,
-            ticketId,
-            pricePaid
+            savedTicket.getTicketId(),
+            firstPayment
         );
 
         return ResponseEntity.ok(savedTicket);
@@ -102,10 +113,10 @@ public class TicketController {
 
     @PostMapping("/tickets/book-guest")
     public ResponseEntity<?> bookTicketGuest(@RequestBody GuestTicketRequest request) {
-        if (request.guestEmail == null || request.guestEmail.isEmpty()) {
+        if (request.guestEmail == null || request.guestEmail.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Guest email is required.");
         }
-        if (request.guestName == null || request.guestName.isEmpty()) {
+        if (request.guestName == null || request.guestName.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Guest name is required.");
         }
 
@@ -120,43 +131,79 @@ public class TicketController {
             return ResponseEntity.badRequest().body("This is a paid event. Payment method cannot be FREE.");
         }
 
-        double pricePaid = event.getPrice() * request.quantity;
-        String ticketId = "H4H-GUEST-" + System.currentTimeMillis();
+        double totalPrice = event.getPrice() * request.quantity;
+        boolean isInstallment = "INSTALLMENT".equalsIgnoreCase(request.paymentPlanType) && request.installmentCycles > 1;
+        int cycles = isInstallment ? request.installmentCycles : 1;
+        double firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
+        double remainingBalance = isInstallment ? (totalPrice - firstPayment) : 0.0;
 
         Ticket ticket = new Ticket(
                 request.eventId,
                 event.getTitle(),
                 event.getDate(),
-                request.guestEmail,
+                request.guestEmail.trim(),
                 request.quantity,
-                pricePaid,
+                firstPayment,
                 request.paymentMethod,
                 "CONFIRMED",
-                LocalDate.now().toString()
+                LocalDate.now().toString(),
+                isInstallment ? "INSTALLMENT" : "FULL",
+                cycles,
+                1,
+                remainingBalance
         );
+        ticket.setGuestName(request.guestName.trim());
 
         Ticket savedTicket = ticketRepository.save(ticket);
 
         // Dispatch Email confirmation
         emailService.sendTicketConfirmationEmail(
-            request.guestEmail,
-            request.guestName,
+            savedTicket.getUserEmail(),
+            savedTicket.getGuestName(),
             event.getTitle(),
             event.getDate(),
             request.quantity,
-            ticketId,
-            pricePaid
+            savedTicket.getTicketId(),
+            firstPayment
         );
 
         return ResponseEntity.ok(savedTicket);
     }
 
+    /**
+     * Secure Guest Ticket Lookup (no sign-in required).
+     * Validates via unique ticketId, confirmationToken, or email.
+     */
+    @GetMapping("/tickets/lookup")
+    public ResponseEntity<?> lookupTicket(
+            @RequestParam(required = false) String ticketId,
+            @RequestParam(required = false) String confirmationToken,
+            @RequestParam(required = false) String email) {
+        
+        if (ticketId != null && !ticketId.trim().isEmpty()) {
+            Optional<Ticket> opt = ticketRepository.findByTicketId(ticketId.trim());
+            if (opt.isPresent()) return ResponseEntity.ok(opt.get());
+        }
+
+        if (confirmationToken != null && !confirmationToken.trim().isEmpty()) {
+            Optional<Ticket> opt = ticketRepository.findByConfirmationToken(confirmationToken.trim());
+            if (opt.isPresent()) return ResponseEntity.ok(opt.get());
+        }
+
+        if (email != null && !email.trim().isEmpty()) {
+            List<Ticket> tickets = ticketRepository.findByUserEmailIgnoreCase(email.trim());
+            if (!tickets.isEmpty()) return ResponseEntity.ok(tickets);
+        }
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No matching ticket found with provided credentials.");
+    }
+
     @GetMapping("/tickets/guest-tickets")
     public ResponseEntity<?> getGuestTickets(@RequestParam String email) {
-        if (email == null || email.isEmpty()) {
+        if (email == null || email.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Email query parameter is required.");
         }
-        List<Ticket> tickets = ticketRepository.findByUserEmailIgnoreCase(email);
+        List<Ticket> tickets = ticketRepository.findByUserEmailIgnoreCase(email.trim());
         return ResponseEntity.ok(tickets);
     }
 
@@ -172,7 +219,7 @@ public class TicketController {
         return ResponseEntity.ok(tickets);
     }
 
-    // --- ADMIN ACCESS ONLY: GET EVENT ATTENDEES ---
+    // --- ADMIN ACCESS ONLY: GET EVENT RSVP ATTENDEES LIST ---
     
     @GetMapping("/admin/tickets/attendees/{eventId}")
     public ResponseEntity<List<Ticket>> getEventAttendees(@PathVariable Long eventId) {

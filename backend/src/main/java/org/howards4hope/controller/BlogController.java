@@ -2,7 +2,7 @@ package org.howards4hope.controller;
 
 import org.howards4hope.model.BlogPost;
 import org.howards4hope.repository.BlogRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,8 +16,11 @@ import java.util.Optional;
 @CrossOrigin(origins = "*", allowedHeaders = "*")
 public class BlogController {
 
-    @Autowired
-    private BlogRepository blogRepository;
+    private final BlogRepository blogRepository;
+
+    public BlogController(BlogRepository blogRepository) {
+        this.blogRepository = blogRepository;
+    }
 
     // --- PUBLIC READ PATHS ---
 

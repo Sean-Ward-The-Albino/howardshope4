@@ -6,7 +6,7 @@ import org.howards4hope.model.Event;
 import org.howards4hope.model.Ticket;
 import org.howards4hope.repository.EventRepository;
 import org.howards4hope.repository.TicketRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,11 +27,13 @@ public class PaymentController {
     @Value("${stripe.api.key}")
     private String stripeApiKey;
 
-    @Autowired
-    private EventRepository eventRepository;
+    private final EventRepository eventRepository;
+    private final TicketRepository ticketRepository;
 
-    @Autowired
-    private TicketRepository ticketRepository;
+    public PaymentController(EventRepository eventRepository, TicketRepository ticketRepository) {
+        this.eventRepository = eventRepository;
+        this.ticketRepository = ticketRepository;
+    }
 
     public static class PaymentRequest {
         public Long eventId;

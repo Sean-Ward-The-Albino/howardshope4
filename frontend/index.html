@@ -3,12 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Howards 4 Hope | Restoring Hope & Rebuilding Lives</title>
-  <meta name="description" content="To restore hope and enhance lives by empowering, supporting, and uplifting youth, caregivers of individuals with disabilities, and single parents with limited income.">
-  <link rel="stylesheet" href="style.css">
   
+  <!-- SEO & Performance Optimization -->
+  <title>Howards 4 Hope | Restoring Hope & Rebuilding Lives in Long Beach</title>
+  <meta name="description" content="Howards 4 Hope restores hope and enhances lives by empowering youth, supporting special-needs caregivers, and providing single parents with financial toolkits in Long Beach, CA.">
+  <meta name="keywords" content="Long Beach non-profit, youth empowerment, caregiver support, single parent assistance, Howards 4 Hope, charity">
+  <meta name="author" content="Howards 4 Hope">
+  <meta name="theme-color" content="#1E2761">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Howards 4 Hope | Restoring Hope & Rebuilding Lives">
+  <meta property="og:description" content="Empowering youth, supporting special-needs caregivers, and providing single parents with financial toolkits in Long Beach, CA.">
+  <meta property="og:image" content="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=1200">
+  
+  <!-- Preload Critical Assets -->
+  <link rel="preload" href="style.css?v=3" as="style">
+  
+  <link rel="stylesheet" href="style.css?v=3">
   <!-- Modern SVG Icons library via FontAwesome Free CDN -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+  
+  <!-- Analytics & Calendar Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js" defer></script>
 </head>
 <body>
 
@@ -41,6 +59,9 @@
       <!-- Primary Actions Grouping -->
       <div class="nav-actions">
         <div class="nav-group-actions">
+          <button class="cal-btn" id="theme-toggle-btn" style="width: 44px; height: 44px; margin-right: 10px; border-radius: 50%; font-size: 1.1rem; background: var(--bg-base); color: var(--text-main); border: 1px solid rgba(15,23,42,0.1);" title="Toggle Dark Mode">
+            <i class="fa-solid fa-moon"></i>
+          </button>
           <a href="#/donate" class="btn btn-donate"><i class="fa-solid fa-heart"></i> Donate</a>
           
           <!-- User Menu -->
@@ -92,7 +113,9 @@
           <a href="#/events" class="nav-link" style="font-size: 1.2rem;" data-route="events">Events & Calendar</a>
           <a href="#/blog" class="nav-link" style="font-size: 1.2rem;" data-route="blog">News & Blog</a>
           <a href="#/get-involved" class="nav-link" style="font-size: 1.2rem;" data-route="get-involved">Get Involved</a>
-          <a href="#/donate" class="btn btn-donate" style="margin-top: 20px; text-align: center;"><i class="fa-solid fa-heart"></i> Donate Now</a>
+          <button class="btn btn-outline" id="mobile-theme-toggle-btn" style="margin-top: 10px; font-size: 1.1rem; width: 100%; border-radius: 8px; border: 1px solid rgba(15,23,42,0.1);"><i class="fa-solid fa-moon"></i> Toggle Dark Mode</button>
+          <button class="btn btn-primary" id="mobile-login-btn" style="margin-top: 10px; font-size: 1.1rem; width: 100%;"><i class="fa-solid fa-user-lock"></i> Login / Sign In</button>
+          <a href="#/donate" class="btn btn-donate" style="margin-top: 10px; text-align: center;"><i class="fa-solid fa-heart"></i> Donate Now</a>
         </div>
         <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding-bottom: 20px;">
           501(c)(3) Non-Profit | EIN 86-1910919
@@ -112,7 +135,12 @@
     <div class="modal" id="auth-modal">
       <div class="modal-content">
         <span class="modal-close" id="auth-modal-close">&times;</span>
-        <h3 class="modal-title" id="auth-title">Welcome Back</h3>
+        <h3 class="modal-title" id="auth-title" style="display:none;">Welcome Back</h3>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 25px;">
+          <button class="btn btn-primary" id="auth-tab-login" style="flex: 1; padding: 12px; font-weight: 700;">Login</button>
+          <button class="btn btn-outline" id="auth-tab-signup" style="flex: 1; padding: 12px; font-weight: 700;">Sign Up</button>
+        </div>
         
         <!-- Google Oauth Auth Button -->
         <button class="auth-social-btn" id="google-login-btn">
@@ -141,23 +169,83 @@
           </button>
         </form>
         
-        <div class="modal-switch" id="auth-toggle">
+        <div class="modal-switch" id="auth-toggle" style="display:none;">
           Don't have an account? <span id="auth-toggle-link">Sign Up</span>
         </div>
       </div>
     </div>
 
-    <!-- --- STUNNING 4-COLUMN FOOTER --- -->
+    <!-- --- COMMUNITY IMPACT & GALLERY PHOTO CAROUSEL --- -->
+    <section class="community-carousel-section" id="community-carousel-root">
+      <div class="carousel-container">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <div class="hero-tag" style="background: rgba(37, 99, 235, 0.1); color: var(--primary);"><i class="fa-solid fa-camera-retro"></i> Hope in Action</div>
+          <h2 style="font-size: 2.2rem; font-weight: 800; color: var(--text-main); margin-top: 8px;">Our Community Impact & Gallery</h2>
+          <p style="color: var(--text-muted); max-width: 680px; margin: 8px auto 0;">Moments of empowerment, caregiver respite, youth mentorship, and family milestones in Long Beach, CA.</p>
+        </div>
+        <div class="carousel-track-wrapper">
+          <div class="carousel-track" id="impact-carousel-track">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </div>
+        <button class="carousel-nav-btn prev" id="carousel-prev-btn" aria-label="Previous Slide"><i class="fa-solid fa-chevron-left"></i></button>
+        <button class="carousel-nav-btn next" id="carousel-next-btn" aria-label="Next Slide"><i class="fa-solid fa-chevron-right"></i></button>
+        <div class="carousel-dots" id="carousel-dots-container"></div>
+      </div>
+    </section>
+
+    <!-- --- STUNNING 4-COLUMN FOOTER WITH OUTREACH & VOLUNTEER FORM --- -->
     <footer>
+      <!-- Footer Outreach & Connection Section -->
+      <div class="footer-form-container">
+        <div class="footer-form-card">
+          <div class="footer-form-header">
+            <div class="footer-form-tag"><i class="fa-solid fa-hand-holding-heart"></i> Get In Touch</div>
+            <h3>Join the Mission & Make an Impact</h3>
+            <p>Whether you'd like to volunteer, sponsor a workshop, become a partner, or ask questions, send us a direct message.</p>
+          </div>
+          <form id="footer-outreach-form" class="footer-form-grid">
+            <div class="footer-form-field">
+              <label for="footer-name">Full Name</label>
+              <input type="text" id="footer-name" class="form-control" required placeholder="Jane Doe">
+            </div>
+            <div class="footer-form-field">
+              <label for="footer-email">Email Address</label>
+              <input type="email" id="footer-email" class="form-control" required placeholder="jane@example.com">
+            </div>
+            <div class="footer-form-field">
+              <label for="footer-role">I want to connect as...</label>
+              <select id="footer-role" class="form-control" style="background-image: none;" required>
+                <option value="Volunteer">Volunteer / Mentor</option>
+                <option value="Sponsor">Corporate Sponsor / Donor</option>
+                <option value="Partner">Non-Profit / Community Partner</option>
+                <option value="Caregiver Support">Caregiver Support / Links of Hope</option>
+                <option value="Youth Mentorship">Youth Mentorship / Me, Myself & Why</option>
+                <option value="General">General Inquiry</option>
+              </select>
+            </div>
+            <div class="footer-form-field footer-form-field-full">
+              <label for="footer-message">Message / Note</label>
+              <textarea id="footer-message" class="form-control" rows="3" required placeholder="Tell us how you would like to get involved..."></textarea>
+            </div>
+            <div class="footer-form-field footer-form-field-full">
+              <button type="submit" class="btn btn-primary" style="width: 100%; height: 46px; font-weight: 700;">
+                <i class="fa-solid fa-paper-plane"></i> Send Outreach Message
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <div class="footer-grid">
         <div class="footer-brand">
           <h4>Howards 4 Hope</h4>
-          <p>Restoring hope and enhancing lives by empowering, supporting, and uplifting youth, caregivers, and single parents in Long Beach.</p>
+          <p>Restoring hope and enhancing lives by empowering youth, supporting caregivers of individuals with disabilities, and uplifting single parents in Long Beach, CA.</p>
           <div class="footer-socials">
-            <a href="#" class="social-circle"><i class="fa-brands fa-facebook-f"></i></a>
-            <a href="#" class="social-circle"><i class="fa-brands fa-instagram"></i></a>
-            <a href="#" class="social-circle"><i class="fa-brands fa-linkedin-in"></i></a>
-            <a href="#" class="social-circle"><i class="fa-brands fa-twitter"></i></a>
+            <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer" class="social-circle" title="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+            <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" class="social-circle" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
+            <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" class="social-circle" title="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" class="social-circle" title="Twitter / X"><i class="fa-brands fa-x-twitter"></i></a>
           </div>
         </div>
         
@@ -165,39 +253,47 @@
           <h5>Quick Links</h5>
           <ul class="footer-links">
             <li><a href="#/">Home</a></li>
-            <li><a href="#/about">Our Philosophy</a></li>
+            <li><a href="#/about">Our Philosophy & Team</a></li>
             <li><a href="#/programs">Programs & Resources</a></li>
             <li><a href="#/events">Calendar & Events</a></li>
-            <li><a href="#/blog">News & Blog</a></li>
+            <li><a href="#/blog">News & Updates</a></li>
             <li><a href="#/get-involved">Get Involved</a></li>
+            <li><a href="#/donate">Donate Now</a></li>
           </ul>
         </div>
         
         <div class="footer-col">
-          <h5>Programs</h5>
+          <h5>Our Programs</h5>
           <ul class="footer-links">
-            <li><a href="#/programs">Youth Empowerment</a></li>
-            <li><a href="#/programs">Caregivers Support</a></li>
-            <li><a href="#/programs">Single Parents navigation</a></li>
-            <li><a href="#/programs">Links of Hope</a></li>
+            <li><a href="#/programs">Me, Myself & Why (Youth)</a></li>
+            <li><a href="#/programs">Links of Hope (Caregivers)</a></li>
+            <li><a href="#/programs">H.O.P.E. Program (Single Parents)</a></li>
+            <li><a href="#/programs">Community Resource Hub</a></li>
           </ul>
+          
+          <h5 style="margin-top: 25px;">Newsletter</h5>
+          <form id="newsletter-form" style="display: flex; gap: 5px;">
+            <input type="email" id="nl-email" required placeholder="Your email address" style="padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: white; width: 100%;">
+            <button type="submit" class="btn btn-primary" style="padding: 8px 14px;" title="Subscribe"><i class="fa-solid fa-paper-plane"></i></button>
+          </form>
         </div>
         
         <div class="footer-col">
           <h5>Contact Us</h5>
           <div class="footer-contact-info">
-            <p><i class="fa-solid fa-location-dot" style="color: var(--accent); margin-right: 8px;"></i> 3711 Long Beach Blvd, #4055 Long Beach, CA 90807</p>
+            <p><i class="fa-solid fa-phone" style="color: var(--accent); margin-right: 8px;"></i> <a href="tel:5624815556">(562) 481-5556</a></p>
             <p><i class="fa-solid fa-envelope" style="color: var(--accent); margin-right: 8px;"></i> <a href="mailto:info@howards4hope.org">info@howards4hope.org</a></p>
-            <p><i class="fa-solid fa-circle-info" style="color: var(--accent); margin-right: 8px;"></i> 501(c)(3) Non-Profit organization</p>
+            <p><i class="fa-solid fa-location-dot" style="color: var(--accent); margin-right: 8px;"></i> 3711 Long Beach Blvd, #4055<br><span style="padding-left: 20px;">Long Beach, CA 90807</span></p>
+            <p><i class="fa-solid fa-certificate" style="color: var(--accent); margin-right: 8px;"></i> 501(c)(3) Tax-Exempt Non-Profit</p>
             <p><i class="fa-solid fa-id-card" style="color: var(--accent); margin-right: 8px;"></i> EIN # 86-1910919</p>
           </div>
         </div>
       </div>
       
       <div class="footer-bottom">
-        <p>&copy; 2026 Howards 4 Hope. All rights reserved.</p>
+        <p>&copy; 2026 Howards 4 Hope. A 501(c)(3) Non-Profit Organization. All rights reserved.</p>
         <div class="footer-bottom-links">
-          <a href="#/terms">Terms of Use</a>
+          <a href="#/terms">Terms of Service</a>
           <a href="#/privacy">Privacy Policy</a>
         </div>
       </div>
@@ -212,6 +308,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   
   <!-- --- APPLICATION ENTRY SCRIPT --- -->
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
