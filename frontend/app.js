@@ -14,6 +14,17 @@ const firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 
+// Stripe Configuration
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51U9viMJCbXhpJ798PQ3RTLGTwmeft50L5GJFTRLuxrXJ0XRjFaMvslrGThOzQI1IUiSTOvkbMdIvwLffdGMTcTU500KEUc9ehI";
+let stripeClient = null;
+try {
+  if (typeof Stripe !== 'undefined') {
+    stripeClient = Stripe(STRIPE_PUBLISHABLE_KEY);
+  }
+} catch (e) {
+  console.warn("Stripe initialization deferred", e);
+}
+
 // Category Colors System (Public Legend & Customizable in Admin Dashboard)
 const DEFAULT_CATEGORY_COLORS = {
   "Youth": "#2563EB",         // Royal Blue
@@ -2663,6 +2674,12 @@ function bindDonationPortal() {
     const receiptNo = result.taxReceiptNumber || ('H4H-TAX-' + new Date().getFullYear() + '-00921');
     const receiptNoEl = document.getElementById('tax-letter-receipt-no');
     if (receiptNoEl) receiptNoEl.innerText = receiptNo;
+
+    if (method.includes('Stripe') && result.checkoutUrl && result.checkoutUrl.startsWith('http')) {
+      alert(`Redirecting to secure Stripe Checkout to complete your $${amt.toFixed(2)} tax-deductible gift...`);
+      window.location.href = result.checkoutUrl;
+      return;
+    }
 
     alert(`Thank you ${donorName}! Your $${amt.toFixed(2)} ${freqLabels[selectedFreq]} contribution to Howards 4 Hope via ${method} has been received.\n\nOfficial IRS 501(c)(3) Tax Receipt #${receiptNo} has been generated and dispatched to ${donorEmail}.`);
   };
