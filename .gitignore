@@ -24,6 +24,7 @@ ui-debug.log
 .env.*.local
 *.env
 !.env.example
+SETUP_CREDENTIALS_GUIDE.txt
 
 # --- FIREBASE SERVICE ACCOUNT CREDENTIALS (NEVER COMMIT) ---
 **/firebase-service-account.json
