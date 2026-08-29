@@ -98,6 +98,12 @@
             <version>4.10.15</version>
         </dependency>
 
+        <!-- Spring Boot Starter Mail (SMTP Email Service) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Spring Boot Configuration Processor -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
