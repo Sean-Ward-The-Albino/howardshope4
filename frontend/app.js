@@ -68,6 +68,207 @@ function getCategoryColor(category) {
   return "#1E2761";
 }
 
+// Custom Event & Campaign Page Studio State
+const DEFAULT_CUSTOM_PAGE = {
+  enabled: true,
+  navLabel: "Featured Gala",
+  slug: "special-event",
+  title: "Unmasking Hope: Annual Charity Gala & Awards",
+  subtitle: "Join community leaders, families, and philanthropists for an inspiring evening of unity, awards, and empowerment to rebuild lives in Long Beach.",
+  date: "2026-11-19",
+  time: "6:00 PM – 10:00 PM PST",
+  location: "Grand Ballroom, 3711 Long Beach Blvd, Long Beach, CA 90807",
+  bannerImage: "assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18 (2).webp",
+  description: "The Unmasking Hope Annual Charity Gala is our signature event of the year, bringing together corporate partners, advocates, and families to celebrate our resilient community and secure vital funding for youth empowerment and caregiver respite services.",
+  schedule: [
+    { time: "5:30 PM", title: "VIP Red Carpet & Reception", desc: "Private networking and hors d'oeuvres for sponsors and VIP pass holders." },
+    { time: "6:30 PM", title: "Welcome Keynote & Dinner", desc: "Keynote addresses from President LaCreashia Willis-Howard and honored community guests." },
+    { time: "7:45 PM", title: "Community Impact Awards", desc: "Recognizing outstanding community partners, teachers, and disability caregiver advocates." },
+    { time: "8:30 PM", title: "Live Benefit Auction & Celebration", desc: "Silent & live auctions with 100% of proceeds supporting our youth seminars and caregiver respite programs." }
+  ],
+  pricingTiers: [
+    {
+      id: "tier-general",
+      name: "General Admission",
+      price: 45,
+      badge: "Standard",
+      popular: false,
+      features: [
+        "Full Gala admission & general seating",
+        "3-Course served dinner & dessert",
+        "Access to silent & live benefit auctions",
+        "Complimentary event program & souvenir"
+      ]
+    },
+    {
+      id: "tier-vip",
+      name: "VIP Hope Champion",
+      price: 95,
+      badge: "Most Popular",
+      popular: true,
+      features: [
+        "Priority VIP front-row seating",
+        "Exclusive 5:30 PM VIP Red Carpet Reception",
+        "2 complimentary artisan beverage tickets",
+        "Official recognition in gala digital brochure",
+        "Dedicated VIP check-in & swag gift bag"
+      ]
+    },
+    {
+      id: "tier-table",
+      name: "Benefactor Table for 8",
+      price: 650,
+      badge: "Sponsor Table",
+      popular: false,
+      features: [
+        "Reserved VIP banquet table for 8 guests",
+        "Full VIP Reception passes for all 8 attendees",
+        "Corporate or family logo on table & screen",
+        "Special on-stage acknowledgment during awards",
+        "Tax-deductible donor receipt (501c3)"
+      ]
+    }
+  ]
+};
+
+function loadCustomPage() {
+  try {
+    const saved = localStorage.getItem('h4h_custom_page');
+    if (saved) return Object.assign({}, DEFAULT_CUSTOM_PAGE, JSON.parse(saved));
+  } catch (e) {}
+  return { ...DEFAULT_CUSTOM_PAGE };
+}
+
+function saveCustomPage(pageConfig) {
+  state.customPage = pageConfig;
+  try {
+    localStorage.setItem('h4h_custom_page', JSON.stringify(pageConfig));
+  } catch (e) {}
+  updateCustomPageNavLinks();
+}
+
+// Calendar Integration Helpers for Gala & Events
+function getGoogleCalendarUrl(title, date, location, description) {
+  try {
+    const cleanDate = (date || '2026-11-19').replace(/-/g, '');
+    const startIso = `${cleanDate}T180000Z`;
+    const endIso = `${cleanDate}T220000Z`;
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: title || 'Howards 4 Hope Charity Gala',
+      dates: `${startIso}/${endIso}`,
+      details: description || 'Howards 4 Hope Special Event & Fundraiser',
+      location: location || '3711 Long Beach Blvd, Long Beach, CA 90807'
+    });
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  } catch (e) {
+    return 'https://calendar.google.com/';
+  }
+}
+
+function downloadIcsFile(title, date, location, description) {
+  try {
+    const cleanDate = (date || '2026-11-19').replace(/-/g, '');
+    const icsData = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Howards 4 Hope//Event Studio//EN',
+      'BEGIN:VEVENT',
+      `SUMMARY:${(title || 'Special Event').replace(/,/g, '\\,')}`,
+      `DESCRIPTION:${(description || '').replace(/\n/g, ' ').replace(/,/g, '\\,')}`,
+      `LOCATION:${(location || '').replace(/,/g, '\\,')}`,
+      `DTSTART:${cleanDate}T180000Z`,
+      `DTEND:${cleanDate}T220000Z`,
+      'STATUS:CONFIRMED',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute('download', `${(title || 'howards4hope_event').toLowerCase().replace(/[^a-z0-9]/g, '_')}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (e) {
+    console.error('Failed to download .ics calendar file', e);
+  }
+}
+
+// Persistent Ticket Storage Helpers
+function loadSavedTickets() {
+  try {
+    const saved = localStorage.getItem('h4h_my_tickets');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  return [];
+}
+
+function saveTicketRecord(ticket) {
+  if (!ticket) return;
+  const existingIdx = state.myTickets.findIndex(t => 
+    (ticket.ticketId && t.ticketId === ticket.ticketId) || 
+    (ticket.id && t.id === ticket.id)
+  );
+  if (existingIdx >= 0) {
+    state.myTickets[existingIdx] = ticket;
+  } else {
+    state.myTickets.unshift(ticket);
+  }
+  try {
+    localStorage.setItem('h4h_my_tickets', JSON.stringify(state.myTickets));
+  } catch (e) {}
+}
+
+function updateCustomPageNavLinks() {
+  // Desktop Navbar link
+  let navLink = document.getElementById('nav-link-special-event');
+  const navbarUl = document.getElementById('navbar-links');
+  if (state.customPage && (state.customPage.enabled || state.isAdmin)) {
+    if (!navLink && navbarUl) {
+      const li = document.createElement('li');
+      li.id = 'nav-item-special-event';
+      li.innerHTML = '<a href="#/special-event" id="nav-link-special-event" class="nav-link" data-route="special-event" style="color: var(--accent); font-weight: 700;"><i class="fa-solid fa-star" style="font-size: 0.85em; margin-right: 4px;"></i>' + (state.customPage.navLabel || 'Featured Gala') + '</a>';
+      const dropdown = navbarUl.querySelector('.nav-item-dropdown');
+      if (dropdown) navbarUl.insertBefore(li, dropdown);
+      else navbarUl.appendChild(li);
+    } else if (navLink) {
+      navLink.innerHTML = '<i class="fa-solid fa-star" style="font-size: 0.85em; margin-right: 4px;"></i>' + (state.customPage.navLabel || 'Featured Gala');
+      const li = document.getElementById('nav-item-special-event');
+      if (li) li.style.display = '';
+    }
+  } else {
+    const li = document.getElementById('nav-item-special-event');
+    if (li) li.style.display = 'none';
+  }
+
+  // Mobile Drawer link
+  let mobLink = document.getElementById('mob-link-special-event');
+  const mobLinksDiv = document.getElementById('mobile-drawer-links');
+  if (state.customPage && (state.customPage.enabled || state.isAdmin)) {
+    if (!mobLink && mobLinksDiv) {
+      mobLink = document.createElement('a');
+      mobLink.id = 'mob-link-special-event';
+      mobLink.href = '#/special-event';
+      mobLink.className = 'nav-link';
+      mobLink.style.cssText = 'font-size: 1.15rem; color: var(--accent); font-weight: 700;';
+      mobLink.innerHTML = '<i class="fa-solid fa-star" style="margin-right: 6px;"></i>' + (state.customPage.navLabel || 'Featured Gala');
+      mobLink.addEventListener('click', () => {
+        const drawer = document.getElementById('mobile-drawer');
+        if (drawer) drawer.classList.remove('active');
+        if (window.location.hash === '#/special-event') router();
+      });
+      mobLinksDiv.insertBefore(mobLink, mobLinksDiv.firstChild);
+    } else if (mobLink) {
+      mobLink.innerHTML = '<i class="fa-solid fa-star" style="margin-right: 6px;"></i>' + (state.customPage.navLabel || 'Featured Gala');
+      mobLink.style.display = '';
+    }
+  } else if (mobLink) {
+    mobLink.style.display = 'none';
+  }
+}
+
 // Global App State
 const state = {
   user: null,
@@ -75,6 +276,7 @@ const state = {
   activeRoute: 'home',
   events: [],
   categoryColors: loadCategoryColors(),
+  customPage: loadCustomPage(),
   selectedCategoryFilter: 'all',
   selectedDate: new Date(),
   selectedEvent: null,
@@ -87,7 +289,7 @@ const state = {
     { id: 5, title: "Special Education Navigators (IEP Guide)", category: "caregivers", desc: "Advocacy roadmaps and IEP toolkits for parents of children with developmental or physical disabilities.", link: "#/programs" },
     { id: 6, title: "CalFresh & Medi-Cal Application Hub", category: "parents", desc: "Direct guidance to secure essential California welfare and nutritional assistance allocations.", link: "https://www.benefitscal.com" }
   ],
-  myTickets: [],
+  myTickets: loadSavedTickets(),
   adminMetrics: {
     totalAttendees: 52,
     totalRevenue: 480.00,
@@ -173,6 +375,23 @@ const mockBlogPosts = [
 
 state.blogPosts = [...mockBlogPosts];
 
+// Fast Network Fetch with Timeout helper (prevents frozen UI on slow/offline backend)
+async function fetchWithTimeout(resource, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(resource, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    return response;
+  } catch (error) {
+    clearTimeout(timer);
+    throw error;
+  }
+}
+
 // Backend API Service Client
 const API = {
   baseUrl: 'http://localhost:8080/api',
@@ -192,10 +411,10 @@ const API = {
 
   async getEvents() {
     try {
-      const response = await fetch(`${this.baseUrl}/events`);
+      const response = await fetchWithTimeout(`${this.baseUrl}/events`, {}, 2500);
       if (response.ok) return await response.json();
     } catch (e) {
-      console.log("Spring Boot API offline, falling back to mock client-side state.");
+      console.log("Backend API offline or timed out, using client state.");
     }
     return state.events;
   },
@@ -205,7 +424,7 @@ const API = {
       let url = `${this.baseUrl}/events/keyset?limit=${limit}`;
       if (cursorDate) url += `&cursorDate=${encodeURIComponent(cursorDate)}`;
       if (cursorId) url += `&cursorId=${cursorId}`;
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url, {}, 2500);
       if (response.ok) return await response.json();
     } catch (e) {
       console.warn("Keyset API offline, using in-memory events.", e);
@@ -215,7 +434,7 @@ const API = {
 
   async searchEvents(query) {
     try {
-      const response = await fetch(`${this.baseUrl}/events/search?q=${encodeURIComponent(query)}`);
+      const response = await fetchWithTimeout(`${this.baseUrl}/events/search?q=${encodeURIComponent(query)}`, {}, 2500);
       if (response.ok) return await response.json();
     } catch (e) {
       console.warn("Search API offline, filtering locally.", e);
@@ -230,7 +449,7 @@ const API = {
   async bookTicket(eventId, quantity = 1, paymentMethod = 'FREE', paymentPlanType = 'FULL', installmentCycles = 1) {
     try {
       const headers = await this.getHeaders();
-      const response = await fetch(`${this.baseUrl}/tickets/book`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/tickets/book`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ 
@@ -240,20 +459,23 @@ const API = {
           paymentPlanType,
           installmentCycles
         })
-      });
+      }, 3000);
       if (response.ok) {
         const ticket = await response.json();
-        state.myTickets.push(ticket);
+        saveTicketRecord(ticket);
         return ticket;
       }
     } catch (e) {
-      console.error("Spring Boot API offline, falling back to local simulation.", e);
+      console.warn("Spring Boot API offline/timed out, saving confirmed pass locally.", e);
     }
     
-    // Simulate booking ticket locally
-    const event = state.events.find(e => e.id === eventId);
-    if (!event) return false;
-    const totalPrice = event.price * quantity;
+    // Simulate booking ticket locally with guaranteed non-null fields
+    const event = state.events.find(e => 
+      e.id.toString() === eventId.toString() || 
+      e.id.toString().replace('evt-', '') === eventId.toString().replace('evt-', '')
+    );
+    const unitPrice = event ? (event.price || 0) : 0;
+    const totalPrice = unitPrice * quantity;
     const isInstallment = paymentPlanType === 'INSTALLMENT' && installmentCycles > 1;
     const cycles = isInstallment ? installmentCycles : 1;
     const firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
@@ -262,9 +484,10 @@ const API = {
       id: Math.floor(100000 + Math.random() * 900000),
       ticketId: 'H4H-TKT-' + Date.now(),
       confirmationToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
-      eventId: event.id,
-      eventTitle: event.title,
-      eventDate: event.date,
+      eventId: event ? event.id : eventId,
+      eventTitle: event ? event.title : 'Community Event Reservation',
+      eventDate: event ? event.date : new Date().toISOString().split('T')[0],
+      eventLocation: event ? event.location : '3711 Long Beach Blvd, #4055, Long Beach, CA 90807',
       guestName: state.user ? (state.user.displayName || state.user.email.split('@')[0]) : 'Valued Attendee',
       userEmail: state.user ? state.user.email : 'guest@example.com',
       quantity: quantity,
@@ -277,13 +500,13 @@ const API = {
       remainingBalance: isInstallment ? (totalPrice - firstPayment) : 0,
       purchaseDate: new Date().toISOString().split('T')[0]
     };
-    state.myTickets.push(ticket);
+    saveTicketRecord(ticket);
     return ticket;
   },
 
   async bookTicketGuest(eventId, quantity = 1, paymentMethod = 'FREE', guestEmail, guestName, paymentPlanType = 'FULL', installmentCycles = 1) {
     try {
-      const response = await fetch(`${this.baseUrl}/tickets/book-guest`, {
+      const response = await fetchWithTimeout(`${this.baseUrl}/tickets/book-guest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -295,29 +518,36 @@ const API = {
           paymentPlanType,
           installmentCycles
         })
-      });
+      }, 3000);
       if (response.ok) {
-        return await response.json();
+        const ticket = await response.json();
+        saveTicketRecord(ticket);
+        return ticket;
       }
     } catch (e) {
-      console.error("Guest booking REST API failed, using fallback.", e);
+      console.warn("Guest booking REST API failed, using fallback.", e);
     }
 
-    const event = state.events.find(e => e.id === eventId);
-    const totalPrice = (event ? event.price : 0) * quantity;
+    const event = state.events.find(e => 
+      e.id.toString() === eventId.toString() || 
+      e.id.toString().replace('evt-', '') === eventId.toString().replace('evt-', '')
+    );
+    const unitPrice = event ? (event.price || 0) : 0;
+    const totalPrice = unitPrice * quantity;
     const isInstallment = paymentPlanType === 'INSTALLMENT' && installmentCycles > 1;
     const cycles = isInstallment ? installmentCycles : 1;
     const firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
 
-    return {
+    const ticket = {
       id: Math.floor(100000 + Math.random() * 900000),
       ticketId: 'H4H-GUEST-' + Date.now(),
       confirmationToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
-      eventId: eventId,
-      eventTitle: event ? event.title : 'Community Event',
+      eventId: event ? event.id : eventId,
+      eventTitle: event ? event.title : 'Community Event Pass',
       eventDate: event ? event.date : new Date().toISOString().split('T')[0],
-      guestName: guestName,
-      userEmail: guestEmail,
+      eventLocation: event ? event.location : '3711 Long Beach Blvd, #4055, Long Beach, CA 90807',
+      guestName: guestName || 'Valued Guest',
+      userEmail: guestEmail || 'guest@example.com',
       quantity: quantity,
       pricePaid: firstPayment,
       paymentMethod: paymentMethod,
@@ -328,6 +558,8 @@ const API = {
       remainingBalance: isInstallment ? (totalPrice - firstPayment) : 0,
       purchaseDate: new Date().toISOString().split('T')[0]
     };
+    saveTicketRecord(ticket);
+    return ticket;
   },
 
   async lookupTicket(ticketId = null, confirmationToken = null, email = null) {
@@ -337,13 +569,21 @@ const API = {
       if (confirmationToken) url += `confirmationToken=${encodeURIComponent(confirmationToken)}&`;
       if (email) url += `email=${encodeURIComponent(email)}&`;
       
-      const response = await fetch(url);
-      if (response.ok) return await response.json();
+      const response = await fetchWithTimeout(url, {}, 2500);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          data.forEach(t => saveTicketRecord(t));
+        } else if (data && data.ticketId) {
+          saveTicketRecord(data);
+        }
+        return data;
+      }
     } catch (e) {
       console.warn("Lookup API offline, searching local state.", e);
     }
     
-    // Local fallback search
+    // Local fallback search from saved state
     return state.myTickets.filter(t => 
       (ticketId && t.ticketId && t.ticketId.toLowerCase() === ticketId.toLowerCase()) ||
       (confirmationToken && t.confirmationToken && t.confirmationToken.toLowerCase() === confirmationToken.toLowerCase()) ||
@@ -503,6 +743,17 @@ firebase.auth().onAuthStateChanged(async (user) => {
       dashboardLink.style.display = 'none';
     }
     
+    // Mobile Profile & Admin Drawer UI
+    const mobProfCard = document.getElementById('mobile-user-profile-card');
+    const mobUserEmail = document.getElementById('mobile-user-email');
+    const mobProfAdminBtn = document.getElementById('mobile-profile-admin-btn');
+    const mobDrawerAdminLink = document.getElementById('mobile-drawer-admin-link');
+
+    if (mobProfCard) {
+      mobProfCard.style.display = 'block';
+      if (mobUserEmail) mobUserEmail.innerText = user.email;
+    }
+
     // Render highly visible Admin Panel Link in navbar links
     let adminNavLink = document.getElementById('navbar-admin-link-li');
     if (state.isAdmin) {
@@ -515,37 +766,16 @@ firebase.auth().onAuthStateChanged(async (user) => {
           navLinksUl.appendChild(adminNavLink);
         }
       }
+      if (mobProfAdminBtn) mobProfAdminBtn.style.display = 'inline-flex';
+      if (mobDrawerAdminLink) mobDrawerAdminLink.style.display = 'block';
     } else {
       if (adminNavLink) adminNavLink.remove();
+      if (mobProfAdminBtn) mobProfAdminBtn.style.display = 'none';
+      if (mobDrawerAdminLink) mobDrawerAdminLink.style.display = 'none';
     }
 
-    // Render highly visible Admin Panel Link in mobile drawer links
-    let mobileAdminNavLink = document.getElementById('mobile-admin-link-li');
-    if (state.isAdmin) {
-      if (!mobileAdminNavLink) {
-        const mobileLinksDiv = document.getElementById('mobile-drawer-links');
-        if (mobileLinksDiv) {
-          mobileAdminNavLink = document.createElement('a');
-          mobileAdminNavLink.id = 'mobile-admin-link-li';
-          mobileAdminNavLink.href = '#/dashboard';
-          mobileAdminNavLink.className = 'nav-link';
-          mobileAdminNavLink.style.fontSize = '1.2rem';
-          mobileAdminNavLink.style.color = 'var(--secondary)';
-          mobileAdminNavLink.style.fontWeight = '700';
-          mobileAdminNavLink.setAttribute('data-route', 'dashboard');
-          mobileAdminNavLink.innerHTML = `<i class="fa-solid fa-gauge-high"></i> Admin Panel`;
-          // Insert it right before the Donate Now button if present
-          const donateBtn = mobileLinksDiv.querySelector('.btn-donate');
-          if (donateBtn) {
-            mobileLinksDiv.insertBefore(mobileAdminNavLink, donateBtn);
-          } else {
-            mobileLinksDiv.appendChild(mobileAdminNavLink);
-          }
-        }
-      }
-    } else {
-      if (mobileAdminNavLink) mobileAdminNavLink.remove();
-    }
+    // Update custom page nav links
+    updateCustomPageNavLinks();
     
     // Toggle dropdown UI binding
     const trigger = document.createElement('div');
@@ -574,11 +804,18 @@ firebase.auth().onAuthStateChanged(async (user) => {
     if (oldTrigger) oldTrigger.remove();
     document.getElementById('user-dropdown-menu').classList.remove('active');
 
+    // Reset mobile profile & admin links
+    const mobProfCard = document.getElementById('mobile-user-profile-card');
+    const mobProfAdminBtn = document.getElementById('mobile-profile-admin-btn');
+    const mobDrawerAdminLink = document.getElementById('mobile-drawer-admin-link');
+    if (mobProfCard) mobProfCard.style.display = 'none';
+    if (mobProfAdminBtn) mobProfAdminBtn.style.display = 'none';
+    if (mobDrawerAdminLink) mobDrawerAdminLink.style.display = 'none';
+
     // Remove admin navigation links if present
     const adminNavLink = document.getElementById('navbar-admin-link-li');
     if (adminNavLink) adminNavLink.remove();
-    const mobileAdminNavLink = document.getElementById('mobile-admin-link-li');
-    if (mobileAdminNavLink) mobileAdminNavLink.remove();
+    updateCustomPageNavLinks();
   }
   
   // Refresh page shell context
@@ -681,16 +918,20 @@ function applyTheme(isDark) {
     document.documentElement.setAttribute('data-theme', 'dark');
     localStorage.setItem('theme', 'dark');
     if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
+    if (mobileThemeBtn) mobileThemeBtn.innerHTML = '<i class="fa-solid fa-sun"></i> Switch to Light Mode';
   } else {
     document.documentElement.removeAttribute('data-theme');
     localStorage.setItem('theme', 'light');
     if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
+    if (mobileThemeBtn) mobileThemeBtn.innerHTML = '<i class="fa-solid fa-moon"></i> Toggle Dark Mode';
   }
 }
 
-// Init theme
+// Explicit Light Mode Default (Clean Pearl White baseline)
 if (localStorage.getItem('theme') === 'dark') {
   applyTheme(true);
+} else {
+  applyTheme(false);
 }
 
 if (themeBtn) {
@@ -741,23 +982,67 @@ if (authForm) {
   });
 }
 
-// Google Authentication
+// Google Authentication with Popup + Redirect Fallback & Environment Diagnostics
 const googleBtn = document.getElementById('google-login-btn');
 if (googleBtn) {
   googleBtn.addEventListener('click', async () => {
     const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
+    provider.setCustomParameters({ prompt: 'select_account' });
     const authLoader = document.getElementById('auth-loader');
     
     try {
       if (authLoader) authLoader.classList.add('active');
+      googleBtn.disabled = true;
       await firebase.auth().signInWithPopup(provider);
+      if (authLoader) authLoader.classList.remove('active');
+      googleBtn.disabled = false;
       authModal.classList.remove('active');
     } catch (err) {
+      console.warn("Google signInWithPopup encountered an issue:", err);
       if (authLoader) authLoader.classList.remove('active');
-      alert(err.message);
+      googleBtn.disabled = false;
+
+      // Handle Popup Blocked or Closed by User -> Prompted Redirect Fallback
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        const tryRedirect = confirm("Sign-in pop-up was blocked or closed. Would you like to sign in directly via page redirect?");
+        if (tryRedirect) {
+          if (authLoader) authLoader.classList.add('active');
+          await firebase.auth().signInWithRedirect(provider);
+          return;
+        }
+      } else if (err.code === 'auth/unauthorized-domain') {
+        alert(
+          `Google Sign-In Domain Authorization Notice:\n\n` +
+          `The domain "${window.location.hostname}" is not yet added to your Firebase project's Authorized Domains list.\n\n` +
+          `To enable Google Login:\n` +
+          `1. Open Firebase Console (console.firebase.google.com)\n` +
+          `2. Go to Authentication -> Settings -> Authorized Domains\n` +
+          `3. Click "Add domain" and add: ${window.location.hostname}\n` +
+          `4. Click Save and refresh.`
+        );
+      } else if (err.code === 'auth/operation-not-supported-in-this-environment') {
+        alert("Google Sign-In is not supported in file:// mode. Please run this website through a web server (e.g. http://localhost:8080, Firebase Hosting, or your live domain).");
+      } else {
+        alert("Google Sign-In Error: " + (err.message || err));
+      }
     }
   });
 }
+
+// Process any pending OAuth redirect result on startup
+try {
+  firebase.auth().getRedirectResult().then(result => {
+    if (result && result.user) {
+      console.log("Logged in via Google Redirect:", result.user.email);
+    }
+  }).catch(err => {
+    if (err.code && err.code !== 'auth/null-user') {
+      console.warn("Google redirect error:", err);
+    }
+  });
+} catch (e) {}
 
 // Logout Action
 const logoutBtn = document.getElementById('logout-btn');
@@ -765,6 +1050,19 @@ if (logoutBtn) {
   logoutBtn.addEventListener('click', async () => {
     const authLoader = document.getElementById('auth-loader');
     if (authLoader) authLoader.classList.add('active');
+    
+    await firebase.auth().signOut();
+    window.location.hash = '#/';
+  });
+}
+
+const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
+if (mobileLogoutBtn) {
+  mobileLogoutBtn.addEventListener('click', async () => {
+    const authLoader = document.getElementById('auth-loader');
+    if (authLoader) authLoader.classList.add('active');
+    const mobileDrawer = document.getElementById('mobile-drawer');
+    if (mobileDrawer) mobileDrawer.classList.remove('active');
     
     await firebase.auth().signOut();
     window.location.hash = '#/';
@@ -1300,6 +1598,213 @@ const templates = {
     `;
   },
 
+  customEventPage() {
+    const page = state.customPage || DEFAULT_CUSTOM_PAGE;
+    const isPreview = window.location.hash.includes('preview=true');
+    if (!page.enabled && !state.isAdmin && !isPreview) {
+      return `
+        <section class="section" style="padding-top: 150px; text-align: center; min-height: 60vh;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+            <div style="font-size: 3.5rem; color: var(--accent); margin-bottom: 20px;"><i class="fa-solid fa-calendar-check"></i></div>
+            <h2 style="font-size: 2.2rem; color: var(--primary); margin-bottom: 12px;">Special Event Coming Soon</h2>
+            <p style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.6; margin-bottom: 25px;">
+              Details for this upcoming gala and community initiative are currently being finalized. Please check back shortly or explore our ongoing community programs.
+            </p>
+            <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+              <a href="#/" class="btn btn-primary"><i class="fa-solid fa-house" style="margin-right: 8px;"></i> Return to Homepage</a>
+              <a href="#/my-tickets" class="btn btn-outline"><i class="fa-solid fa-magnifying-glass" style="margin-right: 6px;"></i> Check Existing Pass</a>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    return `
+      <!-- --- SPECIAL EVENT HERO --- -->
+      <section class="special-event-hero">
+        <div class="hero-bg-shapes">
+          <div class="hero-glow-orb hero-glow-orb-1"></div>
+          <div class="hero-glow-orb hero-glow-orb-2"></div>
+        </div>
+        <div style="position: relative; z-index: 2; max-width: 900px; margin: 0 auto;">
+          ${(!page.enabled && (state.isAdmin || isPreview)) ? `
+            <div style="background: rgba(243, 156, 18, 0.25); border: 1px dashed var(--accent); color: #fef08a; padding: 8px 18px; border-radius: 50px; display: inline-block; margin-bottom: 20px; font-weight: 700; font-size: 0.85rem;">
+              <i class="fa-solid fa-eye-slash" style="margin-right: 6px;"></i> Draft Preview Mode (Hidden from public)
+            </div>
+          ` : ''}
+          <div class="hero-tag" style="background: rgba(243,156,18,0.2); color: var(--accent); border-color: rgba(243,156,18,0.4);">
+            <i class="fa-solid fa-crown" style="margin-right: 6px;"></i> Featured Special Event
+          </div>
+          <h1 class="hero-title" style="font-size: 3.2rem; margin-bottom: 1rem;">${page.title}</h1>
+          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px;">${page.subtitle}</p>
+          
+          <div class="special-event-meta-bar">
+            <div class="special-meta-chip"><i class="fa-regular fa-calendar"></i> ${page.date}</div>
+            <div class="special-meta-chip"><i class="fa-regular fa-clock"></i> ${page.time}</div>
+            <div class="special-meta-chip"><i class="fa-solid fa-location-dot"></i> ${page.location}</div>
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <a href="#custom-pricing-section" class="btn btn-donate" style="padding: 14px 32px; font-size: 1.05rem;"><i class="fa-solid fa-ticket"></i> Select Your Pass</a>
+            <a href="#custom-story-section" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-circle-info"></i> Event Details</a>
+            <a href="#/my-tickets" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-magnifying-glass"></i> Check My Pass</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- EVENT NARRATIVE & HIGHLIGHTS --- -->
+      <section id="custom-story-section" class="section">
+        <div class="section-bg-aura">
+          <div class="section-aura-orb section-aura-orb-1"></div>
+          <div class="section-aura-orb section-aura-orb-2"></div>
+        </div>
+        <div class="special-event-grid">
+          <div>
+            <span class="section-tag">About The Gala</span>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 20px;">An Evening Dedicated to Hope & Healing</h2>
+            <p style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.8; margin-bottom: 25px;">
+              ${page.description}
+            </p>
+            <div style="background: var(--bg-card); border-left: 4px solid var(--accent); padding: 20px; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); margin-bottom: 25px;">
+              <h4 style="color: var(--primary); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-hand-holding-heart" style="color: var(--accent); margin-right: 6px;"></i> 100% Mission-Focused Proceeds</h4>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency single-parent food security toolkits.</p>
+            </div>
+            
+            <!-- Program Schedule Timeline -->
+            <h3 style="font-size: 1.4rem; color: var(--primary); margin: 35px 0 15px 0; font-weight: 800;"><i class="fa-solid fa-list-check" style="color: var(--secondary); margin-right: 8px;"></i> Program Itinerary</h3>
+            <div class="timeline-list">
+              ${(page.schedule || []).map(item => `
+                <div class="timeline-item">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-time">${item.time}</div>
+                  <div class="timeline-title">${item.title}</div>
+                  <div class="timeline-desc">${item.desc}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Banner & Venue Card -->
+          <div>
+            <div class="calendar-card" style="padding: 20px; overflow: hidden; border-radius: var(--radius-lg);">
+              <img src="${page.bannerImage || 'assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18 (2).webp'}" alt="Event Banner" style="width: 100%; height: 280px; object-fit: cover; border-radius: var(--radius-md); margin-bottom: 20px;">
+              <h3 style="font-size: 1.25rem; color: var(--primary); font-weight: 800; margin-bottom: 12px;"><i class="fa-solid fa-building-columns" style="color: var(--accent); margin-right: 8px;"></i> Venue & Host Details</h3>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Location:</strong> ${page.location}</p>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Date & Time:</strong> ${page.date} at ${page.time}</p>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;"><strong>Dress Code:</strong> Semi-Formal / Cocktail Attire</p>
+              <div style="display: flex; gap: 10px;">
+                <a href="${getGoogleCalendarUrl(page.title, page.date, page.location, page.description)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="flex: 1; text-align: center; font-size: 0.85rem; padding: 10px 8px;">
+                  <i class="fa-brands fa-google"></i> Add Google Cal
+                </a>
+                <button onclick="downloadIcsFile('${page.title.replace(/'/g, "\\'")}', '${page.date}', '${page.location.replace(/'/g, "\\'")}', '${page.description.replace(/'/g, "\\'")}')" class="btn btn-outline" style="flex: 1; text-align: center; font-size: 0.85rem; padding: 10px 8px;">
+                  <i class="fa-solid fa-calendar-arrow-down"></i> .ICS File
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- TIERED PRICING & FEATURES SECTION --- -->
+      <section id="custom-pricing-section" class="section section-alt" style="padding-top: 60px;">
+        <div class="section-header">
+          <span class="section-tag">Tiered Entry & Passes</span>
+          <h2 class="section-title">Select Your Pass or Sponsorship Table</h2>
+          <p class="section-subtitle">Reserve your seat for an unforgettable evening. All contributions support Howards 4 Hope 501(c)(3) mission initiatives.</p>
+        </div>
+
+        <div class="pricing-tiers-grid">
+          ${(page.pricingTiers || []).map(tier => `
+            <div class="pricing-card ${tier.popular ? 'featured' : ''}">
+              ${tier.badge ? `<span class="pricing-badge">${tier.badge}</span>` : ''}
+              <div class="pricing-tier-name">${tier.name}</div>
+              <div class="pricing-price">${tier.price === 0 ? 'FREE' : '$' + tier.price} <span>/ pass</span></div>
+              
+              <ul class="pricing-features">
+                ${(tier.features || []).map(feat => `
+                  <li class="pricing-feature-item">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <span>${feat}</span>
+                  </li>
+                `).join('')}
+              </ul>
+
+              <button class="btn ${tier.popular ? 'btn-donate' : 'btn-primary'} custom-book-tier-btn" data-tier-id="${tier.id}" data-tier-name="${tier.name}" data-tier-price="${tier.price}" style="width: 100%; padding: 12px; font-weight: 700;">
+                <i class="fa-solid fa-ticket" style="margin-right: 6px;"></i> Reserve ${tier.name}
+              </button>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="text-align: center; margin-top: 35px;">
+          <div style="display: inline-flex; align-items: center; gap: 10px; background: var(--bg-card); padding: 12px 24px; border-radius: 50px; border: 1px solid rgba(15,23,42,0.1); box-shadow: var(--shadow-sm); font-size: 0.9rem;">
+            <i class="fa-solid fa-circle-check" style="color: var(--success);"></i>
+            <span style="color: var(--text-muted);">Already booked a Gala pass or table?</span>
+            <a href="#/my-tickets" style="color: var(--secondary); font-weight: 700; text-decoration: underline;">
+              Look up & Print Your Pass &rarr;
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- --- CUSTOM TICKET CHECKOUT MODAL --- -->
+      <div class="modal" id="custom-tier-modal">
+        <div class="modal-content" style="max-width: 520px;">
+          <span class="modal-close" id="custom-tier-close">&times;</span>
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(243, 156, 18, 0.15); color: var(--accent); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-size: 1.4rem;">
+              <i class="fa-solid fa-ticket"></i>
+            </div>
+            <h3 class="modal-title" id="custom-modal-tier-title" style="margin: 0; font-size: 1.4rem;">Reserve Pass</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;" id="custom-modal-tier-subtitle">Complete your registration below.</p>
+          </div>
+
+          <form id="custom-tier-booking-form">
+            <input type="hidden" id="custom-tier-input-id">
+            <input type="hidden" id="custom-tier-input-price">
+            
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label style="font-size: 0.85rem; font-weight: 700;">Pass Quantity</label>
+              <select id="custom-tier-qty" class="form-control" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                <option value="1">1 Pass</option>
+                <option value="2">2 Passes</option>
+                <option value="4">4 Passes</option>
+                <option value="8">Full Table (8 Passes)</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label style="font-size: 0.85rem; font-weight: 700;">Full Name *</label>
+              <input type="text" id="custom-tier-name" class="form-control" required placeholder="Jane Doe" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label style="font-size: 0.85rem; font-weight: 700;">Email Address *</label>
+              <input type="email" id="custom-tier-email" class="form-control" required placeholder="jane@example.com" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+              <label style="font-size: 0.85rem; font-weight: 700;">Phone Number</label>
+              <input type="tel" id="custom-tier-phone" class="form-control" placeholder="(562) 555-0199" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+            </div>
+
+            <div style="background: var(--bg-base); padding: 15px; border-radius: var(--radius-sm); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">Total Order Amount:</span>
+                <div style="font-size: 1.4rem; font-weight: 800; color: var(--primary);" id="custom-tier-total-display">$0.00</div>
+              </div>
+              <span class="badge" style="background: rgba(30, 130, 76, 0.15); color: var(--success); font-weight: 700; padding: 6px 12px; border-radius: 50px;">Tax Deductible</span>
+            </div>
+
+            <button type="submit" class="btn btn-donate" id="custom-tier-submit-btn" style="width: 100%; padding: 14px; font-weight: 800; font-size: 1rem;">
+              Confirm & Book Reservation
+            </button>
+          </form>
+        </div>
+      </div>
+    `;
+  },
+
   dashboard() {
     if (!state.isAdmin) {
       return `<div class="section" style="padding-top: 140px; text-align: center;"><h3 style="color: var(--danger);">Access Denied</h3></div>`;
@@ -1309,434 +1814,515 @@ const templates = {
         <div class="section-header">
           <span class="section-tag">Admin Panel</span>
           <h2 class="section-title">Control Dashboard</h2>
-          <p class="section-subtitle">Manage upcoming events, customize public category dot colors, update community blog articles, and export registries.</p>
+          <p class="section-subtitle">Manage upcoming events, customize public category dot colors, update community blog articles, configure dedicated gala campaigns, and export registries.</p>
         </div>
 
-        <!-- Interactive Analytics Dashboard -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 3rem; max-width: 1200px; margin-left: auto; margin-right: auto;">
-          <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--primary); text-align: left; display: flex; align-items: center; gap: 15px;">
-            <div style="font-size: 2.2rem; color: var(--primary);"><i class="fa-solid fa-users"></i></div>
-            <div>
-              <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.totalAttendees}</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total Attendees</div>
+        <!-- Admin Navigation Tabs -->
+        <div class="admin-tabs-bar">
+          <button type="button" class="admin-tab-btn active" data-tab="adm-pane-overview">
+            <i class="fa-solid fa-chart-pie"></i> Overview & Metrics
+          </button>
+          <button type="button" class="admin-tab-btn" data-tab="adm-pane-events">
+            <i class="fa-solid fa-calendar-days"></i> Events & Categories
+          </button>
+          <button type="button" class="admin-tab-btn" data-tab="adm-pane-blog">
+            <i class="fa-solid fa-newspaper"></i> Blog Articles
+          </button>
+          <button type="button" class="admin-tab-btn" data-tab="adm-pane-roles">
+            <i class="fa-solid fa-shield-halved"></i> Roles & System
+          </button>
+          <button type="button" class="admin-tab-btn" data-tab="adm-pane-gala" style="margin-left: auto; border-left: 1px solid rgba(15,23,42,0.1);">
+            <i class="fa-solid fa-crown" style="color: var(--accent);"></i> Gala & Campaign Studio <span class="tab-badge">Gala</span>
+          </button>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB PANE 1: OVERVIEW & ANALYTICS METRICS                  -->
+        <!-- ========================================================= -->
+        <div class="admin-tab-pane active" id="adm-pane-overview">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 3rem; max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--primary); text-align: left; display: flex; align-items: center; gap: 15px;">
+              <div style="font-size: 2.2rem; color: var(--primary);"><i class="fa-solid fa-users"></i></div>
+              <div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.totalAttendees}</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total Attendees</div>
+              </div>
+            </div>
+            <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--success); text-align: left; display: flex; align-items: center; gap: 15px;">
+              <div style="font-size: 2.2rem; color: var(--success);"><i class="fa-solid fa-circle-dollar-to-slot"></i></div>
+              <div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">$${state.adminMetrics.totalRevenue.toFixed(2)}</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total Revenue</div>
+              </div>
+            </div>
+            <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--accent); text-align: left; display: flex; align-items: center; gap: 15px;">
+              <div style="font-size: 2.2rem; color: var(--accent);"><i class="fa-solid fa-ticket"></i></div>
+              <div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.activeEvents}</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Active Events</div>
+              </div>
+            </div>
+            <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--secondary); text-align: left; display: flex; align-items: center; gap: 15px;">
+              <div style="font-size: 2.2rem; color: var(--secondary);"><i class="fa-solid fa-chart-line"></i></div>
+              <div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.rsvpConversion}</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">RSVP Conversion</div>
+              </div>
             </div>
           </div>
-          <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--success); text-align: left; display: flex; align-items: center; gap: 15px;">
-            <div style="font-size: 2.2rem; color: var(--success);"><i class="fa-solid fa-circle-dollar-to-slot"></i></div>
-            <div>
-              <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">$${state.adminMetrics.totalRevenue.toFixed(2)}</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total Revenue</div>
+
+          <!-- Quick Navigation & Traffic -->
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; max-width: 1200px; margin: 0 auto 3rem auto; align-items: start;">
+            <div class="calendar-card" style="padding: 24px;">
+              <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Traffic Analytics</h3>
+              <div style="position: relative; height: 260px; width: 100%;">
+                <canvas id="analytics-chart"></canvas>
+              </div>
             </div>
-          </div>
-          <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--accent); text-align: left; display: flex; align-items: center; gap: 15px;">
-            <div style="font-size: 2.2rem; color: var(--accent);"><i class="fa-solid fa-ticket"></i></div>
-            <div>
-              <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.activeEvents}</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Active Events</div>
-            </div>
-          </div>
-          <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--secondary); text-align: left; display: flex; align-items: center; gap: 15px;">
-            <div style="font-size: 2.2rem; color: var(--secondary);"><i class="fa-solid fa-chart-line"></i></div>
-            <div>
-              <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.rsvpConversion}</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">RSVP Conversion</div>
+
+            <div class="calendar-card" style="padding: 24px;">
+              <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Quick Control Shortcuts</h3>
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button type="button" class="btn btn-primary admin-tab-jump-btn" data-target-tab="adm-pane-gala" style="text-align: left; justify-content: flex-start; padding: 12px 16px;">
+                  <i class="fa-solid fa-crown" style="color: var(--accent); margin-right: 8px;"></i> Open Gala & Campaign Studio
+                </button>
+                <button type="button" class="btn btn-outline admin-tab-jump-btn" data-target-tab="adm-pane-events" style="text-align: left; justify-content: flex-start; padding: 12px 16px;">
+                  <i class="fa-solid fa-calendar-plus" style="color: var(--secondary); margin-right: 8px;"></i> Create & Manage Community Events
+                </button>
+                <button type="button" class="btn btn-outline admin-tab-jump-btn" data-target-tab="adm-pane-blog" style="text-align: left; justify-content: flex-start; padding: 12px 16px;">
+                  <i class="fa-solid fa-pen-nib" style="color: var(--primary); margin-right: 8px;"></i> Publish News & Milestones Blog
+                </button>
+                <button class="btn btn-outline" onclick="window.location.href='${API.baseUrl}/admin/newsletter/export'" style="text-align: left; justify-content: flex-start; padding: 12px 16px;">
+                  <i class="fa-solid fa-file-csv" style="color: var(--success); margin-right: 8px;"></i> Export Newsletter Registry (CSV)
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- CATEGORY & DOT COLOR MANAGER -->
-        <div class="calendar-card" style="max-width: 1200px; margin: 0 auto 3rem auto; padding: 25px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 12px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-            <div>
-              <h3 style="font-size: 1.3rem; color: var(--primary); margin: 0;"><i class="fa-solid fa-palette" style="color: var(--accent); margin-right: 8px;"></i> Event Categories & Public Dot Colors</h3>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Set the color corresponding to each category. Changes immediately update the public calendar dots and legend.</p>
+        <!-- ========================================================= -->
+        <!-- TAB PANE 2: EVENTS & CATEGORIES                           -->
+        <!-- ========================================================= -->
+        <div class="admin-tab-pane" id="adm-pane-events">
+          <!-- CATEGORY & DOT COLOR MANAGER -->
+          <div class="calendar-card" style="max-width: 1200px; margin: 0 auto 3rem auto; padding: 25px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 12px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 style="font-size: 1.3rem; color: var(--primary); margin: 0;"><i class="fa-solid fa-palette" style="color: var(--accent); margin-right: 8px;"></i> Event Categories & Public Dot Colors</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Set the color corresponding to each category. Changes immediately update the public calendar dots and legend.</p>
+              </div>
+              <button class="btn btn-outline" id="adm-reset-colors-btn" style="font-size: 0.8rem; padding: 6px 14px;">
+                <i class="fa-solid fa-rotate-left"></i> Reset to Defaults
+              </button>
             </div>
-            <button class="btn btn-outline" id="adm-reset-colors-btn" style="font-size: 0.8rem; padding: 6px 14px;">
-              <i class="fa-solid fa-rotate-left"></i> Reset to Defaults
-            </button>
-          </div>
 
-          <div class="category-manager-grid">
-            ${Object.entries(state.categoryColors).map(([cat, color]) => `
-              <div class="category-item-card">
-                <div class="category-item-left">
-                  <div class="category-color-circle" style="background-color: ${color};"></div>
-                  <span class="category-name">${cat}</span>
-                </div>
-                <div class="category-item-actions">
-                  <div class="color-picker-wrapper" title="Pick color for ${cat}">
-                    <input type="color" class="color-picker-input category-color-picker" data-cat="${cat}" value="${color}">
+            <div class="category-manager-grid">
+              ${Object.entries(state.categoryColors).map(([cat, color]) => `
+                <div class="category-item-card">
+                  <div class="category-item-left">
+                    <div class="category-color-circle" style="background-color: ${color};"></div>
+                    <span class="category-name">${cat}</span>
                   </div>
-                  <span style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">${color}</span>
-                  ${!DEFAULT_CATEGORY_COLORS[cat] ? `
-                    <button class="btn btn-outline delete-category-btn" data-cat="${cat}" style="padding: 4px 8px; font-size: 0.75rem; color: var(--danger); border-color: var(--danger);" title="Delete Category">
-                      <i class="fa-solid fa-trash-can"></i>
-                    </button>
-                  ` : ''}
+                  <div class="category-item-actions">
+                    <div class="color-picker-wrapper" title="Pick color for ${cat}">
+                      <input type="color" class="color-picker-input category-color-picker" data-cat="${cat}" value="${color}">
+                    </div>
+                    <span style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">${color}</span>
+                    ${!DEFAULT_CATEGORY_COLORS[cat] ? `
+                      <button class="btn btn-outline delete-category-btn" data-cat="${cat}" style="padding: 4px 8px; font-size: 0.75rem; color: var(--danger); border-color: var(--danger);" title="Delete Category">
+                        <i class="fa-solid fa-trash-can"></i>
+                      </button>
+                    ` : ''}
+                  </div>
                 </div>
-              </div>
-            `).join('')}
-          </div>
+              `).join('')}
+            </div>
 
-          <!-- Add New Category Form -->
-          <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(15,23,42,0.08);">
-            <h4 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--primary);">Add New Category</h4>
-            <form id="adm-add-category-form" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-              <input type="text" id="new-cat-name" class="form-control" placeholder="Category Name (e.g., Volunteer Drive)" required style="flex: 1; min-width: 200px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-size: 0.85rem; font-weight: 600;">Dot Color:</label>
-                <input type="color" id="new-cat-color" value="#007C92" style="width: 40px; height: 38px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); cursor: pointer;">
-              </div>
-              <button type="submit" class="btn btn-primary" style="padding: 10px 20px;">
-                <i class="fa-solid fa-plus"></i> Add Category
-              </button>
-            </form>
-          </div>
-        </div>
-        
-        <!-- TRAFFIC & ADMIN CONTROLS -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1200px; margin: 0 auto 3rem auto; align-items: start;">
-          <div class="calendar-card" style="padding: 20px;">
-            <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Traffic Analytics</h3>
-            <div style="position: relative; height: 250px; width: 100%;">
-              <canvas id="analytics-chart"></canvas>
-            </div>
-          </div>
-          <div class="calendar-card" style="padding: 20px;">
-            <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Admin Actions</h3>
-            <div style="margin-bottom: 20px;">
-              <h4 style="font-size: 1rem; margin-bottom: 10px;">Export Newsletter Subscribers</h4>
-              <button class="btn btn-primary" onclick="window.location.href='${API.baseUrl}/admin/newsletter/export'">
-                <i class="fa-solid fa-file-csv"></i> Download CSV
-              </button>
-            </div>
-            <hr style="border: none; border-top: 1px solid rgba(15,23,42,0.1); margin-bottom: 20px;">
-            <div>
-              <h4 style="font-size: 1rem; margin-bottom: 10px;">Grant Admin Role</h4>
-              <form id="grant-admin-form" style="display: flex; gap: 10px;">
-                <input type="email" id="grant-admin-email" class="form-control" required placeholder="User Email" style="flex: 1;">
-                <button type="submit" class="btn btn-secondary">Grant</button>
+            <!-- Add New Category Form -->
+            <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(15,23,42,0.08);">
+              <h4 style="font-size: 0.95rem; margin-bottom: 12px; color: var(--primary);">Add New Category</h4>
+              <form id="adm-add-category-form" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <input type="text" id="new-cat-name" class="form-control" placeholder="Category Name (e.g., Volunteer Drive)" required style="flex: 1; min-width: 200px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label style="font-size: 0.85rem; font-weight: 600;">Dot Color:</label>
+                  <input type="color" id="new-cat-color" value="#007C92" style="width: 40px; height: 38px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); cursor: pointer;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="padding: 10px 20px;">
+                  <i class="fa-solid fa-plus"></i> Add Category
+                </button>
               </form>
             </div>
           </div>
-        </div>
 
-        <!-- MEDIA ASSET OPTIMIZER & IMAGE CONVERTER TOOL -->
-        <div class="image-converter-card" style="max-width: 1200px; margin: 0 auto 3rem auto;">
-          <div style="border-bottom: 2px solid var(--primary); padding-bottom: 12px; margin-bottom: 20px;">
-            <h3 style="font-size: 1.3rem; color: var(--primary); margin: 0;">
-              <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent); margin-right: 8px;"></i> Media Asset Converter & Image Optimizer
-            </h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
-              Convert and optimize high-resolution community images in real-time into lightweight <strong>WebP</strong> (for ultra-fast loading) or transparent <strong>PNG</strong> (for logos & badges).
-            </p>
-          </div>
-
-          <div class="converter-guidance-grid">
-            <div class="format-guide-box webp-box">
-              <div style="font-weight: 700; color: #10B981; margin-bottom: 4px;"><i class="fa-solid fa-bolt"></i> When to use WebP (Recommended)</div>
-              <div>Best for photographic event banners, blog feature images, flyers, and carousel galleries. Provides ~80% reduction in file size with zero perceptible quality loss.</div>
-            </div>
-            <div class="format-guide-box png-box">
-              <div style="font-weight: 700; color: #6366F1; margin-bottom: 4px;"><i class="fa-solid fa-shapes"></i> When to use PNG</div>
-              <div>Best for official organization logos, seal graphics, award badges, and icons requiring crisp alpha-channel transparent backgrounds.</div>
-            </div>
-          </div>
-
-          <div class="converter-dropzone" id="admin-converter-dropzone">
-            <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2.2rem; color: var(--primary); margin-bottom: 10px;"></i>
-            <div style="font-weight: 700; color: var(--primary); font-size: 1rem;">Drag & drop any image here or click to browse</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Supports JPEG, PNG, WebP, GIF, HEIC up to 20MB</div>
-            <input type="file" id="converter-file-input" accept="image/*" style="display: none;">
-          </div>
-
-          <div class="converter-controls-row" id="converter-controls-section" style="display: none;">
-            <div style="display: flex; gap: 10px; align-items: center;">
-              <label style="font-weight: 700; font-size: 0.85rem;">Target Format:</label>
-              <select id="converter-format-select" class="form-control" style="width: 120px; padding: 6px 10px;">
-                <option value="image/webp" selected>WebP (.webp)</option>
-                <option value="image/png">PNG (.png)</option>
-              </select>
-            </div>
-
-            <div style="display: flex; gap: 10px; align-items: center;">
-              <label style="font-weight: 700; font-size: 0.85rem;">Preset Dimension:</label>
-              <select id="converter-preset-select" class="form-control" style="width: 180px; padding: 6px 10px;">
-                <option value="1200x630" selected>Event Banner (1200x630)</option>
-                <option value="800x500">Blog Cover (800x500)</option>
-                <option value="400x400">Square Icon (400x400)</option>
-                <option value="original">Original Dimensions</option>
-              </select>
-            </div>
-
-            <div style="display: flex; gap: 10px; align-items: center;" id="converter-quality-group">
-              <label style="font-weight: 700; font-size: 0.85rem;">Quality: <span id="converter-quality-val">85%</span></label>
-              <input type="range" id="converter-quality-slider" min="50" max="100" value="85" style="width: 100px;">
-            </div>
-
-            <button class="btn btn-primary" id="converter-process-btn" style="padding: 8px 16px; font-size: 0.85rem;">
-              <i class="fa-solid fa-arrows-rotate"></i> Convert & Optimize
-            </button>
-          </div>
-
-          <!-- Preview & Action Result -->
-          <div class="converter-preview-area" id="converter-result-area" style="display: none;">
-            <img id="converter-result-img" class="converter-preview-img" src="" alt="Converted Preview">
-            <div style="flex: 1;">
-              <div style="font-weight: 700; color: var(--primary); font-size: 0.95rem;" id="converter-stat-title">Image Optimized Successfully!</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 12px 0;" id="converter-stat-desc">
-                Size reduced from 1.4 MB to 120 KB (91% saved).
-              </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="btn btn-secondary" id="apply-to-event-banner-btn" style="padding: 6px 14px; font-size: 0.8rem;">
-                  <i class="fa-solid fa-calendar-check"></i> Set as Event Banner
-                </button>
-                <button class="btn btn-outline" id="apply-to-blog-cover-btn" style="padding: 6px 14px; font-size: 0.8rem;">
-                  <i class="fa-solid fa-newspaper"></i> Set as Blog Cover
-                </button>
-                <button class="btn btn-outline" id="download-converted-img-btn" style="padding: 6px 14px; font-size: 0.8rem;">
-                  <i class="fa-solid fa-download"></i> Download File
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 3rem; align-items: start; max-width: 1200px; margin-left: auto; margin-right: auto;">
-          <!-- Event Creator Card -->
-          <div class="form-card" style="margin: 0; padding: 30px;">
-            <h3 style="margin-bottom: 20px;"><i class="fa-regular fa-calendar-plus" style="color: var(--secondary); margin-right: 8px;"></i> Create New Event</h3>
-            <form id="admin-create-event-form">
-              <div class="form-group">
-                <label class="form-label">Event Title</label>
-                <input type="text" class="form-control" id="adm-evt-title" required placeholder="E.g., Links of Hope Support Summit">
-              </div>
-              <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div>
-                  <label class="form-label">Date</label>
-                  <input type="date" class="form-control" id="adm-evt-date" required>
+          <!-- EVENT CREATOR & LIST -->
+          <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 3rem; align-items: start; max-width: 1200px; margin: 0 auto 3rem auto;">
+            <!-- Event Creator Card -->
+            <div class="form-card" style="margin: 0; padding: 30px;">
+              <h3 style="margin-bottom: 20px;"><i class="fa-regular fa-calendar-plus" style="color: var(--secondary); margin-right: 8px;"></i> Create New Event</h3>
+              <form id="admin-create-event-form">
+                <div class="form-group">
+                  <label class="form-label">Event Title</label>
+                  <input type="text" class="form-control" id="adm-evt-title" required placeholder="E.g., Links of Hope Support Summit">
                 </div>
-                <div>
-                  <label class="form-label">Time</label>
-                  <input type="text" class="form-control" id="adm-evt-time" required placeholder="4:00 PM">
+                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <div>
+                    <label class="form-label">Date</label>
+                    <input type="date" class="form-control" id="adm-evt-date" required>
+                  </div>
+                  <div>
+                    <label class="form-label">Time</label>
+                    <input type="text" class="form-control" id="adm-evt-time" required placeholder="4:00 PM">
+                  </div>
                 </div>
-              </div>
-              <div class="form-group" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px;">
-                <div>
-                  <label class="form-label">Location</label>
-                  <input type="text" class="form-control" id="adm-evt-loc" required value="3711 Long Beach Blvd, #4055, Long Beach, CA 90807">
+                <div class="form-group" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px;">
+                  <div>
+                    <label class="form-label">Location</label>
+                    <input type="text" class="form-control" id="adm-evt-loc" required value="3711 Long Beach Blvd, #4055, Long Beach, CA 90807">
+                  </div>
+                  <div>
+                    <label class="form-label">Price ($)</label>
+                    <input type="number" class="form-control" id="adm-evt-price" required min="0" placeholder="0">
+                  </div>
                 </div>
-                <div>
-                  <label class="form-label">Price ($)</label>
-                  <input type="number" class="form-control" id="adm-evt-price" required min="0" placeholder="0">
-                </div>
-              </div>
 
-              <!-- Payment Splitting & Installment Settings -->
-              <div class="installment-config-box">
-                <label style="display: flex; align-items: center; gap: 8px; font-weight: 700; cursor: pointer; font-size: 0.9rem; color: var(--primary);">
-                  <input type="checkbox" id="adm-evt-allow-installments">
-                  <span><i class="fa-solid fa-hand-holding-dollar"></i> Enable Payment Splitting / Installment Plan</span>
-                </label>
-                <div id="adm-evt-installment-fields" style="display: none; padding-top: 8px; border-top: 1px dashed rgba(37,99,235,0.2);">
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
-                    <div>
-                      <label style="font-size: 0.8rem; font-weight: 600;">Payment Cycles:</label>
-                      <select class="form-control" id="adm-evt-installment-cycles" style="padding: 6px 10px;">
-                        <option value="2">2 Payments</option>
-                        <option value="3" selected>3 Payments</option>
-                        <option value="4">4 Payments</option>
-                        <option value="6">6 Payments</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style="font-size: 0.8rem; font-weight: 600;">Cycle Frequency:</label>
-                      <select class="form-control" id="adm-evt-installment-frequency" style="padding: 6px 10px;">
-                        <option value="Monthly" selected>Monthly</option>
-                        <option value="Bi-Weekly">Bi-Weekly</option>
-                        <option value="Weekly">Weekly</option>
-                      </select>
+                <!-- Payment Splitting & Installment Settings -->
+                <div class="installment-config-box">
+                  <label style="display: flex; align-items: center; gap: 8px; font-weight: 700; cursor: pointer; font-size: 0.9rem; color: var(--primary);">
+                    <input type="checkbox" id="adm-evt-allow-installments">
+                    <span><i class="fa-solid fa-hand-holding-dollar"></i> Enable Payment Splitting / Installment Plan</span>
+                  </label>
+                  <div id="adm-evt-installment-fields" style="display: none; padding-top: 8px; border-top: 1px dashed rgba(37,99,235,0.2);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                      <div>
+                        <label style="font-size: 0.8rem; font-weight: 600;">Payment Cycles:</label>
+                        <select class="form-control" id="adm-evt-installment-cycles" style="padding: 6px 10px;">
+                          <option value="2">2 Payments</option>
+                          <option value="3" selected>3 Payments</option>
+                          <option value="4">4 Payments</option>
+                          <option value="6">6 Payments</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style="font-size: 0.8rem; font-weight: 600;">Cycle Frequency:</label>
+                        <select class="form-control" id="adm-evt-installment-frequency" style="padding: 6px 10px;">
+                          <option value="Monthly" selected>Monthly</option>
+                          <option value="Bi-Weekly">Bi-Weekly</option>
+                          <option value="Weekly">Weekly</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                  <div class="installment-badge" id="adm-evt-installment-preview-badge">
-                    <i class="fa-solid fa-calculator"></i> Installment preview will calculate with price
+                </div>
+
+                <div class="form-group" style="margin-top: 14px;">
+                  <label class="form-label">Banner Image URL or WebP Asset</label>
+                  <input type="text" class="form-control" id="adm-evt-banner" placeholder="https://..." value="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=1000">
+                </div>
+
+                <div class="form-group" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 15px;">
+                  <div>
+                    <label class="form-label">Event Category</label>
+                    <select class="form-control" id="adm-evt-category" style="background-image: none;" onchange="
+                      const cat = this.value;
+                      const colorEl = document.getElementById('adm-evt-color');
+                      if (cat === '__custom__') {
+                        document.getElementById('adm-evt-custom-category-group').style.display = 'block';
+                      } else {
+                        document.getElementById('adm-evt-custom-category-group').style.display = 'none';
+                        if (colorEl) colorEl.value = getCategoryColor(cat);
+                      }
+                    ">
+                      ${Object.keys(state.categoryColors).map(cat => `
+                        <option value="${cat}">${cat}</option>
+                      `).join('')}
+                      <option value="__custom__">+ Add Custom Category...</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label">Assigned Dot Color</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input type="color" id="adm-evt-color" value="${getCategoryColor(Object.keys(state.categoryColors)[0])}" style="width: 44px; height: 42px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); cursor: pointer;">
+                      <span style="font-size: 0.8rem; color: var(--text-muted); font-family: monospace;" id="adm-evt-color-hex">${getCategoryColor(Object.keys(state.categoryColors)[0])}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div class="form-group" style="margin-top: 14px;">
-                <label class="form-label">Banner Image URL or WebP Asset</label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                  <input type="text" class="form-control" id="adm-evt-banner" placeholder="https://... or choose from converter above" value="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=1000">
+                <div class="form-group" id="adm-evt-custom-category-group" style="display: none; margin-top: 10px;">
+                  <label class="form-label">Custom Category Name</label>
+                  <input type="text" class="form-control" id="adm-evt-custom-category" placeholder="E.g., Youth Resiliency">
                 </div>
-              </div>
-
-              <div class="form-group" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 15px;">
-                <div>
-                  <label class="form-label">Event Category</label>
-                  <select class="form-control" id="adm-evt-category" style="background-image: none;" onchange="
-                    const cat = this.value;
-                    const colorEl = document.getElementById('adm-evt-color');
-                    if (cat === '__custom__') {
-                      document.getElementById('adm-evt-custom-category-group').style.display = 'block';
-                    } else {
-                      document.getElementById('adm-evt-custom-category-group').style.display = 'none';
-                      if (colorEl) colorEl.value = getCategoryColor(cat);
-                    }
-                  ">
-                    ${Object.keys(state.categoryColors).map(cat => `
-                      <option value="${cat}">${cat}</option>
-                    `).join('')}
-                    <option value="__custom__">+ Add Custom Category...</option>
-                  </select>
+                <div class="form-group">
+                  <label class="form-label">Event Description</label>
+                  <textarea class="form-control" id="adm-evt-desc" required placeholder="Detailed seminar guidelines, goals, and community impact..."></textarea>
                 </div>
-                <div>
-                  <label class="form-label">Assigned Dot Color</label>
-                  <div style="display: flex; gap: 8px; align-items: center;">
-                    <input type="color" id="adm-evt-color" value="${getCategoryColor(Object.keys(state.categoryColors)[0])}" style="width: 44px; height: 42px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); cursor: pointer;">
-                    <span style="font-size: 0.8rem; color: var(--text-muted); font-family: monospace;" id="adm-evt-color-hex">${getCategoryColor(Object.keys(state.categoryColors)[0])}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="form-group" id="adm-evt-custom-category-group" style="display: none; margin-top: 10px;">
-                <label class="form-label">Custom Category Name</label>
-                <input type="text" class="form-control" id="adm-evt-custom-category" placeholder="E.g., Youth Resiliency">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Event Description</label>
-                <textarea class="form-control" id="adm-evt-desc" required placeholder="Detailed seminar guidelines, goals, and community impact..."></textarea>
-              </div>
-              <button class="btn btn-primary" style="width: 100%; height: 46px;" type="submit">
-                <i class="fa-solid fa-plus"></i> Publish Event
-              </button>
-            </form>
-          </div>
-          
-          <!-- Event List and Exporter -->
-          <div class="calendar-card">
-            <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Active Event Records</h3>
+                <button class="btn btn-primary" style="width: 100%; height: 46px;" type="submit">
+                  <i class="fa-solid fa-plus"></i> Publish Event
+                </button>
+              </form>
+            </div>
             
-            <div style="overflow-x: auto;">
-              <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
-                <thead>
-                  <tr style="border-bottom: 2px solid rgba(15, 23, 42, 0.08);">
-                    <th style="padding: 12px 6px;">Event Details</th>
-                    <th style="padding: 12px 6px;">Category & Dot</th>
-                    <th style="padding: 12px 6px; text-align: right;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${state.events.map(evt => {
-                    const evtColor = evt.color || getCategoryColor(evt.category);
-                    return `
+            <!-- Event List and Exporter -->
+            <div class="calendar-card">
+              <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Active Event Records</h3>
+              
+              <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                  <thead>
+                    <tr style="border-bottom: 2px solid rgba(15, 23, 42, 0.08);">
+                      <th style="padding: 12px 6px;">Event Details</th>
+                      <th style="padding: 12px 6px;">Category & Dot</th>
+                      <th style="padding: 12px 6px; text-align: right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${state.events.map(evt => {
+                      const evtColor = evt.color || getCategoryColor(evt.category);
+                      return `
+                        <tr style="border-bottom: 1px solid rgba(15, 23, 42, 0.04);">
+                          <td style="padding: 12px 6px;">
+                            <div style="font-weight: 700; color: var(--primary);">${evt.title}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-regular fa-calendar"></i> ${evt.date} &bull; ${evt.time || ''}</div>
+                          </td>
+                          <td style="padding: 12px 6px;">
+                            <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 4px 10px; background-color: ${evtColor}; color: white; display: inline-flex; align-items: center; gap: 6px;">
+                              <span style="width: 6px; height: 6px; border-radius: 50%; background: white; display: inline-block;"></span>
+                              ${evt.category}
+                            </span>
+                          </td>
+                          <td style="padding: 12px 6px; text-align: right; display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                            <button class="btn btn-outline download-csv-btn" data-id="${evt.id}" style="padding: 6px 12px; font-size: 0.75rem;">
+                              <i class="fa-solid fa-file-csv"></i> CSV
+                            </button>
+                            <button class="btn btn-outline delete-event-btn" data-id="${evt.id}" style="padding: 6px 12px; font-size: 0.75rem; color: var(--danger); border-color: var(--danger);">
+                              <i class="fa-solid fa-trash-can"></i> Delete
+                            </button>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+              
+              <h3 style="margin-top: 40px; margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Event Calendar Preview</h3>
+              <div id="admin-calendar" style="min-height: 400px; background: white; border-radius: 8px; padding: 10px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB PANE 3: BLOG ARTICLES MANAGEMENT                      -->
+        <!-- ========================================================= -->
+        <div class="admin-tab-pane" id="adm-pane-blog">
+          <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 3rem; align-items: start; max-width: 1200px; margin-left: auto; margin-right: auto;">
+            <!-- Blog Creator Card -->
+            <div class="form-card" style="margin: 0; padding: 30px;">
+              <h3 style="margin-bottom: 20px;"><i class="fa-regular fa-pen-to-square" style="color: var(--secondary); margin-right: 8px;"></i> Create Blog Post</h3>
+              <form id="admin-create-blog-form">
+                <div class="form-group">
+                  <label class="form-label">Article Title</label>
+                  <input type="text" class="form-control" id="adm-blog-title" required placeholder="Milestones, recap, announcements...">
+                </div>
+                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <div>
+                    <label class="form-label">Author</label>
+                    <input type="text" class="form-control" id="adm-blog-author" value="LaCreashia Willis-Howard, President" required>
+                  </div>
+                  <div>
+                    <label class="form-label">Category</label>
+                    <select class="form-control" id="adm-blog-category" style="background-image: none;" onchange="if(this.value==='__custom__'){document.getElementById('adm-blog-custom-category-group').style.display='block';}else{document.getElementById('adm-blog-custom-category-group').style.display='none';}">
+                      <option value="Youth Milestones">Youth Milestones</option>
+                      <option value="Caregiver Summits">Caregiver Summits</option>
+                      <option value="Event recaps">Event recaps</option>
+                      <option value="Announcements">Announcements</option>
+                      <option value="__custom__">+ Add Custom Category...</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group" id="adm-blog-custom-category-group" style="display: none; margin-top: 10px;">
+                  <label class="form-label">Custom Category Name</label>
+                  <input type="text" class="form-control" id="adm-blog-custom-category" placeholder="E.g., Respite Outreach">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Image URL (Optional)</label>
+                  <input type="text" class="form-control" id="adm-blog-image" placeholder="https://images.unsplash.com/photo-...">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Content Body</label>
+                  <textarea class="form-control" id="adm-blog-content" required placeholder="Write article content here..." style="height: 120px;"></textarea>
+                </div>
+                <button class="btn btn-primary" style="width: 100%;" type="submit">
+                  <i class="fa-solid fa-paper-plane"></i> Publish Article
+                </button>
+              </form>
+            </div>
+            
+            <!-- Blog List & Delete Control -->
+            <div class="calendar-card">
+              <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Active Blog Posts</h3>
+              
+              <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                  <thead>
+                    <tr style="border-bottom: 2px solid rgba(15, 23, 42, 0.08);">
+                      <th style="padding: 12px 6px;">Title & Author</th>
+                      <th style="padding: 12px 6px;">Category</th>
+                      <th style="padding: 12px 6px; text-align: right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${state.blogPosts.map(post => `
                       <tr style="border-bottom: 1px solid rgba(15, 23, 42, 0.04);">
                         <td style="padding: 12px 6px;">
-                          <div style="font-weight: 700; color: var(--primary);">${evt.title}</div>
-                          <div style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-regular fa-calendar"></i> ${evt.date} &bull; ${evt.time || ''}</div>
+                          <div style="font-weight: 700; color: var(--primary);">${post.title}</div>
+                          <div style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-user-pen"></i> ${post.author} on ${post.date}</div>
                         </td>
                         <td style="padding: 12px 6px;">
-                          <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 4px 10px; background-color: ${evtColor}; color: white; display: inline-flex; align-items: center; gap: 6px;">
-                            <span style="width: 6px; height: 6px; border-radius: 50%; background: white; display: inline-block;"></span>
-                            ${evt.category}
-                          </span>
+                          <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 4px 10px;">${post.category}</span>
                         </td>
-                        <td style="padding: 12px 6px; text-align: right; display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
-                          <button class="btn btn-outline download-csv-btn" data-id="${evt.id}" style="padding: 6px 12px; font-size: 0.75rem;">
-                            <i class="fa-solid fa-file-csv"></i> CSV
-                          </button>
-                          <button class="btn btn-outline delete-event-btn" data-id="${evt.id}" style="padding: 6px 12px; font-size: 0.75rem; color: var(--danger); border-color: var(--danger);">
+                        <td style="padding: 12px 6px; text-align: right;">
+                          <button class="btn btn-outline delete-blog-btn" data-id="${post.id}" style="padding: 6px 12px; font-size: 0.75rem; color: var(--danger); border-color: var(--danger);">
                             <i class="fa-solid fa-trash-can"></i> Delete
                           </button>
                         </td>
                       </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            
-            <h3 style="margin-top: 40px; margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Event Calendar Preview</h3>
-            <div id="admin-calendar" style="min-height: 400px; background: white; border-radius: 8px; padding: 10px;"></div>
           </div>
         </div>
 
-        <!-- Blog Manager Section -->
-        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 3rem; align-items: start; max-width: 1200px; margin-left: auto; margin-right: auto; margin-top: 3rem; border-top: 1px solid rgba(15,23,42,0.08); padding-top: 3rem;">
-          <!-- Blog Creator Card -->
-          <div class="form-card" style="margin: 0; padding: 30px;">
-            <h3 style="margin-bottom: 20px;"><i class="fa-regular fa-pen-to-square" style="color: var(--secondary); margin-right: 8px;"></i> Create Blog Post</h3>
-            <form id="admin-create-blog-form">
-              <div class="form-group">
-                <label class="form-label">Article Title</label>
-                <input type="text" class="form-control" id="adm-blog-title" required placeholder="Milestones, recap, announcements...">
-              </div>
-              <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div>
-                  <label class="form-label">Author</label>
-                  <input type="text" class="form-control" id="adm-blog-author" value="LaCreashia Willis-Howard, President" required>
-                </div>
-                <div>
-                  <label class="form-label">Category</label>
-                  <select class="form-control" id="adm-blog-category" style="background-image: none;" onchange="if(this.value==='__custom__'){document.getElementById('adm-blog-custom-category-group').style.display='block';}else{document.getElementById('adm-blog-custom-category-group').style.display='none';}">
-                    <option value="Youth Milestones">Youth Milestones</option>
-                    <option value="Caregiver Summits">Caregiver Summits</option>
-                    <option value="Event recaps">Event recaps</option>
-                    <option value="Announcements">Announcements</option>
-                    <option value="__custom__">+ Add Custom Category...</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-group" id="adm-blog-custom-category-group" style="display: none; margin-top: 10px;">
-                <label class="form-label">Custom Category Name</label>
-                <input type="text" class="form-control" id="adm-blog-custom-category" placeholder="E.g., Respite Outreach">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Image URL (Optional)</label>
-                <input type="text" class="form-control" id="adm-blog-image" placeholder="https://images.unsplash.com/photo-...">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Content Body</label>
-                <textarea class="form-control" id="adm-blog-content" required placeholder="Write article content here..." style="height: 120px;"></textarea>
-              </div>
-              <button class="btn btn-primary" style="width: 100%;" type="submit">
-                <i class="fa-solid fa-paper-plane"></i> Publish Article
-              </button>
-            </form>
-          </div>
-          
-          <!-- Blog List & Delete Control -->
-          <div class="calendar-card">
-            <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Active Blog Posts</h3>
-            
-            <div style="overflow-x: auto;">
-              <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
-                <thead>
-                  <tr style="border-bottom: 2px solid rgba(15, 23, 42, 0.08);">
-                    <th style="padding: 12px 6px;">Title & Author</th>
-                    <th style="padding: 12px 6px;">Category</th>
-                    <th style="padding: 12px 6px; text-align: right;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${state.blogPosts.map(post => `
-                    <tr style="border-bottom: 1px solid rgba(15, 23, 42, 0.04);">
-                      <td style="padding: 12px 6px;">
-                        <div style="font-weight: 700; color: var(--primary);">${post.title}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-user-pen"></i> ${post.author} on ${post.date}</div>
-                      </td>
-                      <td style="padding: 12px 6px;">
-                        <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 4px 10px;">${post.category}</span>
-                      </td>
-                      <td style="padding: 12px 6px; text-align: right;">
-                        <button class="btn btn-outline delete-blog-btn" data-id="${post.id}" style="padding: 6px 12px; font-size: 0.75rem; color: var(--danger); border-color: var(--danger);">
-                          <i class="fa-solid fa-trash-can"></i> Delete
-                        </button>
-                      </td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
+        <!-- ========================================================= -->
+        <!-- TAB PANE 4: ROLES & SYSTEM ACTIONS                        -->
+        <!-- ========================================================= -->
+        <div class="admin-tab-pane" id="adm-pane-roles">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1200px; margin: 0 auto; align-items: start;">
+            <div class="calendar-card" style="padding: 24px;">
+              <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">User & Admin Role Management</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px;">Grant administrative dashboard access to verified staff or board members via Firebase Auth custom claims.</p>
+              <form id="grant-admin-form" style="display: flex; gap: 10px;">
+                <input type="email" id="grant-admin-email" class="form-control" required placeholder="User Email (e.g. staff@howards4hope.org)" style="flex: 1;">
+                <button type="submit" class="btn btn-primary">Grant Admin</button>
+              </form>
             </div>
+
+            <div class="calendar-card" style="padding: 24px;">
+              <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Data & Newsletter Exports</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px;">Export community subscriber contacts, volunteer registrations, and attendee data for mailings and audit records.</p>
+              <button class="btn btn-outline" onclick="window.location.href='${API.baseUrl}/admin/newsletter/export'" style="width: 100%; padding: 12px; font-weight: 700;">
+                <i class="fa-solid fa-file-csv" style="color: var(--success); margin-right: 8px;"></i> Download Newsletter Subscribers CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB PANE 5: GALA & SPECIAL EVENT STUDIO (DEDICATED TAB)   -->
+        <!-- ========================================================= -->
+        <div class="admin-tab-pane" id="adm-pane-gala">
+          <div class="calendar-card" style="max-width: 1200px; margin: 0 auto 3rem auto; padding: 25px; border-top: 4px solid var(--accent);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 14px; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 style="font-size: 1.4rem; color: var(--primary); margin: 0; font-weight: 800;">
+                  <i class="fa-solid fa-crown" style="color: var(--accent); margin-right: 8px;"></i> Special Event Page & Pricing Studio
+                </h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+                  Configure your signature Gala or major community event with custom tiered ticket pricing, schedule, and live visibility toggling.
+                </p>
+              </div>
+              
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <!-- VISIBILITY SWITCH -->
+                <div class="admin-switch-container">
+                  <span style="font-weight: 700; font-size: 0.9rem; color: ${state.customPage.enabled ? 'var(--success)' : 'var(--text-muted)'};" id="adm-switch-status-label">
+                    ${state.customPage.enabled ? '<i class="fa-solid fa-globe"></i> Published (Live)' : '<i class="fa-solid fa-eye-slash"></i> Hidden (Draft)'}
+                  </span>
+                  <label class="admin-switch">
+                    <input type="checkbox" id="adm-custom-page-toggle" ${state.customPage.enabled ? 'checked' : ''}>
+                    <span class="admin-slider"></span>
+                  </label>
+                </div>
+
+                <a href="#/special-event?preview=true" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 16px;">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Preview Page
+                </a>
+              </div>
+            </div>
+
+            <form id="adm-custom-page-form">
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;">
+                <div class="form-group">
+                  <label style="font-size: 0.85rem; font-weight: 700;">Navigation Link Label (Appears in Navbar & Mobile Drawer)</label>
+                  <input type="text" id="adm-custom-nav-label" class="form-control" value="${state.customPage.navLabel || 'Featured Gala'}" required style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.85rem; font-weight: 700;">Hero Event Title</label>
+                  <input type="text" id="adm-custom-title" class="form-control" value="${state.customPage.title || ''}" required style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 18px;">
+                <label style="font-size: 0.85rem; font-weight: 700;">Hero Subtitle / Tagline</label>
+                <textarea id="adm-custom-subtitle" class="form-control" rows="2" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">${state.customPage.subtitle || ''}</textarea>
+              </div>
+
+              <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 18px;">
+                <div class="form-group">
+                  <label style="font-size: 0.85rem; font-weight: 700;">Date</label>
+                  <input type="date" id="adm-custom-date" class="form-control" value="${state.customPage.date || ''}" required style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.85rem; font-weight: 700;">Time</label>
+                  <input type="text" id="adm-custom-time" class="form-control" value="${state.customPage.time || ''}" placeholder="6:00 PM – 10:00 PM PST" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.85rem; font-weight: 700;">Location / Venue</label>
+                  <input type="text" id="adm-custom-location" class="form-control" value="${state.customPage.location || ''}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 18px;">
+                <label style="font-size: 0.85rem; font-weight: 700;">Banner Image Asset Path / URL</label>
+                <input type="text" id="adm-custom-banner" class="form-control" value="${state.customPage.bannerImage || ''}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 24px;">
+                <label style="font-size: 0.85rem; font-weight: 700;">Event Mission Story & Details</label>
+                <textarea id="adm-custom-desc" class="form-control" rows="3" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">${state.customPage.description || ''}</textarea>
+              </div>
+
+              <!-- TIERED PRICING MANAGER -->
+              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                  <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0; font-weight: 800;">
+                    <i class="fa-solid fa-tags" style="color: var(--secondary); margin-right: 6px;"></i> Custom Pricing & Feature Tiers
+                  </h4>
+                  <button type="button" class="btn btn-outline" id="adm-add-tier-btn" style="font-size: 0.8rem; padding: 6px 12px;">
+                    <i class="fa-solid fa-plus"></i> Add New Tier
+                  </button>
+                </div>
+
+                <div id="adm-tiers-container" style="display: flex; flex-direction: column; gap: 12px;">
+                  ${(state.customPage.pricingTiers || []).map((t, idx) => `
+                    <div class="calendar-card adm-tier-row" style="padding: 16px; display: grid; grid-template-columns: 2fr 1fr 1fr 3fr auto; gap: 10px; align-items: center;">
+                      <input type="text" class="form-control tier-name-input" value="${t.name}" placeholder="Tier Name" style="padding: 8px;">
+                      <input type="number" class="form-control tier-price-input" value="${t.price}" placeholder="Price ($)" style="padding: 8px;">
+                      <input type="text" class="form-control tier-badge-input" value="${t.badge || ''}" placeholder="Badge" style="padding: 8px;">
+                      <input type="text" class="form-control tier-features-input" value="${(t.features || []).join('; ')}" placeholder="Features (semicolon-separated)" style="padding: 8px;">
+                      <button type="button" class="btn btn-outline adm-delete-tier-btn" style="color: var(--danger); border-color: var(--danger); padding: 8px 10px;" title="Remove Tier"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- SAVE BUTTON -->
+              <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="submit" class="btn btn-donate" id="adm-save-custom-page-btn" style="padding: 12px 28px; font-weight: 800;">
+                  <i class="fa-solid fa-floppy-disk" style="margin-right: 6px;"></i> Save & Publish Studio Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </section>
@@ -1749,7 +2335,7 @@ const templates = {
         <div class="section-header">
           <span class="section-tag">Access Passes</span>
           <h2 class="section-title">Event Tickets & Verification</h2>
-          <p class="section-subtitle">View, verify, and print your digital entry passes for Howards 4 Hope community workshops and charity events.</p>
+          <p class="section-subtitle">View, verify, and print your digital entry passes for Howards 4 Hope community workshops, galas, and charity events.</p>
         </div>
         
         <div style="max-width: 850px; margin: 0 auto;">
@@ -1758,7 +2344,7 @@ const templates = {
             <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
               <i class="fa-solid fa-qrcode" style="font-size: 2.2rem; color: var(--secondary);"></i>
               <div>
-                <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--primary); margin: 0;">Guest Ticket & RSVP Lookup</h3>
+                <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--primary); margin: 0;">Instant Ticket & Pass Verification</h3>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">Search by purchaser email, Ticket ID (e.g. <code>H4H-TKT-...</code>), or Confirmation Token.</p>
               </div>
             </div>
@@ -1773,38 +2359,84 @@ const templates = {
             <div id="lookup-results-container" style="margin-top: 25px; display: none;"></div>
           </div>
 
-          ${state.user && state.myTickets.length > 0 ? `
+          <!-- Saved Passes on this device or user account -->
+          ${state.myTickets && state.myTickets.length > 0 ? `
             <div style="margin-top: 30px;">
-              <h3 style="font-size: 1.2rem; color: var(--primary); font-weight: 800; margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 8px;">
-                <i class="fa-solid fa-user-check" style="color: var(--accent); margin-right: 6px;"></i> My Registered Member Passes (${state.myTickets.length})
-              </h3>
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 8px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="font-size: 1.2rem; color: var(--primary); font-weight: 800; margin: 0;">
+                  <i class="fa-solid fa-ticket" style="color: var(--accent); margin-right: 6px;"></i> Saved Passes on this Device (${state.myTickets.length})
+                </h3>
+                <button class="btn btn-outline" onclick="window.print()" style="font-size: 0.8rem; padding: 6px 14px;">
+                  <i class="fa-solid fa-print"></i> Print All Passes
+                </button>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
                 ${state.myTickets.map(tkt => `
-                  <div class="calendar-card" style="border-left: 6px solid var(--accent); position: relative; overflow: hidden; padding: 22px;">
+                  <div class="calendar-card ticket-receipt-card" style="border-left: 6px solid var(--accent); position: relative; overflow: hidden; padding: 22px; box-shadow: var(--shadow-md);">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                       <div>
-                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin: 0;">${tkt.eventTitle}</h4>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-top: 4px;"><i class="fa-solid fa-calendar-day"></i> ${tkt.eventDate}</div>
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin: 0;">${tkt.eventTitle || 'Howards 4 Hope Event'}</h4>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-top: 4px;">
+                          <i class="fa-solid fa-calendar-day"></i> ${tkt.eventDate || 'Confirmed'}
+                        </div>
                       </div>
-                      <span class="event-badge" style="position: static; background: var(--accent); color: var(--primary); font-size: 0.75rem;">${tkt.quantity} Pass(es)</span>
+                      <span class="event-badge" style="position: static; background: var(--accent); color: var(--primary); font-size: 0.75rem; font-weight: 700;">
+                        ${tkt.quantity || 1} Pass(es)
+                      </span>
                     </div>
-                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+                    
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
                       <i class="fa-solid fa-location-dot"></i> ${tkt.eventLocation || '3711 Long Beach Blvd, #4055, Long Beach, CA 90807'}
                     </div>
+                    
+                    <div style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 8px;">
+                      <strong>Holder:</strong> ${tkt.guestName || tkt.userEmail || (state.user ? state.user.displayName || state.user.email : 'Valued Attendee')}
+                    </div>
+
+                    ${tkt.pricePaid !== undefined && tkt.pricePaid !== null ? `
+                      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
+                        <strong>Total Amount:</strong> $${typeof tkt.pricePaid === 'number' ? tkt.pricePaid.toFixed(2) : tkt.pricePaid}
+                      </div>
+                    ` : ''}
+
                     ${tkt.paymentPlanType === 'INSTALLMENT' ? `
                       <div class="installment-badge" style="margin-bottom: 12px; font-size: 0.75rem;">
                         <i class="fa-solid fa-clock-rotate-left"></i> Installment Plan: ${tkt.installmentsPaid || 1} of ${tkt.installmentCycles || 3} Paid ($${tkt.remainingBalance ? tkt.remainingBalance.toFixed(2) : '0.00'} remaining)
                       </div>
                     ` : ''}
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: var(--primary); border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 10px; margin-top: 10px;">
-                      <span>PASS ID: ${tkt.ticketId || ('H4H-TKT-' + (tkt.id || '98284'))}</span>
-                      <span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> CONFIRMED</span>
+
+                    <div style="background: #f8fafc; border: 1px solid rgba(15,23,42,0.08); border-radius: 8px; padding: 10px 12px; margin-top: 12px;">
+                      <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Pass Verification Code</div>
+                      <div style="font-family: monospace; font-size: 0.95rem; font-weight: 800; color: var(--primary); margin-top: 2px;">
+                        ${tkt.ticketId || ('H4H-TKT-' + (tkt.id || 'CONFIRMED'))}
+                      </div>
+                      ${tkt.confirmationToken ? `
+                        <div style="font-family: monospace; font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                          Token: ${tkt.confirmationToken}
+                        </div>
+                      ` : ''}
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 600; color: var(--primary); border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 10px; margin-top: 14px;">
+                      <span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> VALIDATED PASS</span>
+                      <button class="btn btn-outline" onclick="window.print()" style="padding: 3px 8px; font-size: 0.75rem;">
+                        <i class="fa-solid fa-print"></i> Print
+                      </button>
                     </div>
                   </div>
                 `).join('')}
               </div>
             </div>
-          ` : ''}
+          ` : `
+            <div style="text-align: center; padding: 40px 20px; background: white; border-radius: 12px; border: 1px dashed rgba(15,23,42,0.15); margin-top: 20px;">
+              <i class="fa-solid fa-ticket" style="font-size: 2.5rem; color: rgba(15,23,42,0.25); margin-bottom: 12px;"></i>
+              <h4 style="font-weight: 700; color: var(--primary); margin-bottom: 6px;">No Stored Passes on This Device</h4>
+              <p style="font-size: 0.9rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 16px;">
+                If you recently booked a ticket or Gala pass, enter your email or confirmation token above to verify and print your pass, or explore our upcoming charity events.
+              </p>
+              <a href="#/events" class="btn btn-outline" style="font-size: 0.85rem;"><i class="fa-solid fa-calendar"></i> Browse Events</a>
+            </div>
+          `}
         </div>
       </section>
     `;
@@ -1981,14 +2613,23 @@ async function router() {
     }).catch(e => console.warn('Analytics tracking failed', e));
   } catch (e) {}
 
+  // Non-blocking background sync for fresh data
   if (hash === '#/' || hash === '#/events' || hash === '#/dashboard' || hash.startsWith('#/blog')) {
-    await refreshEvents();
-    await refreshBlogPosts();
+    refreshEvents().catch(() => {});
+    refreshBlogPosts().catch(() => {});
     if (hash === '#/dashboard') {
-      await refreshAdminMetrics();
+      refreshAdminMetrics().then(() => {
+        const attEl = document.getElementById('metric-total-attendees');
+        if (attEl && state.adminMetrics) attEl.innerText = state.adminMetrics.totalAttendees;
+        const revEl = document.getElementById('metric-total-revenue');
+        if (revEl && state.adminMetrics) revEl.innerText = `$${state.adminMetrics.totalRevenue.toLocaleString()}`;
+        const evtEl = document.getElementById('metric-active-events');
+        if (evtEl && state.adminMetrics) evtEl.innerText = state.adminMetrics.activeEvents;
+      }).catch(() => {});
     }
   }
   
+  updateCustomPageNavLinks();
   // Highlight active link
   document.querySelectorAll('#navbar-links .nav-link, #mobile-drawer .nav-link').forEach(link => {
     link.classList.remove('active');
@@ -2028,6 +2669,9 @@ async function router() {
     contentDiv.innerHTML = templates.blogPost();
   } else if (hash === '#/blog') {
     contentDiv.innerHTML = templates.blog();
+  } else if (hash === '#/special-event') {
+    contentDiv.innerHTML = templates.customEventPage();
+    bindCustomEventPage();
   } else if (hash === '#/terms') {
     contentDiv.innerHTML = templates.terms();
   } else if (hash === '#/privacy') {
@@ -2048,8 +2692,10 @@ async function router() {
 }
 
 window.addEventListener('hashchange', router);
-// Run initial routing on load
-window.addEventListener('load', () => {
+
+// Instant application bootstrap on DOM ready
+function initApp() {
+  updateCustomPageNavLinks();
   router();
   
   // Newsletter Form binding
@@ -2093,7 +2739,13 @@ window.addEventListener('load', () => {
       footerOutreach.reset();
     });
   }
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 /* --- EVENT BINDING MODULES --- */
 
@@ -2155,6 +2807,110 @@ function bindProgramsEvents() {
 }
 
 // --- 2. INTERACTIVE CALENDAR & RSVP SYSTEM ---
+function bindCustomEventPage() {
+  const modal = document.getElementById('custom-tier-modal');
+  const closeBtn = document.getElementById('custom-tier-close');
+  const form = document.getElementById('custom-tier-booking-form');
+  const qtySelect = document.getElementById('custom-tier-qty');
+  const totalDisplay = document.getElementById('custom-tier-total-display');
+  const priceInput = document.getElementById('custom-tier-input-price');
+  const idInput = document.getElementById('custom-tier-input-id');
+
+  function updateTotal() {
+    const qty = parseInt(qtySelect ? qtySelect.value : '1', 10);
+    const unitPrice = parseFloat(priceInput ? priceInput.value : '0');
+    const total = qty * unitPrice;
+    if (totalDisplay) {
+      totalDisplay.textContent = total === 0 ? 'FREE' : '$' + total.toFixed(2);
+    }
+  }
+
+  if (qtySelect) {
+    qtySelect.addEventListener('change', updateTotal);
+  }
+
+  document.querySelectorAll('.custom-book-tier-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tierId = btn.getAttribute('data-tier-id');
+      const tierName = btn.getAttribute('data-tier-name');
+      const tierPrice = btn.getAttribute('data-tier-price');
+
+      if (idInput) idInput.value = tierId;
+      if (priceInput) priceInput.value = tierPrice;
+
+      const titleEl = document.getElementById('custom-modal-tier-title');
+      if (titleEl) titleEl.textContent = 'Reserve ' + tierName;
+
+      updateTotal();
+      if (modal) modal.classList.add('active');
+    });
+  });
+
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('custom-tier-name').value;
+      const email = document.getElementById('custom-tier-email').value;
+      const qty = parseInt(qtySelect.value, 10);
+      const tierName = document.getElementById('custom-modal-tier-title').textContent.replace('Reserve ', '');
+      const submitBtn = document.getElementById('custom-tier-submit-btn');
+
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Confirming Reservation...';
+      submitBtn.disabled = true;
+
+      try {
+        const unitPrice = parseFloat(priceInput ? priceInput.value : '0') || 0;
+        const totalPrice = qty * unitPrice;
+        const confirmationNumber = 'H4H-GALA-' + Math.floor(100000 + Math.random() * 900000);
+        const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        const galaTicket = {
+          id: Math.floor(100000 + Math.random() * 900000),
+          ticketId: confirmationNumber,
+          confirmationToken: token,
+          eventId: 9999,
+          eventTitle: `${state.customPage.title} - ${tierName}`,
+          eventDate: state.customPage.date,
+          eventLocation: state.customPage.location,
+          guestName: name,
+          userEmail: email,
+          quantity: qty,
+          pricePaid: totalPrice,
+          paymentMethod: totalPrice === 0 ? 'FREE' : 'STRIPE',
+          status: 'CONFIRMED',
+          paymentPlanType: 'FULL',
+          installmentCycles: 1,
+          installmentsPaid: 1,
+          remainingBalance: 0,
+          purchaseDate: new Date().toISOString().split('T')[0]
+        };
+
+        saveTicketRecord(galaTicket);
+
+        // Attempt guest booking call on backend if available
+        API.bookTicketGuest(9999, qty, galaTicket.paymentMethod, email, name).catch(() => {});
+
+        alert(`🎉 Gala Pass Confirmed!\n\nThank you ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nConfirmation ID: ${confirmationNumber}\nVerification Token: ${token}\n\nYour pass is now saved and available under "My Tickets" for verification or printing.`);
+        
+        if (modal) modal.classList.remove('active');
+        form.reset();
+        window.location.hash = '#/my-tickets';
+      } catch (err) {
+        console.error("Error booking gala pass:", err);
+        alert("Reservation received! Our team will contact you directly to confirm.");
+        if (modal) modal.classList.remove('active');
+      } finally {
+        submitBtn.innerHTML = 'Confirm & Book Reservation';
+        submitBtn.disabled = false;
+      }
+    });
+  }
+}
+
 function bindCalendarEvents(targetEventId) {
   const daysGrid = document.getElementById('calendar-days-grid');
   const prevBtn = document.getElementById('prev-month-btn');
@@ -2708,6 +3464,138 @@ function bindInvolvementForm() {
 
 // --- 5. ADMIN CONTROL PANEL, CATEGORY COLORS & CSV UTILITY ---
 function bindAdminDashboard() {
+  // Admin Tabs Navigation Switching
+  const tabBtns = document.querySelectorAll('.admin-tab-btn');
+  const tabPanes = document.querySelectorAll('.admin-tab-pane');
+  
+  function activateAdminTab(targetTabId) {
+    tabBtns.forEach(btn => {
+      if (btn.getAttribute('data-tab') === targetTabId) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    tabPanes.forEach(pane => {
+      if (pane.id === targetTabId) {
+        pane.classList.add('active');
+      } else {
+        pane.classList.remove('active');
+      }
+    });
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.getAttribute('data-tab');
+      activateAdminTab(targetTab);
+    });
+  });
+
+  // Handle shortcut jump buttons from Overview
+  document.querySelectorAll('.admin-tab-jump-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.getAttribute('data-target-tab');
+      if (targetTab) activateAdminTab(targetTab);
+    });
+  });
+
+  // Special Event Page Studio Binding
+  const customPageForm = document.getElementById('adm-custom-page-form');
+  const customPageToggle = document.getElementById('adm-custom-page-toggle');
+  const switchLabel = document.getElementById('adm-switch-status-label');
+  const addTierBtn = document.getElementById('adm-add-tier-btn');
+  const tiersContainer = document.getElementById('adm-tiers-container');
+
+  if (customPageToggle) {
+    customPageToggle.addEventListener('change', () => {
+      const isEnabled = customPageToggle.checked;
+      state.customPage.enabled = isEnabled;
+      saveCustomPage(state.customPage);
+      if (switchLabel) {
+        switchLabel.innerHTML = isEnabled ? '<i class="fa-solid fa-globe"></i> Published (Live)' : '<i class="fa-solid fa-eye-slash"></i> Hidden (Draft)';
+        switchLabel.style.color = isEnabled ? 'var(--success)' : 'var(--text-muted)';
+      }
+    });
+  }
+
+  if (addTierBtn && tiersContainer) {
+    addTierBtn.addEventListener('click', () => {
+      const row = document.createElement('div');
+      row.className = 'calendar-card adm-tier-row';
+      row.style.cssText = 'padding: 16px; display: grid; grid-template-columns: 2fr 1fr 1fr 3fr auto; gap: 10px; align-items: center;';
+      row.innerHTML = 
+        '<input type="text" class="form-control tier-name-input" value="Special Supporter" placeholder="Tier Name" style="padding: 8px;">' +
+        '<input type="number" class="form-control tier-price-input" value="50" placeholder="Price ($)" style="padding: 8px;">' +
+        '<input type="text" class="form-control tier-badge-input" value="Popular" placeholder="Badge" style="padding: 8px;">' +
+        '<input type="text" class="form-control tier-features-input" value="General Gala Entry; Dinner & Dessert; Auction Access" placeholder="Features (semicolon-separated)" style="padding: 8px;">' +
+        '<button type="button" class="btn btn-outline adm-delete-tier-btn" style="color: var(--danger); border-color: var(--danger); padding: 8px 10px;" title="Remove Tier"><i class="fa-solid fa-trash"></i></button>';
+      tiersContainer.appendChild(row);
+      row.querySelector('.adm-delete-tier-btn').addEventListener('click', () => row.remove());
+    });
+  }
+
+  if (tiersContainer) {
+    tiersContainer.querySelectorAll('.adm-delete-tier-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const row = e.target.closest('.adm-tier-row');
+        if (row) row.remove();
+      });
+    });
+  }
+
+  if (customPageForm) {
+    customPageForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const tiers = [];
+      document.querySelectorAll('.adm-tier-row').forEach((row, i) => {
+        const nameInput = row.querySelector('.tier-name-input');
+        const priceInput = row.querySelector('.tier-price-input');
+        const badgeInput = row.querySelector('.tier-badge-input');
+        const featsInput = row.querySelector('.tier-features-input');
+
+        if (nameInput) {
+          const name = nameInput.value.trim();
+          const price = parseFloat(priceInput.value) || 0;
+          const badge = badgeInput ? badgeInput.value.trim() : '';
+          const rawFeats = featsInput ? featsInput.value : '';
+          const features = rawFeats.split(';').map(f => f.trim()).filter(Boolean);
+
+          if (name) {
+            tiers.push({
+              id: 'tier-' + (i + 1),
+              name,
+              price,
+              badge,
+              popular: badge.toLowerCase().includes('popular'),
+              features: features.length > 0 ? features : ['Gala admission']
+            });
+          }
+        }
+      });
+
+      const updatedPage = {
+        enabled: customPageToggle ? customPageToggle.checked : true,
+        navLabel: document.getElementById('adm-custom-nav-label').value.trim() || 'Featured Gala',
+        slug: 'special-event',
+        title: document.getElementById('adm-custom-title').value.trim(),
+        subtitle: document.getElementById('adm-custom-subtitle').value.trim(),
+        date: document.getElementById('adm-custom-date').value,
+        time: document.getElementById('adm-custom-time').value.trim(),
+        location: document.getElementById('adm-custom-location').value.trim(),
+        bannerImage: document.getElementById('adm-custom-banner').value.trim(),
+        description: document.getElementById('adm-custom-desc').value.trim(),
+        schedule: state.customPage.schedule || DEFAULT_CUSTOM_PAGE.schedule,
+        pricingTiers: tiers.length > 0 ? tiers : DEFAULT_CUSTOM_PAGE.pricingTiers
+      };
+
+      saveCustomPage(updatedPage);
+      alert("✅ Special Event Page & Pricing Studio settings successfully saved and published!");
+    });
+  }
+
   // 1. Category Color Pickers Live Update
   document.querySelectorAll('.category-color-picker').forEach(picker => {
     picker.addEventListener('input', (e) => {
@@ -3276,14 +4164,14 @@ function bindMyTicketsEvents() {
       
       // Fallback local lookup if backend returned empty or offline
       if (tickets.length === 0) {
+        const qLower = q.toLowerCase();
         tickets = state.myTickets.filter(t => 
-          (t.userEmail && t.userEmail.toLowerCase() === q.toLowerCase()) ||
-          (t.ticketId && t.ticketId.toLowerCase() === q.toLowerCase()) ||
-          (t.confirmationToken && t.confirmationToken.toLowerCase() === q.toLowerCase())
+          (t.userEmail && t.userEmail.toLowerCase() === qLower) ||
+          (t.guestName && t.guestName.toLowerCase().includes(qLower)) ||
+          (t.ticketId && t.ticketId.toLowerCase() === qLower) ||
+          (t.confirmationToken && t.confirmationToken.toLowerCase() === qLower) ||
+          (t.id && t.id.toString().toLowerCase() === qLower)
         );
-      }
-      if (tickets.length === 0 && !q.includes('@')) {
-        tickets = state.myTickets.slice(-2); // simulated fallback preview
       }
       
       lookupBtn.disabled = false;

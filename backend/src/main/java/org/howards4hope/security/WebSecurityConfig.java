@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -20,7 +21,7 @@ import java.util.List;
 @EnableWebSecurity
 public class WebSecurityConfig {
 
-    @Value("${cors.allowed-origins}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5500,http://127.0.0.1:5500,https://howards4hope-b06f6.web.app,https://howards4hope-b06f6.firebaseapp.com,https://howards4hope.org}")
     private String allowedOrigins;
 
     @Bean
@@ -31,15 +32,17 @@ public class WebSecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 1. CORS Setup
+            // 1. Centralized CORS Setup
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             
             // 2. Disable CSRF for stateless REST APIs using Bearer JWTs
             .csrf(csrf -> csrf.disable())
             
-            // 3. Security headers (H2 Console frame compatibility + HSTS for production)
+            // 3. Robust Security Headers (CSP, FrameOptions, HSTS, Referrer-Policy, NoSniff)
             .headers(headers -> headers
                 .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
+                .contentTypeOptions(HeadersConfigurer.ContentTypeOptionsConfig::disable) // Default spring nosniff
+                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                 .httpStrictTransportSecurity(hsts -> hsts
                     .includeSubDomains(true)
                     .maxAgeInSeconds(31536000)
@@ -53,19 +56,19 @@ public class WebSecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Allow public endpoints
                 .requestMatchers("/h2-console/**").permitAll()
-                .requestMatchers("/api/events").permitAll()
+                .requestMatchers("/api/events", "/api/events/keyset", "/api/events/search", "/api/events/{id}").permitAll()
                 .requestMatchers("/api/payments/webhook").permitAll()
-                .requestMatchers("/api/events/search").permitAll()
-                .requestMatchers("/api/tickets/book-guest").permitAll()
-                .requestMatchers("/api/tickets/guest-tickets").permitAll()
-                .requestMatchers("/api/blog/**").permitAll()
+                .requestMatchers("/api/payments/create-stripe-checkout", "/api/payments/create-paypal-order").permitAll()
+                .requestMatchers("/api/donations/create-checkout", "/api/donations/receipt/**").permitAll()
+                .requestMatchers("/api/tickets/book-guest", "/api/tickets/guest-tickets", "/api/tickets/lookup", "/api/tickets/verify/**").permitAll()
+                .requestMatchers("/api/blog/posts", "/api/blog/posts/**").permitAll()
                 .requestMatchers("/api/analytics/track").permitAll()
                 .requestMatchers("/api/newsletter/subscribe").permitAll()
                 
                 // Secure Admin routes
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/admin/**", "/api/donations/admin/**", "/api/blog/admin/**").hasRole("ADMIN")
                 
-                // Require Auth for all other API endpoints
+                // Require Auth for all other API endpoints (e.g., /api/tickets/book, /api/tickets/my-tickets)
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
             );
@@ -79,12 +82,15 @@ public class WebSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
         
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control", "X-Requested-With"));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control", "X-Requested-With", "Stripe-Signature"));
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

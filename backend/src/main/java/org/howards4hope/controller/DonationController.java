@@ -17,7 +17,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/donations")
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class DonationController {
 
     @Value("${stripe.api.key}")
@@ -106,6 +105,12 @@ public class DonationController {
                         .setSuccessUrl(request.successUrl != null ? request.successUrl : "https://howards4hope.org/#/donate?status=success&receipt=" + savedDonation.getTaxReceiptNumber())
                         .setCancelUrl(request.cancelUrl != null ? request.cancelUrl : "https://howards4hope.org/#/donate?status=cancelled")
                         .setCustomerEmail(request.donorEmail)
+                        .putMetadata("type", "DONATION")
+                        .putMetadata("taxReceiptNumber", savedDonation.getTaxReceiptNumber())
+                        .putMetadata("donorName", savedDonation.getDonorName())
+                        .putMetadata("donorEmail", savedDonation.getDonorEmail())
+                        .putMetadata("amount", String.valueOf(savedDonation.getAmount()))
+                        .putMetadata("frequency", savedDonation.getFrequency())
                         .addLineItem(SessionCreateParams.LineItem.builder()
                                 .setQuantity(1L)
                                 .setPriceData(priceDataBuilder.build())

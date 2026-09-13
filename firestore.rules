@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- AUTHENTICATION & ROLE-BASED ACCESS HELPERS ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'avlorycorp@gmail.com'
+      );
+    }
+    
+    function isOwner(userEmail) {
+      return isAuthenticated() && request.auth.token.email == userEmail;
+    }
+
+    // --- EVENTS COLLECTION ---
+    // Public read access; write operations restricted to verified administrators
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- BLOG POSTS & UPDATES ---
+    // Public read access; publish/edit/delete restricted to administrators
+    match /blogPosts/{postId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- COMMUNITY RESOURCES DIRECTORY ---
+    match /resources/{resourceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- TICKETS & RSVP PASSES (Row-Level Security) ---
+    // Attendees can read only their own passes; Admins have full audit visibility
+    match /tickets/{ticketId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userEmail == request.auth.token.email);
+      allow create: if true; // Public RSVP booking allowed with backend validation
+      allow update, delete: if isAdmin();
+    }
+
+    // --- DONATIONS & TAX RECEIPTS (Row-Level Security) ---
+    // Donors can read only their own contributions; Admins have full access
+    match /donations/{donationId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.donorEmail == request.auth.token.email);
+      allow create: if true; // Checkout recording
+      allow update, delete: if isAdmin();
+    }
+
+    // --- NEWSLETTER SUBSCRIPTIONS ---
+    // Public can subscribe; only administrators can export or view list
+    match /newsletterSubscribers/{subscriberId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // --- INVOLVEMENT & VOLUNTEER SUBMISSIONS ---
+    match /volunteerSubmissions/{submissionId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // --- USER PROFILES & ROLES ---
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // --- PLATFORM SETTINGS ---
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Default Deny Rule for undefined paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

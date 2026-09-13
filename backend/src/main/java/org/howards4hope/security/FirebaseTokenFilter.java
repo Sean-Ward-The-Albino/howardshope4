@@ -34,6 +34,14 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP_TYPE_REF = new TypeReference<>() {};
 
+    private static final List<String> ADMIN_WHITELIST = List.of(
+        "howards4hope@gmail.com",
+        "staff@howards4hope.org",
+        "lacreashia@howards4hope.org",
+        "lamar@howards4hope.org",
+        "avlorycorp@gmail.com"
+    );
+
     // In-memory cache of verified key IDs for seamless transition & key rotation tracking
     private static final Map<String, Long> verifiedKeyIds = new ConcurrentHashMap<>();
 
@@ -82,14 +90,14 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
                     Map<String, Object> map = objectMapper.readValue(payload, MAP_TYPE_REF);
                     email = (String) map.get("email");
                     Object adminClaim = map.get("admin");
-                    isAdmin = Boolean.TRUE.equals(adminClaim) || "avlorycorp@gmail.com".equalsIgnoreCase(email);
+                    isAdmin = Boolean.TRUE.equals(adminClaim) || (email != null && ADMIN_WHITELIST.contains(email.toLowerCase().trim()));
                 }
             } else {
                 // Production RS256 signature verification with automatic Google JWKS key rotation
                 FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(token);
                 email = decodedToken.getEmail();
                 Object adminClaim = decodedToken.getClaims().get("admin");
-                isAdmin = Boolean.TRUE.equals(adminClaim) || "avlorycorp@gmail.com".equalsIgnoreCase(email);
+                isAdmin = Boolean.TRUE.equals(adminClaim) || (email != null && ADMIN_WHITELIST.contains(email.toLowerCase().trim()));
             }
 
             if (email != null) {

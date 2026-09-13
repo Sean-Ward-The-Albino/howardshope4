@@ -27,6 +27,8 @@ public class BlogPost {
 
     private String imageUrl;
 
+    private boolean broadcastToSubscribers = true;
+
     // Constructors
     public BlogPost() {}
 
@@ -94,5 +96,13 @@ public class BlogPost {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public boolean isBroadcastToSubscribers() {
+        return broadcastToSubscribers;
+    }
+
+    public void setBroadcastToSubscribers(boolean broadcastToSubscribers) {
+        this.broadcastToSubscribers = broadcastToSubscribers;
     }
 }

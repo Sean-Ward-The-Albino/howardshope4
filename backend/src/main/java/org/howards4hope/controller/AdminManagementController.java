@@ -9,11 +9,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api")
-@CrossOrigin(origins = "*")
+@RequestMapping("/api/admin/roles")
 public class AdminManagementController {
 
-    @PostMapping("/admin/roles/grant")
+    @PostMapping("/grant")
     public ResponseEntity<?> grantAdminRole(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         if (email == null || email.trim().isEmpty()) {
@@ -33,6 +32,29 @@ public class AdminManagementController {
             return ResponseEntity.ok().body("Admin role granted to " + email);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Failed to grant admin role: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/revoke")
+    public ResponseEntity<?> revokeAdminRole(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Email is required");
+        }
+
+        try {
+            if (com.google.firebase.FirebaseApp.getApps().isEmpty()) {
+                return ResponseEntity.ok().body("Admin role revoked for " + email + " (MOCK MODE)");
+            }
+            UserRecord user = FirebaseAuth.getInstance().getUserByEmail(email);
+            Map<String, Object> claims = new HashMap<>();
+            claims.put("admin", false);
+            
+            FirebaseAuth.getInstance().setCustomUserClaims(user.getUid(), claims);
+            
+            return ResponseEntity.ok().body("Admin role revoked for " + email);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Failed to revoke admin role: " + e.getMessage());
         }
     }
 }

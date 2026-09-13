@@ -1,7 +1,10 @@
 package org.howards4hope.controller;
 
 import org.howards4hope.model.BlogPost;
+import org.howards4hope.model.NewsletterSubscriber;
 import org.howards4hope.repository.BlogRepository;
+import org.howards4hope.repository.NewsletterRepository;
+import org.howards4hope.service.EmailService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,13 +16,18 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class BlogController {
 
     private final BlogRepository blogRepository;
+    private final NewsletterRepository newsletterRepository;
+    private final EmailService emailService;
 
-    public BlogController(BlogRepository blogRepository) {
+    public BlogController(BlogRepository blogRepository, 
+                          NewsletterRepository newsletterRepository,
+                          EmailService emailService) {
         this.blogRepository = blogRepository;
+        this.newsletterRepository = newsletterRepository;
+        this.emailService = emailService;
     }
 
     // --- PUBLIC READ PATHS ---
@@ -51,6 +59,13 @@ public class BlogController {
             post.setDate(LocalDate.now().toString());
         }
         BlogPost savedPost = blogRepository.save(post);
+
+        // Automated broadcast to all newsletter subscribers
+        if (post.isBroadcastToSubscribers()) {
+            List<NewsletterSubscriber> subscribers = newsletterRepository.findAll();
+            emailService.broadcastBlogPostToSubscribers(subscribers, savedPost);
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED).body(savedPost);
     }
 

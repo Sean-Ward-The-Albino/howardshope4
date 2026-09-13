@@ -2,6 +2,7 @@ package org.howards4hope.controller;
 
 import org.howards4hope.model.NewsletterSubscriber;
 import org.howards4hope.repository.NewsletterRepository;
+import org.howards4hope.service.EmailService;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,13 +15,14 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*")
 public class NewsletterController {
 
     private final NewsletterRepository newsletterRepository;
+    private final EmailService emailService;
 
-    public NewsletterController(NewsletterRepository newsletterRepository) {
+    public NewsletterController(NewsletterRepository newsletterRepository, EmailService emailService) {
         this.newsletterRepository = newsletterRepository;
+        this.emailService = emailService;
     }
 
     @PostMapping("/newsletter/subscribe")
@@ -30,14 +32,29 @@ public class NewsletterController {
             return ResponseEntity.badRequest().body("Email is required");
         }
         
-        Optional<NewsletterSubscriber> existing = newsletterRepository.findByEmail(email);
+        String cleanEmail = email.trim().toLowerCase();
+        Optional<NewsletterSubscriber> existing = newsletterRepository.findByEmail(cleanEmail);
         if (existing.isPresent()) {
             return ResponseEntity.ok().body("Already subscribed");
         }
 
-        NewsletterSubscriber subscriber = new NewsletterSubscriber(email);
+        NewsletterSubscriber subscriber = new NewsletterSubscriber(cleanEmail);
         newsletterRepository.save(subscriber);
+
+        // Dispatch welcome confirmation email
+        emailService.sendNewsletterWelcomeEmail(cleanEmail);
+
         return ResponseEntity.ok().body("Successfully subscribed");
+    }
+
+    @PostMapping("/newsletter/unsubscribe")
+    public ResponseEntity<?> unsubscribe(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email != null) {
+            Optional<NewsletterSubscriber> existing = newsletterRepository.findByEmail(email.trim().toLowerCase());
+            existing.ifPresent(newsletterRepository::delete);
+        }
+        return ResponseEntity.ok().body("Successfully unsubscribed");
     }
 
     @GetMapping("/admin/newsletter/export")
@@ -48,8 +65,8 @@ public class NewsletterController {
         
         for (NewsletterSubscriber sub : subscribers) {
             csv.append(sub.getId()).append(",")
-               .append(sub.getEmail()).append(",")
-               .append(sub.getSubscribedAt()).append("\n");
+               .append(escapeCSVField(sub.getEmail())).append(",")
+               .append(escapeCSVField(sub.getSubscribedAt() != null ? sub.getSubscribedAt().toString() : "")).append("\n");
         }
 
         HttpHeaders headers = new HttpHeaders();
@@ -59,5 +76,20 @@ public class NewsletterController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(csv.toString());
+    }
+
+    private String escapeCSVField(String field) {
+        if (field == null) {
+            return "";
+        }
+        String sanitized = field;
+        if (sanitized.startsWith("=") || sanitized.startsWith("+") || sanitized.startsWith("-") ||
+            sanitized.startsWith("@") || sanitized.startsWith("\t") || sanitized.startsWith("\r")) {
+            sanitized = "'" + sanitized;
+        }
+        if (sanitized.contains(",") || sanitized.contains("\"") || sanitized.contains("\n") || sanitized.contains("\r")) {
+            return "\"" + sanitized.replace("\"", "\"\"") + "\"";
+        }
+        return sanitized;
     }
 }

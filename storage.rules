@@ -1,0 +1,32 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Public read for website static assets and event photos
+    match /assets/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && (request.auth.token.admin == true || request.auth.token.email == 'avlorycorp@gmail.com');
+    }
+
+    // Community gallery and blog image uploads
+    match /gallery/{imageId} {
+      allow read: if true;
+      allow write: if request.auth != null && (request.auth.token.admin == true || request.auth.token.email == 'avlorycorp@gmail.com')
+                    && request.resource.size < 10 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+    }
+
+    // User profile pictures or event receipts
+    match /users/{userId}/{allPaths=**} {
+      allow read: if request.auth != null && (request.auth.uid == userId || request.auth.token.admin == true);
+      allow write: if request.auth != null && request.auth.uid == userId
+                    && request.resource.size < 5 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

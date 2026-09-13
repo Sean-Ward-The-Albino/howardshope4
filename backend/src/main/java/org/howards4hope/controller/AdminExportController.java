@@ -16,7 +16,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/admin")
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class AdminExportController {
 
     private final TicketRepository ticketRepository;
@@ -45,7 +44,8 @@ public class AdminExportController {
         
         // Append ticket rows
         for (Ticket ticket : tickets) {
-            csvBuilder.append(ticket.getId()).append(",")
+            String tId = ticket.getTicketId() != null ? ticket.getTicketId() : ("H4H-TKT-" + ticket.getId());
+            csvBuilder.append(escapeCSVField(tId)).append(",")
                       .append(escapeCSVField(ticket.getUserEmail())).append(",")
                       .append(ticket.getQuantity()).append(",")
                       .append(escapeCSVField(ticket.getPaymentMethod())).append(",")
@@ -54,20 +54,9 @@ public class AdminExportController {
                       .append(escapeCSVField(ticket.getStatus())).append("\n");
         }
 
-        // Add default mock sample rows if database is freshly initialized and has no actual purchases yet!
-        // This ensures the stakeholder demonstration is 100% successful with gorgeous pre-filled tables!
+        // If tickets is empty, indicate no attendees currently booked
         if (tickets.isEmpty()) {
-            csvBuilder.append("281948,sward.student@university.edu,2,")
-                      .append(event.getPrice() == 0 ? "FREE" : "STRIPE").append(",")
-                      .append(String.format("%.2f", event.getPrice() * 2)).append(",2026-05-20,CONFIRMED\n");
-            
-            csvBuilder.append("902183,volunteer.core@gmail.com,1,")
-                      .append(event.getPrice() == 0 ? "FREE" : "PAYPAL").append(",")
-                      .append(String.format("%.2f", event.getPrice())).append(",2026-05-20,CONFIRMED\n");
-            
-            csvBuilder.append("551283,donor.lb@corporate.com,4,")
-                      .append(event.getPrice() == 0 ? "FREE" : "STRIPE").append(",")
-                      .append(String.format("%.2f", event.getPrice() * 4)).append(",2026-05-20,CONFIRMED\n");
+            csvBuilder.append("# No attendees have registered for this event yet.\n");
         }
 
         byte[] csvBytes = csvBuilder.toString().getBytes();
@@ -86,9 +75,15 @@ public class AdminExportController {
         if (field == null) {
             return "";
         }
-        if (field.contains(",") || field.contains("\"") || field.contains("\n")) {
-            return "\"" + field.replace("\"", "\"\"") + "\"";
+        String sanitized = field;
+        // Prevent CSV Formula Injection (DDE injection on =, +, -, @, tab, cr)
+        if (sanitized.startsWith("=") || sanitized.startsWith("+") || sanitized.startsWith("-") ||
+            sanitized.startsWith("@") || sanitized.startsWith("\t") || sanitized.startsWith("\r")) {
+            sanitized = "'" + sanitized;
         }
-        return field;
+        if (sanitized.contains(",") || sanitized.contains("\"") || sanitized.contains("\n") || sanitized.contains("\r")) {
+            return "\"" + sanitized.replace("\"", "\"\"") + "\"";
+        }
+        return sanitized;
     }
 }

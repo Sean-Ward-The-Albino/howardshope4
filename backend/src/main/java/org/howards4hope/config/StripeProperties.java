@@ -6,8 +6,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "stripe")
 public class StripeProperties {
+
     private String apiKey;
-    private Webhook webhook = new Webhook();
+    private String publishableKey;
+    private String webhookSecret = "whsec_mock_secret";
 
     public String getApiKey() {
         return apiKey;
@@ -17,23 +19,19 @@ public class StripeProperties {
         this.apiKey = apiKey;
     }
 
-    public Webhook getWebhook() {
-        return webhook;
+    public String getPublishableKey() {
+        return publishableKey;
     }
 
-    public void setWebhook(Webhook webhook) {
-        this.webhook = webhook;
+    public void setPublishableKey(String publishableKey) {
+        this.publishableKey = publishableKey;
     }
 
-    public static class Webhook {
-        private String secret;
+    public String getWebhookSecret() {
+        return webhookSecret;
+    }
 
-        public String getSecret() {
-            return secret;
-        }
-
-        public void setSecret(String secret) {
-            this.secret = secret;
-        }
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret;
     }
 }

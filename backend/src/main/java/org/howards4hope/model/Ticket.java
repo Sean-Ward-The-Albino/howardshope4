@@ -46,6 +46,7 @@ public class Ticket {
 
     // Convenience constructor
     public Ticket(Long eventId, String eventTitle, String eventDate, String userEmail, int quantity, double pricePaid, String paymentMethod, String status, String purchaseDate) {
+        this();
         this.eventId = eventId;
         this.eventTitle = eventTitle;
         this.eventDate = eventDate;
@@ -55,10 +56,10 @@ public class Ticket {
         this.paymentMethod = paymentMethod;
         this.status = status;
         this.purchaseDate = purchaseDate;
-        this.confirmationToken = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     public Ticket(Long eventId, String eventTitle, String eventDate, String userEmail, int quantity, double pricePaid, String paymentMethod, String status, String purchaseDate, String paymentPlanType, int installmentCycles, int installmentsPaid, double remainingBalance) {
+        this();
         this.eventId = eventId;
         this.eventTitle = eventTitle;
         this.eventDate = eventDate;
@@ -72,7 +73,6 @@ public class Ticket {
         this.installmentCycles = installmentCycles;
         this.installmentsPaid = installmentsPaid;
         this.remainingBalance = remainingBalance;
-        this.confirmationToken = java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     // Getters and Setters

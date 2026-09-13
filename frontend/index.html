@@ -11,16 +11,72 @@
   <meta name="author" content="Howards 4 Hope">
   <meta name="theme-color" content="#1E2761">
   
+  <link rel="canonical" href="https://howards4hope.org/">
+  
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://howards4hope.org/">
   <meta property="og:title" content="Howards 4 Hope | Restoring Hope & Rebuilding Lives">
   <meta property="og:description" content="Empowering youth, supporting special-needs caregivers, and providing single parents with financial toolkits in Long Beach, CA.">
-  <meta property="og:image" content="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=1200">
+  <meta property="og:image" content="assets/logos/logo.png">
+
+  <!-- Twitter Card Metadata -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://howards4hope.org/">
+  <meta name="twitter:title" content="Howards 4 Hope | Restoring Hope & Rebuilding Lives">
+  <meta name="twitter:description" content="Empowering youth, supporting special-needs caregivers, and providing single parents with financial toolkits in Long Beach, CA.">
+  <meta name="twitter:image" content="assets/logos/logo.png">
+
+  <!-- Schema.org JSON-LD Structured Data for 501(c)(3) NGO / Non-Profit -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "NGO",
+    "name": "Howards 4 Hope",
+    "alternateName": "Howards 4 Hope Inc.",
+    "url": "https://howards4hope.org",
+    "logo": "https://howards4hope.org/assets/logos/logo.png",
+    "image": "https://howards4hope.org/assets/logos/logo.png",
+    "description": "501(c)(3) public charity empowering youth through self-advocacy, supporting special-needs caregivers with respite summits, and providing low-income single parents with financial aid in Long Beach, CA.",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "3711 Long Beach Blvd, #4055",
+      "addressLocality": "Long Beach",
+      "addressRegion": "CA",
+      "postalCode": "90807",
+      "addressCountry": "US"
+    },
+    "telephone": "+1-562-481-5556",
+    "email": "howards4hope@gmail.com",
+    "taxID": "86-1910919",
+    "nonprofitStatus": "Nonprofit501c3",
+    "founder": [
+      {
+        "@type": "Person",
+        "name": "LaCreashia Willis-Howard",
+        "jobTitle": "President & Co-Founder"
+      },
+      {
+        "@type": "Person",
+        "name": "Lamar Howard Sr.",
+        "jobTitle": "Vice President & Co-Founder"
+      }
+    ]
+  }
+  </script>
   
+  <!-- Favicon & Touch Icons -->
+  <link rel="icon" type="image/svg+xml" href="assets/logos/logo.svg">
+  <link rel="apple-touch-icon" href="assets/logos/logo.png">
+  
+  <!-- Google Fonts Preconnect & High-Performance Display Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+
   <!-- Preload Critical Assets -->
-  <link rel="preload" href="style.css?v=3" as="style">
-  
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="preload" href="style.css?v=20" as="style">
+  <link rel="stylesheet" href="style.css?v=20">
   <!-- Modern SVG Icons library via FontAwesome Free CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
   
@@ -28,16 +84,18 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js" defer></script>
   <!-- Stripe Payments Engine -->
-  <script src="https://js.stripe.com/v3/"></script>
+  <script src="https://js.stripe.com/v3/" defer></script>
 </head>
 <body>
+  <!-- Skip to Main Content Landmark for Screen Readers & Keyboard Navigation (ADA WCAG 2.1 AA) -->
+  <a href="#app-content" class="skip-to-content">Skip to main content</a>
 
   <div id="app-shell">
     
     <!-- --- MODERN RESPONSIVE HEADER --- -->
     <header class="navbar" id="main-navbar">
       <a href="#/" class="logo-container">
-        <div class="logo-icon">H</div>
+        <img src="assets/logos/logo.png" alt="Howards 4 Hope Logo" class="navbar-logo-img">
         <div class="logo-text">Howards 4 <span>Hope</span></div>
       </a>
       
@@ -99,49 +157,175 @@
       <div class="loader-spinner"></div>
       <div class="loader-text">Authenticating...</div>
     </div>
+
+    <!-- --- TOAST NOTIFICATION CONTAINER --- -->
+    <div class="toast-container" id="toast-container"></div>
     
     <!-- --- MOBILE ROUTING DRAWER --- -->
     <div class="modal" id="mobile-drawer" style="justify-content: flex-end; padding: 0;">
-      <div class="modal-content" style="height: 100%; border-radius: 0; max-width: 320px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="modal-content" style="height: 100%; border-radius: 0; max-width: 320px; width: 85%; display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto;">
         <span class="modal-close" id="mobile-drawer-close">&times;</span>
-        <div id="mobile-drawer-links" style="margin-top: 40px; display: flex; flex-direction: column; gap: 1.5rem;">
-          <div class="logo-container" style="margin-bottom: 20px;">
-            <div class="logo-icon">H</div>
-            <div style="font-size: 1.15rem;">Howards 4 <span>Hope</span></div>
+        <div id="mobile-drawer-links" style="margin-top: 20px; display: flex; flex-direction: column; gap: 1rem;">
+          <div class="logo-container" style="margin-bottom: 10px;">
+            <img src="assets/logos/logo.png" alt="Howards 4 Hope" class="navbar-logo-img" style="height: 42px; width: auto;">
+            <div style="font-size: 1.15rem; font-weight: 800; font-family: 'Outfit', sans-serif;">Howards 4 <span>Hope</span></div>
           </div>
-          <a href="#/" class="nav-link" style="font-size: 1.2rem;" data-route="home">Home</a>
-          <a href="#/about" class="nav-link" style="font-size: 1.2rem;" data-route="about">About</a>
-          <a href="#/programs" class="nav-link" style="font-size: 1.2rem;" data-route="programs">Programs & Resources</a>
-          <a href="#/events" class="nav-link" style="font-size: 1.2rem;" data-route="events">Events & Calendar</a>
-          <a href="#/blog" class="nav-link" style="font-size: 1.2rem;" data-route="blog">News & Blog</a>
-          <a href="#/get-involved" class="nav-link" style="font-size: 1.2rem;" data-route="get-involved">Get Involved</a>
-          <button class="btn btn-outline" id="mobile-theme-toggle-btn" style="margin-top: 10px; font-size: 1.1rem; width: 100%; border-radius: 8px; border: 1px solid rgba(15,23,42,0.1);"><i class="fa-solid fa-moon"></i> Toggle Dark Mode</button>
-          <button class="btn btn-primary" id="mobile-login-btn" style="margin-top: 10px; font-size: 1.1rem; width: 100%;"><i class="fa-solid fa-user-lock"></i> Login / Sign In</button>
-          <a href="#/donate" class="btn btn-donate" style="margin-top: 10px; text-align: center;"><i class="fa-solid fa-heart"></i> Donate Now</a>
+          
+          <!-- Mobile User Profile Card (When Logged In) -->
+          <div id="mobile-user-profile-card" style="display: none; padding: 12px 14px; background: rgba(37,99,235,0.06); border-radius: var(--radius-sm); border: 1px solid rgba(37,99,235,0.15); margin-bottom: 6px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Logged in as:</div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--primary); word-break: break-all;" id="mobile-user-email">user@email.com</div>
+            <div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;">
+              <a href="#/dashboard" class="btn btn-primary nav-link" id="mobile-profile-admin-btn" style="display: none; flex: 1; font-size: 0.75rem; padding: 6px 8px; text-align: center; background: linear-gradient(135deg, var(--primary), var(--secondary));"><i class="fa-solid fa-gauge-high"></i> Admin</a>
+              <a href="#/my-tickets" class="btn btn-outline nav-link" style="flex: 1; font-size: 0.75rem; padding: 6px 8px; text-align: center;"><i class="fa-solid fa-ticket"></i> My Tickets</a>
+              <button type="button" class="btn btn-outline" id="mobile-logout-btn" style="color: var(--danger); border-color: var(--danger); font-size: 0.75rem; padding: 6px 8px;"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+            </div>
+          </div>
+
+          <a href="#/dashboard" class="btn btn-primary nav-link" id="mobile-drawer-admin-link" style="display: none; margin-top: 6px; background: linear-gradient(135deg, #1E2761, #007C92); font-weight: 700; text-align: center;"><i class="fa-solid fa-shield-halved" style="margin-right: 6px;"></i> Admin Control Panel</a>
+
+          <a href="#/" class="nav-link" style="font-size: 1.15rem;" data-route="home">Home</a>
+          <a href="#/about" class="nav-link" style="font-size: 1.15rem;" data-route="about">About</a>
+          <a href="#/programs" class="nav-link" style="font-size: 1.15rem;" data-route="programs">Programs & Resources</a>
+          <a href="#/events" class="nav-link" style="font-size: 1.15rem;" data-route="events">Events & Calendar</a>
+          <a href="#/blog" class="nav-link" style="font-size: 1.15rem;" data-route="blog">News & Blog</a>
+          <a href="#/get-involved" class="nav-link" style="font-size: 1.15rem;" data-route="get-involved">Get Involved</a>
+          <button class="btn btn-outline" id="mobile-theme-toggle-btn" style="margin-top: 6px; font-size: 1rem; width: 100%; border-radius: 8px; border: 1px solid rgba(15,23,42,0.1);"><i class="fa-solid fa-moon"></i> Toggle Dark Mode</button>
+          <button class="btn btn-primary" id="mobile-login-btn" style="margin-top: 6px; font-size: 1rem; width: 100%;"><i class="fa-solid fa-user-lock"></i> Login / Sign In</button>
+          <a href="#/donate" class="btn btn-donate nav-link" style="margin-top: 6px; text-align: center;"><i class="fa-solid fa-heart"></i> Donate Now</a>
         </div>
-        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding-bottom: 20px;">
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 20px 0 10px 0;">
           501(c)(3) Non-Profit | EIN 86-1910919
         </div>
       </div>
     </div>
 
-    <!-- --- MAIN DYNAMIC RUNTIME CONTENT VIEWPORT --- -->
+        <!-- --- MAIN DYNAMIC RUNTIME CONTENT VIEWPORT --- -->
     <main id="app-content">
-      <!-- Loaded dynamically by app.js -->
-      <div style="display: flex; align-items: center; justify-content: center; height: 60vh;">
-        <div class="stat-num" style="font-size: 1.5rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading Hope...</div>
-      </div>
+      <!-- Pre-rendered Instant First Paint Shell -->
+      <section class="hero">
+        <div class="hero-bg-shapes">
+          <div class="hero-shape-1"></div>
+          <div class="hero-shape-2"></div>
+          <div class="hero-glow-orb hero-glow-orb-1"></div>
+          <div class="hero-glow-orb hero-glow-orb-2"></div>
+          <svg class="hero-flow-svg" viewBox="0 0 1440 600" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="flowGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#2563EB" stop-opacity="0.45"/>
+                <stop offset="50%" stop-color="#007C92" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#F39C12" stop-opacity="0.25"/>
+              </linearGradient>
+              <linearGradient id="flowGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#F39C12" stop-opacity="0.35"/>
+                <stop offset="50%" stop-color="#EC4899" stop-opacity="0.25"/>
+                <stop offset="100%" stop-color="#2563EB" stop-opacity="0.2"/>
+              </linearGradient>
+            </defs>
+            <path class="flow-line flow-line-1" d="M -100,280 C 250,150 450,420 800,260 C 1150,100 1350,380 1600,220" stroke="url(#flowGrad1)" stroke-width="3" stroke-linecap="round" fill="none" />
+            <path class="flow-line flow-line-2" d="M -100,380 C 300,500 600,180 950,340 C 1300,500 1450,260 1600,320" stroke="url(#flowGrad2)" stroke-width="2.5" stroke-linecap="round" fill="none" />
+            <path class="flow-line flow-line-3" d="M -50,180 C 350,80 700,350 1100,160 C 1350,80 1480,240 1600,180" stroke="url(#flowGrad1)" stroke-width="1.5" stroke-dasharray="8 8" opacity="0.6" fill="none" />
+          </svg>
+        </div>
+        <div class="hero-content">
+          <div class="hero-tag"><i class="fa-solid fa-seedling"></i> Restoring Hope & Rebuilding Lives</div>
+          <h1 class="hero-title">Empowering Youth,<br><span>Caregivers</span> & Families</h1>
+          <p class="hero-subtitle">Howards 4 Hope is a registered 501(c)(3) nonprofit organization in Long Beach, CA dedicated to providing educational workshops, caregiver respite circles, and single parent self-sufficiency toolkits.</p>
+          <div class="hero-actions">
+            <a href="#/donate" class="btn btn-donate"><i class="fa-solid fa-heart"></i> Donate Now</a>
+            <a href="#/programs" class="btn btn-outline" style="color: white; border-color: white;"><i class="fa-solid fa-hands-holding-child"></i> Our Programs</a>
+            <a href="#/events" class="btn btn-outline" style="color: white; border-color: white;"><i class="fa-regular fa-calendar"></i> Events Calendar</a>
+          </div>
+        </div>
+        <div class="hero-image-wrapper divine-light" style="border-radius: 50%; padding: 20px;">
+          <img class="hero-image" src="assets/logos/logo.png" alt="Howards 4 Hope Community" style="border-radius: 50%;">
+        </div>
+        <div class="hero-wave-divider">
+          <svg viewBox="0 0 1440 60" fill="none" preserveAspectRatio="none">
+            <path d="M0,28 C360,56 720,0 1080,32 C1260,48 1380,36 1440,28 L1440,60 L0,60 Z" fill="var(--bg-base)" fill-opacity="0.4"/>
+            <path d="M0,38 C280,12 680,50 1020,22 C1240,6 1380,30 1440,34 L1440,60 L0,60 Z" fill="var(--bg-base)"/>
+          </svg>
+        </div>
+      </section>
+
+      <!-- --- STATS BAR --- -->
+      <section class="stats-bar">
+        <div class="stat-item">
+          <div class="stat-num">500<span>+</span></div>
+          <div class="stat-label">Families Uplifted</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">100<span>%</span></div>
+          <div class="stat-label">Community Driven</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">501<span>(c)(3)</span></div>
+          <div class="stat-label">Tax-Exempt Non-Profit (EIN 86-1910919)</div>
+        </div>
+      </section>
+
+      <!-- --- PILLARS OF MISSION --- -->
+      <section class="section">
+        <div class="section-bg-aura">
+          <div class="section-aura-orb section-aura-orb-1"></div>
+          <div class="section-aura-orb section-aura-orb-2"></div>
+        </div>
+        <div class="section-header">
+          <span class="section-tag">Core Initiatives</span>
+          <h2 class="section-title">Our Three Pillars of Empowerment</h2>
+          <p class="section-subtitle">We deliver structural aid, social-emotional development, and community safety nets across Long Beach and surrounding areas.</p>
+        </div>
+        <div class="pillars-grid">
+          <div class="pillar-card">
+            <div class="pillar-icon" style="background: rgba(37, 99, 235, 0.1); color: #2563EB;"><i class="fa-solid fa-graduation-cap"></i></div>
+            <h3 class="pillar-title">Me, Myself & Why</h3>
+            <p style="font-size: 0.9rem; color: var(--secondary); font-weight: 600; margin-bottom: 10px;">Youth Mentorship (Grades 4–8)</p>
+            <ul style="text-align: left; margin: 15px 0; color: var(--text-muted); font-size: 0.95rem; padding-left: 20px;">
+              <li style="margin-bottom: 8px;">Self-identity & confidence workshops</li>
+              <li style="margin-bottom: 8px;">Middle school transition & anti-bullying</li>
+              <li style="margin-bottom: 8px;">Emotional wellness & peer resilience</li>
+            </ul>
+            <a href="#/programs" class="res-link">Explore Program <i class="fa-solid fa-arrow-right"></i></a>
+          </div>
+          <div class="pillar-card">
+            <div class="pillar-icon" style="background: rgba(243, 156, 18, 0.1); color: #F39C12;"><i class="fa-solid fa-hand-holding-heart"></i></div>
+            <h3 class="pillar-title">Links of Hope</h3>
+            <p style="font-size: 0.9rem; color: var(--accent); font-weight: 600; margin-bottom: 10px;">Disability Caregiver Support</p>
+            <ul style="text-align: left; margin: 15px 0; color: var(--text-muted); font-size: 0.95rem; padding-left: 20px;">
+              <li style="margin-bottom: 8px;">Caregiver stress-relief & respite circles</li>
+              <li style="margin-bottom: 8px;">Special Education (IEP) advocacy guidance</li>
+              <li style="margin-bottom: 8px;">Support for intellectual & physical needs</li>
+            </ul>
+            <a href="#/programs" class="res-link">Access Resources <i class="fa-solid fa-arrow-right"></i></a>
+          </div>
+          <div class="pillar-card">
+            <div class="pillar-icon" style="background: rgba(0, 124, 146, 0.1); color: #007C92;"><i class="fa-solid fa-people-roof"></i></div>
+            <h3 class="pillar-title">The H.O.P.E. Program</h3>
+            <p style="font-size: 0.9rem; color: var(--secondary); font-weight: 600; margin-bottom: 10px;">Helping Other People Persevere Effectively</p>
+            <ul style="text-align: left; margin: 15px 0; color: var(--text-muted); font-size: 0.95rem; padding-left: 20px;">
+              <li style="margin-bottom: 8px;">Single parents financial self-sufficiency</li>
+              <li style="margin-bottom: 8px;">CalFresh & Medi-Cal application navigations</li>
+              <li style="margin-bottom: 8px;">Career & vocational transition assistance</li>
+            </ul>
+            <a href="#/programs" class="res-link">Get Assistance <i class="fa-solid fa-arrow-right"></i></a>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- --- AUTHENTICATION POPUP DIALOG --- -->
     <div class="modal" id="auth-modal">
       <div class="modal-content">
-        <span class="modal-close" id="auth-modal-close">&times;</span>
-        <h3 class="modal-title" id="auth-title" style="display:none;">Welcome Back</h3>
+        <span class="modal-close" id="auth-modal-close" title="Close Dialog">&times;</span>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="assets/logos/logo.png" alt="Howards 4 Hope" style="height: 54px; width: auto; margin: 0 auto 10px auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));">
+          <h3 class="modal-title" id="auth-title" style="margin: 0; font-size: 1.4rem;">Welcome to Howards 4 Hope</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Sign in to access your RSVP passes and donor receipts.</p>
+        </div>
         
-        <div style="display: flex; gap: 10px; margin-bottom: 25px;">
-          <button class="btn btn-primary" id="auth-tab-login" style="flex: 1; padding: 12px; font-weight: 700;">Login</button>
-          <button class="btn btn-outline" id="auth-tab-signup" style="flex: 1; padding: 12px; font-weight: 700;">Sign Up</button>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+          <button class="btn btn-primary" id="auth-tab-login" style="flex: 1; padding: 10px; font-weight: 700;">Login</button>
+          <button class="btn btn-outline" id="auth-tab-signup" style="flex: 1; padding: 10px; font-weight: 700;">Sign Up</button>
         </div>
         
         <!-- Google Oauth Auth Button -->
@@ -170,31 +354,18 @@
             <i class="fa-solid fa-right-to-bracket"></i> Login
           </button>
         </form>
-        
-        <div class="modal-switch" id="auth-toggle" style="display:none;">
-          Don't have an account? <span id="auth-toggle-link">Sign Up</span>
-        </div>
       </div>
     </div>
 
-    <!-- --- COMMUNITY IMPACT & GALLERY PHOTO CAROUSEL --- -->
-    <section class="community-carousel-section" id="community-carousel-root">
-      <div class="carousel-container">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <div class="hero-tag" style="background: rgba(37, 99, 235, 0.1); color: var(--primary);"><i class="fa-solid fa-camera-retro"></i> Hope in Action</div>
-          <h2 style="font-size: 2.2rem; font-weight: 800; color: var(--text-main); margin-top: 8px;">Our Community Impact & Gallery</h2>
-          <p style="color: var(--text-muted); max-width: 680px; margin: 8px auto 0;">Moments of empowerment, caregiver respite, youth mentorship, and family milestones in Long Beach, CA.</p>
+    <!-- --- STATUS, CONFIRMATION & 501(c)(3) TAX RECEIPT DIALOG --- -->
+    <div class="modal" id="status-modal">
+      <div class="modal-content" style="max-width: 550px;">
+        <span class="modal-close" id="status-modal-close" title="Close">&times;</span>
+        <div id="status-modal-body">
+          <!-- Dynamic content inserted by app.js showStatusModal() -->
         </div>
-        <div class="carousel-track-wrapper">
-          <div class="carousel-track" id="impact-carousel-track">
-            <!-- Populated dynamically by app.js -->
-          </div>
-        </div>
-        <button class="carousel-nav-btn prev" id="carousel-prev-btn" aria-label="Previous Slide"><i class="fa-solid fa-chevron-left"></i></button>
-        <button class="carousel-nav-btn next" id="carousel-next-btn" aria-label="Next Slide"><i class="fa-solid fa-chevron-right"></i></button>
-        <div class="carousel-dots" id="carousel-dots-container"></div>
       </div>
-    </section>
+    </div>
 
     <!-- --- STUNNING 4-COLUMN FOOTER WITH OUTREACH & VOLUNTEER FORM --- -->
     <footer>
@@ -241,7 +412,10 @@
 
       <div class="footer-grid">
         <div class="footer-brand">
-          <h4>Howards 4 Hope</h4>
+          <div class="footer-brand-logo" style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+            <img src="assets/logos/logo.png" alt="Howards 4 Hope" style="height: 48px; width: auto; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));">
+            <h4 style="margin: 0; font-size: 1.4rem; color: #ffffff;">Howards 4 <span style="color: var(--accent);">Hope</span></h4>
+          </div>
           <p>Restoring hope and enhancing lives by empowering youth, supporting caregivers of individuals with disabilities, and uplifting single parents in Long Beach, CA.</p>
           <div class="footer-socials">
             <a href="https://www.facebook.com" target="_blank" rel="noopener noreferrer" class="social-circle" title="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
@@ -284,7 +458,7 @@
           <h5>Contact Us</h5>
           <div class="footer-contact-info">
             <p><i class="fa-solid fa-phone" style="color: var(--accent); margin-right: 8px;"></i> <a href="tel:5624815556">(562) 481-5556</a></p>
-            <p><i class="fa-solid fa-envelope" style="color: var(--accent); margin-right: 8px;"></i> <a href="mailto:info@howards4hope.org">info@howards4hope.org</a></p>
+            <p><i class="fa-solid fa-envelope" style="color: var(--accent); margin-right: 8px;"></i> <a href="mailto:howards4hope@gmail.com">howards4hope@gmail.com</a></p>
             <p><i class="fa-solid fa-location-dot" style="color: var(--accent); margin-right: 8px;"></i> 3711 Long Beach Blvd, #4055<br><span style="padding-left: 20px;">Long Beach, CA 90807</span></p>
             <p><i class="fa-solid fa-certificate" style="color: var(--accent); margin-right: 8px;"></i> 501(c)(3) Tax-Exempt Non-Profit</p>
             <p><i class="fa-solid fa-id-card" style="color: var(--accent); margin-right: 8px;"></i> EIN # 86-1910919</p>
@@ -297,19 +471,23 @@
         <div class="footer-bottom-links">
           <a href="#/terms">Terms of Service</a>
           <a href="#/privacy">Privacy Policy</a>
+          <a href="javascript:void(0)" id="open-cookie-settings-link">Cookie Settings</a>
         </div>
       </div>
     </footer>
     
   </div>
 
+  <!-- --- GDPR / PRIVACY COOKIE CONSENT BANNER ROOT --- -->
+  <div id="cookie-consent-root"></div>
+
   <!-- --- FIREBASE SDKS BINDING --- -->
   <!-- Firebase App (the core Firebase SDK) -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" defer></script>
   <!-- Firebase Auth -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js" defer></script>
   
   <!-- --- APPLICATION ENTRY SCRIPT --- -->
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=20" defer></script>
 </body>
 </html>
