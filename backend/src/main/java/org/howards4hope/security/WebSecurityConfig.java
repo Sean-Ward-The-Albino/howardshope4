@@ -60,8 +60,8 @@ public class WebSecurityConfig {
                 .requestMatchers("/api/payments/webhook").permitAll()
                 .requestMatchers("/api/payments/create-stripe-checkout", "/api/payments/create-paypal-order").permitAll()
                 .requestMatchers("/api/donations/create-checkout", "/api/donations/receipt/**").permitAll()
-                .requestMatchers("/api/tickets/book-guest", "/api/tickets/guest-tickets", "/api/tickets/lookup", "/api/tickets/verify/**").permitAll()
-                .requestMatchers("/api/blog/posts", "/api/blog/posts/**").permitAll()
+                .requestMatchers("/api/tickets/book-guest", "/api/tickets/lookup", "/api/tickets/verify/**").permitAll()
+                .requestMatchers("/api/blog", "/api/blog/**", "/api/outreach/apply").permitAll()
                 .requestMatchers("/api/analytics/track").permitAll()
                 .requestMatchers("/api/newsletter/subscribe").permitAll()
                 

@@ -176,8 +176,7 @@ public class TicketController {
     @GetMapping("/tickets/lookup")
     public ResponseEntity<?> lookupTicket(
             @RequestParam(required = false) String ticketId,
-            @RequestParam(required = false) String confirmationToken,
-            @RequestParam(required = false) String email) {
+            @RequestParam(required = false) String confirmationToken) {
         
         if (ticketId != null && !ticketId.trim().isEmpty()) {
             Optional<Ticket> opt = ticketRepository.findByTicketId(ticketId.trim());
@@ -189,21 +188,7 @@ public class TicketController {
             if (opt.isPresent()) return ResponseEntity.ok(opt.get());
         }
 
-        if (email != null && !email.trim().isEmpty()) {
-            List<Ticket> tickets = ticketRepository.findByUserEmailIgnoreCase(email.trim());
-            if (!tickets.isEmpty()) return ResponseEntity.ok(tickets);
-        }
-
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No matching ticket found with provided credentials.");
-    }
-
-    @GetMapping("/tickets/guest-tickets")
-    public ResponseEntity<?> getGuestTickets(@RequestParam String email) {
-        if (email == null || email.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Email query parameter is required.");
-        }
-        List<Ticket> tickets = ticketRepository.findByUserEmailIgnoreCase(email.trim());
-        return ResponseEntity.ok(tickets);
     }
 
     @GetMapping("/tickets/my-tickets")

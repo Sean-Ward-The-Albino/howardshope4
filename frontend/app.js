@@ -562,12 +562,11 @@ const API = {
     return ticket;
   },
 
-  async lookupTicket(ticketId = null, confirmationToken = null, email = null) {
+  async lookupTicket(ticketId = null, confirmationToken = null) {
     try {
       let url = `${this.baseUrl}/tickets/lookup?`;
       if (ticketId) url += `ticketId=${encodeURIComponent(ticketId)}&`;
       if (confirmationToken) url += `confirmationToken=${encodeURIComponent(confirmationToken)}&`;
-      if (email) url += `email=${encodeURIComponent(email)}&`;
       
       const response = await fetchWithTimeout(url, {}, 2500);
       if (response.ok) {
@@ -796,7 +795,7 @@ firebase.auth().onAuthStateChanged(async (user) => {
   } else {
     state.user = null;
     state.isAdmin = false;
-    state.myTickets = [];
+    // Do NOT wipe state.myTickets here; keep device-saved tickets for guests.
     
     loginBtn.style.display = 'flex';
     if (mobileLoginBtn) mobileLoginBtn.style.display = 'block';
@@ -928,11 +927,9 @@ function applyTheme(isDark) {
 }
 
 // Explicit Light Mode Default (Clean Pearl White baseline)
-if (localStorage.getItem('theme') === 'dark') {
-  applyTheme(true);
-} else {
-  applyTheme(false);
-}
+// Force light mode explicitly to clear any stuck dark mode states
+localStorage.setItem('theme', 'light');
+applyTheme(false);
 
 if (themeBtn) {
   themeBtn.addEventListener('click', () => {
@@ -1146,8 +1143,21 @@ const templates = {
             <a href="#/events" class="btn btn-outline" style="color: white; border-color: white;"><i class="fa-regular fa-calendar"></i> Events Calendar</a>
           </div>
         </div>
-        <div class="hero-image-wrapper divine-light" style="border-radius: 50%; padding: 20px;">
-          <img class="hero-image" src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=1200" alt="Hope Community" style="border-radius: 50%;">
+        <div class="hero-image-wrapper divine-light" style="border-radius: 12px; padding: 0; overflow: hidden; position: relative; height: 100%; min-height: 400px; max-height: 500px;">
+          <div style="width: 100%; height: 100%; position: absolute; inset: 0; overflow: hidden;" id="hero-carousel-container">
+            <div id="hero-carousel-track" style="display: flex; height: 100%; transition: transform 0.5s ease-in-out;"></div>
+            
+            <button class="hero-carousel-nav hero-carousel-prev" id="hero-carousel-prev" aria-label="Previous slide">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <button class="hero-carousel-nav hero-carousel-next" id="hero-carousel-next" aria-label="Next slide">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+
+            <div style="position: absolute; bottom: 15px; width: 100%; display: flex; justify-content: center; z-index: 10;">
+              <div id="hero-carousel-dots" style="display: flex; gap: 8px;"></div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1167,14 +1177,15 @@ const templates = {
         </div>
       </section>
 
+
+
       <!-- --- PILLARS OF MISSION --- -->
       <section class="section">
         <div class="section-header">
-          <span class="section-tag">Core Initiatives</span>
-          <h2 class="section-title">Our Three Pillars of Empowerment</h2>
-          <p class="section-subtitle">We deliver structural aid, social-emotional development, and community safety nets across Long Beach and surrounding areas.</p>
+          <span class="section-tag">Our Impact Pillars</span>
+          <h2 class="section-title">Core Initiatives</h2>
         </div>
-        <div class="pillars-grid">
+        <div class="mission-grid">
           <div class="pillar-card">
             <div class="pillar-icon" style="background: rgba(37, 99, 235, 0.1); color: #2563EB;"><i class="fa-solid fa-graduation-cap"></i></div>
             <h3 class="pillar-title">Me, Myself & Why</h3>
@@ -1210,6 +1221,32 @@ const templates = {
           </div>
         </div>
       </section>
+
+      <!-- --- IMPACT HIGHLIGHTS --- -->
+      <section class="section animate-on-scroll" style="padding-top: 20px;">
+        <div class="section-header">
+          <span class="section-tag">Our Impact</span>
+          <h2 class="section-title">Highlighting Community Success</h2>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
+          <div class="calendar-card animate-hover" style="padding: 24px; text-align: center;">
+            <div style="font-size: 2rem; color: var(--accent); margin-bottom: 15px;"><i class="fa-solid fa-graduation-cap"></i></div>
+            <h3 style="color: var(--primary); margin-bottom: 10px;">Youth Leadership</h3>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">Empowering middle-school students with social-emotional resilience and self-advocacy through the "Me, Myself & Why" program.</p>
+          </div>
+          <div class="calendar-card animate-hover" style="padding: 24px; text-align: center;">
+            <div style="font-size: 2rem; color: var(--accent); margin-bottom: 15px;"><i class="fa-solid fa-hands-holding-child"></i></div>
+            <h3 style="color: var(--primary); margin-bottom: 10px;">Caregiver Respite</h3>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">Providing safe havens and mental wellness networks for family caregivers through the "Links of Hope" initiative.</p>
+          </div>
+          <div class="calendar-card animate-hover" style="padding: 24px; text-align: center;">
+            <div style="font-size: 2rem; color: var(--accent); margin-bottom: 15px;"><i class="fa-solid fa-house-chimney-medical"></i></div>
+            <h3 style="color: var(--primary); margin-bottom: 10px;">Single Parent Aid</h3>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">Equipping low-income single parents with career guidance and emergency grant assistance via The H.O.P.E. Program.</p>
+          </div>
+        </div>
+      </section>
+
 
       <!-- --- TEASER EVENTS --- -->
       <section class="section section-alt">
@@ -1279,6 +1316,36 @@ const templates = {
           </div>
         </div>
         
+        <!-- History & Milestones -->
+        <div class="section-header" style="margin-top: 60px; margin-bottom: 40px;">
+          <span class="section-tag">Our Journey</span>
+          <h2 class="section-title">History & Milestones</h2>
+          <p class="section-subtitle">Tracing our growth from a local community initiative to a registered 501(c)(3) nonprofit organization.</p>
+        </div>
+        <div style="max-width: 800px; margin: 0 auto 60px auto; display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; gap: 20px; align-items: flex-start; background: var(--bg-card); padding: 20px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border-left: 4px solid var(--accent);">
+            <div style="font-weight: 800; color: var(--primary); font-size: 1.2rem; min-width: 100px;">Jan 2022</div>
+            <div>
+              <h4 style="color: var(--secondary); margin-bottom: 5px; font-weight: 700;">Foundation Established</h4>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">Howards 4 Hope was founded by the Howard family to address critical gaps in youth mentorship and caregiver support.</p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 20px; align-items: flex-start; background: var(--bg-card); padding: 20px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border-left: 4px solid var(--accent);">
+            <div style="font-weight: 800; color: var(--primary); font-size: 1.2rem; min-width: 100px;">Nov 2023</div>
+            <div>
+              <h4 style="color: var(--secondary); margin-bottom: 5px; font-weight: 700;">First Annual Gala</h4>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">Hosted the inaugural "Unmasking Hope" charity gala, raising essential funds for the Links of Hope caregiver network.</p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 20px; align-items: flex-start; background: var(--bg-card); padding: 20px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border-left: 4px solid var(--accent);">
+            <div style="font-weight: 800; color: var(--primary); font-size: 1.2rem; min-width: 100px;">Mar 2025</div>
+            <div>
+              <h4 style="color: var(--secondary); margin-bottom: 5px; font-weight: 700;">501(c)(3) Status Achieved</h4>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">Officially recognized as a tax-exempt organization, enabling expanded corporate partnerships and grant funding.</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Meet Our Staff & Leadership -->
         <div class="section-header" style="margin-top: 60px; margin-bottom: 40px;">
           <span class="section-tag">Leadership Team</span>
@@ -1645,8 +1712,8 @@ const templates = {
           </div>
 
           <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-            <a href="#custom-pricing-section" class="btn btn-donate" style="padding: 14px 32px; font-size: 1.05rem;"><i class="fa-solid fa-ticket"></i> Select Your Pass</a>
-            <a href="#custom-story-section" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-circle-info"></i> Event Details</a>
+            <a href="javascript:void(0)" onclick="document.getElementById('custom-pricing-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-donate" style="padding: 14px 32px; font-size: 1.05rem;"><i class="fa-solid fa-ticket"></i> Select Your Pass</a>
+            <a href="javascript:void(0)" onclick="document.getElementById('custom-story-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-circle-info"></i> Event Details</a>
             <a href="#/my-tickets" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-magnifying-glass"></i> Check My Pass</a>
           </div>
         </div>
@@ -1747,61 +1814,99 @@ const templates = {
         </div>
       </section>
 
-      <!-- --- CUSTOM TICKET CHECKOUT MODAL --- -->
-      <div class="modal" id="custom-tier-modal">
-        <div class="modal-content" style="max-width: 520px;">
-          <span class="modal-close" id="custom-tier-close">&times;</span>
-          <div style="text-align: center; margin-bottom: 20px;">
-            <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(243, 156, 18, 0.15); color: var(--accent); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-size: 1.4rem;">
+      <!-- --- INLINE CHECKOUT SECTION --- -->
+      <section id="custom-pricing-checkout" class="section" style="padding-top: 40px; display: none;">
+        <div style="max-width: 600px; margin: 0 auto; background: var(--bg-card); padding: 30px; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); border: 1px solid rgba(15,23,42,0.1);">
+          <div style="text-align: center; margin-bottom: 25px;">
+            <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(243, 156, 18, 0.15); color: var(--accent); display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; font-size: 1.6rem;">
               <i class="fa-solid fa-ticket"></i>
             </div>
-            <h3 class="modal-title" id="custom-modal-tier-title" style="margin: 0; font-size: 1.4rem;">Reserve Pass</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;" id="custom-modal-tier-subtitle">Complete your registration below.</p>
+            <h3 id="custom-modal-tier-title" style="margin: 0; font-size: 1.6rem; color: var(--primary); font-weight: 800;">Complete Reservation</h3>
+            <p style="color: var(--text-muted); margin-top: 8px;">You're almost there! Fill out the details below.</p>
+            <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px; font-size: 0.95rem; border-bottom: 1px solid rgba(15,23,42,0.1); padding-bottom: 15px;">
+              <div id="step-indicator-1" style="font-weight: 800; color: var(--primary);"><i class="fa-solid fa-circle-1" style="margin-right: 5px;"></i> Details</div>
+              <div id="step-indicator-2" style="color: var(--text-muted);"><i class="fa-solid fa-circle-2" style="margin-right: 5px;"></i> Payment</div>
+            </div>
           </div>
 
           <form id="custom-tier-booking-form">
             <input type="hidden" id="custom-tier-input-id">
             <input type="hidden" id="custom-tier-input-price">
             
-            <div class="form-group" style="margin-bottom: 14px;">
-              <label style="font-size: 0.85rem; font-weight: 700;">Pass Quantity</label>
-              <select id="custom-tier-qty" class="form-control" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
-                <option value="1">1 Pass</option>
-                <option value="2">2 Passes</option>
-                <option value="4">4 Passes</option>
-                <option value="8">Full Table (8 Passes)</option>
-              </select>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 14px;">
-              <label style="font-size: 0.85rem; font-weight: 700;">Full Name *</label>
-              <input type="text" id="custom-tier-name" class="form-control" required placeholder="Jane Doe" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
-            </div>
-
-            <div class="form-group" style="margin-bottom: 14px;">
-              <label style="font-size: 0.85rem; font-weight: 700;">Email Address *</label>
-              <input type="email" id="custom-tier-email" class="form-control" required placeholder="jane@example.com" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
-            </div>
-
-            <div class="form-group" style="margin-bottom: 20px;">
-              <label style="font-size: 0.85rem; font-weight: 700;">Phone Number</label>
-              <input type="tel" id="custom-tier-phone" class="form-control" placeholder="(562) 555-0199" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
-            </div>
-
-            <div style="background: var(--bg-base); padding: 15px; border-radius: var(--radius-sm); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <span style="font-size: 0.85rem; color: var(--text-muted);">Total Order Amount:</span>
-                <div style="font-size: 1.4rem; font-weight: 800; color: var(--primary);" id="custom-tier-total-display">$0.00</div>
+            <!-- STEP 1: Details -->
+            <div id="checkout-step-1">
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Pass Quantity</label>
+                <select id="custom-tier-qty" class="form-control" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+                  <option value="1">1 Pass</option>
+                  <option value="2">2 Passes</option>
+                  <option value="4">4 Passes</option>
+                  <option value="8">Full Table (8 Passes)</option>
+                </select>
               </div>
-              <span class="badge" style="background: rgba(30, 130, 76, 0.15); color: var(--success); font-weight: 700; padding: 6px 12px; border-radius: 50px;">Tax Deductible</span>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Full Name *</label>
+                <input type="text" id="custom-tier-name" class="form-control" required placeholder="Jane Doe" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+              </div>
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Email Address *</label>
+                <input type="email" id="custom-tier-email" class="form-control" required placeholder="jane@example.com" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+              </div>
+              <div class="form-group" style="margin-bottom: 25px;">
+                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Phone Number</label>
+                <input type="tel" id="custom-tier-phone" class="form-control" placeholder="(562) 555-0199" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+              </div>
+              
+              <button type="button" class="btn btn-primary" id="checkout-next-btn" style="width: 100%; padding: 16px; font-weight: 800; font-size: 1.05rem;">
+                Continue to Payment <i class="fa-solid fa-arrow-right" style="margin-left: 8px;"></i>
+              </button>
             </div>
 
-            <button type="submit" class="btn btn-donate" id="custom-tier-submit-btn" style="width: 100%; padding: 14px; font-weight: 800; font-size: 1rem;">
-              Confirm & Book Reservation
-            </button>
+            <!-- STEP 2: Payment -->
+            <div id="checkout-step-2" style="display: none;">
+              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-sm); margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(15,23,42,0.05);">
+                <div>
+                  <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600;">Total Order Amount:</span>
+                  <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);" id="custom-tier-total-display">$0.00</div>
+                </div>
+                <span class="badge" style="background: rgba(30, 130, 76, 0.15); color: var(--success); font-weight: 800; padding: 8px 14px; border-radius: 50px; font-size: 0.85rem;">Tax Deductible</span>
+              </div>
+              
+              <label style="font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; display: block; color: var(--text-main);">Select Payment Method</label>
+              <div class="payment-options-grid" style="display: grid; gap: 12px; margin-bottom: 25px;">
+                ${state.customPage.paymentStripe !== false ? `
+                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 18px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
+                    <input type="radio" name="gala_payment" value="stripe" required checked style="transform: scale(1.2);">
+                    <i class="fa-brands fa-stripe fa-2x" style="color: #635bff;"></i>
+                    <span style="font-weight: 700; font-size: 1.05rem;">Credit/Debit Card</span>
+                  </label>
+                ` : ''}
+                ${state.customPage.paymentPaypal !== false ? `
+                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 18px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
+                    <input type="radio" name="gala_payment" value="paypal" required ${state.customPage.paymentStripe === false ? 'checked' : ''} style="transform: scale(1.2);">
+                    <i class="fa-brands fa-paypal fa-2x" style="color: #00457C;"></i>
+                    <span style="font-weight: 700; font-size: 1.05rem;">PayPal</span>
+                  </label>
+                ` : ''}
+                ${state.customPage.paymentDoor ? `
+                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 18px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
+                    <input type="radio" name="gala_payment" value="door" required ${state.customPage.paymentStripe === false && state.customPage.paymentPaypal === false ? 'checked' : ''} style="transform: scale(1.2);">
+                    <i class="fa-solid fa-money-bill-wave fa-2x" style="color: var(--success);"></i>
+                    <span style="font-weight: 700; font-size: 1.05rem;">Pay at Door</span>
+                  </label>
+                ` : ''}
+              </div>
+
+              <div style="display: flex; gap: 12px;">
+                <button type="button" class="btn btn-outline" id="checkout-back-btn" style="padding: 16px; font-weight: 800; flex: 1;">Back</button>
+                <button type="submit" class="btn btn-donate" id="custom-tier-submit-btn" style="padding: 16px; font-weight: 800; font-size: 1.05rem; flex: 2;">
+                  Confirm & Book Reservation
+                </button>
+              </div>
+            </div>
           </form>
         </div>
-      </div>
+      </section>
     `;
   },
 
@@ -1844,28 +1949,28 @@ const templates = {
             <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--primary); text-align: left; display: flex; align-items: center; gap: 15px;">
               <div style="font-size: 2.2rem; color: var(--primary);"><i class="fa-solid fa-users"></i></div>
               <div>
-                <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.totalAttendees}</div>
+                <div id="metric-total-attendees" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.totalAttendees}</div>
                 <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total Attendees</div>
               </div>
             </div>
             <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--success); text-align: left; display: flex; align-items: center; gap: 15px;">
               <div style="font-size: 2.2rem; color: var(--success);"><i class="fa-solid fa-circle-dollar-to-slot"></i></div>
               <div>
-                <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">$${state.adminMetrics.totalRevenue.toFixed(2)}</div>
+                <div id="metric-total-revenue" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">$${state.adminMetrics.totalRevenue.toFixed(2)}</div>
                 <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total Revenue</div>
               </div>
             </div>
             <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--accent); text-align: left; display: flex; align-items: center; gap: 15px;">
               <div style="font-size: 2.2rem; color: var(--accent);"><i class="fa-solid fa-ticket"></i></div>
               <div>
-                <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.activeEvents}</div>
+                <div id="metric-active-events" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.activeEvents}</div>
                 <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Active Events</div>
               </div>
             </div>
             <div class="calendar-card" style="padding: 20px; border-left: 4px solid var(--secondary); text-align: left; display: flex; align-items: center; gap: 15px;">
               <div style="font-size: 2.2rem; color: var(--secondary);"><i class="fa-solid fa-chart-line"></i></div>
               <div>
-                <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.rsvpConversion}</div>
+                <div id="metric-rsvp-conversion" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.rsvpConversion}</div>
                 <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">RSVP Conversion</div>
               </div>
             </div>
@@ -2316,6 +2421,27 @@ const templates = {
                 </div>
               </div>
 
+              <!-- PAYMENT METHODS CONFIGURATION -->
+              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px;">
+                <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0 0 14px 0; font-weight: 800;">
+                  <i class="fa-solid fa-credit-card" style="color: var(--secondary); margin-right: 6px;"></i> Accepted Payment Methods
+                </h4>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem; cursor: pointer;">
+                    <input type="checkbox" id="adm-custom-pay-stripe" ${state.customPage.paymentStripe !== false ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary);">
+                    Credit/Debit (Stripe)
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem; cursor: pointer;">
+                    <input type="checkbox" id="adm-custom-pay-paypal" ${state.customPage.paymentPaypal !== false ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary);">
+                    PayPal
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem; cursor: pointer;">
+                    <input type="checkbox" id="adm-custom-pay-door" ${state.customPage.paymentDoor ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary);">
+                    Pay at Door
+                  </label>
+                </div>
+              </div>
+
               <!-- SAVE BUTTON -->
               <div style="display: flex; gap: 12px; justify-content: flex-end;">
                 <button type="submit" class="btn btn-donate" id="adm-save-custom-page-btn" style="padding: 12px 28px; font-weight: 800;">
@@ -2350,7 +2476,7 @@ const templates = {
             </div>
             
             <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px;">
-              <input type="text" class="form-control" id="lookup-guest-query" placeholder="Enter Email, Ticket ID, or Confirmation Token..." style="height: 46px;" value="${state.user ? state.user.email : ''}">
+              <input type="text" class="form-control" id="lookup-guest-query" placeholder="Enter Ticket ID, or Confirmation Token..." style="height: 46px;" value="${state.user ? state.user.email : ''}">
               <button class="btn btn-primary" id="lookup-guest-btn" style="height: 46px; padding: 0 24px; display: flex; align-items: center; gap: 8px;">
                 <i class="fa-solid fa-magnifying-glass"></i> Search Pass
               </button>
@@ -2645,6 +2771,8 @@ async function router() {
   // Basic Hash Routing Matches
   if (hash === '#/') {
     contentDiv.innerHTML = templates.home();
+    initHeroCarousel();
+    initScrollAnimations();
   } else if (hash === '#/about') {
     contentDiv.innerHTML = templates.about();
   } else if (hash === '#/programs') {
@@ -2660,6 +2788,10 @@ async function router() {
     contentDiv.innerHTML = templates.donate();
     bindDonationPortal();
   } else if (hash === '#/dashboard') {
+    if (!state.isAdmin) {
+      window.location.hash = '#/';
+      return;
+    }
     contentDiv.innerHTML = templates.dashboard();
     bindAdminDashboard();
   } else if (hash === '#/my-tickets') {
@@ -2808,6 +2940,7 @@ function bindProgramsEvents() {
 
 // --- 2. INTERACTIVE CALENDAR & RSVP SYSTEM ---
 function bindCustomEventPage() {
+  const checkoutSection = document.getElementById('custom-pricing-checkout');
   const modal = document.getElementById('custom-tier-modal');
   const closeBtn = document.getElementById('custom-tier-close');
   const form = document.getElementById('custom-tier-booking-form');
@@ -2815,6 +2948,15 @@ function bindCustomEventPage() {
   const totalDisplay = document.getElementById('custom-tier-total-display');
   const priceInput = document.getElementById('custom-tier-input-price');
   const idInput = document.getElementById('custom-tier-input-id');
+  const nameInput = document.getElementById('custom-tier-name');
+  const emailInput = document.getElementById('custom-tier-email');
+
+  const step1 = document.getElementById('checkout-step-1');
+  const step2 = document.getElementById('checkout-step-2');
+  const ind1 = document.getElementById('step-indicator-1');
+  const ind2 = document.getElementById('step-indicator-2');
+  const nextBtn = document.getElementById('checkout-next-btn');
+  const backBtn = document.getElementById('checkout-back-btn');
 
   function updateTotal() {
     const qty = parseInt(qtySelect ? qtySelect.value : '1', 10);
@@ -2842,17 +2984,61 @@ function bindCustomEventPage() {
       if (titleEl) titleEl.textContent = 'Reserve ' + tierName;
 
       updateTotal();
-      if (modal) modal.classList.add('active');
+      
+      if (step1 && step2) {
+        step1.style.display = 'block';
+        step2.style.display = 'none';
+        ind1.style.fontWeight = 'bold';
+        ind1.style.color = 'var(--primary)';
+        ind2.style.fontWeight = 'normal';
+        ind2.style.color = 'var(--text-muted)';
+      }
+
+      if (checkoutSection) {
+        checkoutSection.style.display = 'block';
+        setTimeout(() => {
+          checkoutSection.scrollIntoView({ behavior: 'smooth' });
+          if (nameInput) nameInput.focus();
+        }, 50);
+      }
     });
   });
 
-  if (closeBtn && modal) {
-    closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      const name = document.getElementById('custom-tier-name').value;
+      const email = document.getElementById('custom-tier-email').value;
+      if (!name || !email) {
+        alert("Please fill out your name and email.");
+        return;
+      }
+      step1.style.display = 'none';
+      step2.style.display = 'block';
+      ind1.style.fontWeight = 'normal';
+      ind1.style.color = 'var(--text-muted)';
+      ind2.style.fontWeight = 'bold';
+      ind2.style.color = 'var(--primary)';
+    });
+  }
+
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      step2.style.display = 'none';
+      step1.style.display = 'block';
+      ind2.style.fontWeight = 'normal';
+      ind2.style.color = 'var(--text-muted)';
+      ind1.style.fontWeight = 'bold';
+      ind1.style.color = 'var(--primary)';
+    });
   }
 
   if (form) {
+    let isSubmitting = false;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (isSubmitting) return;
+      isSubmitting = true;
+      
       const name = document.getElementById('custom-tier-name').value;
       const email = document.getElementById('custom-tier-email').value;
       const qty = parseInt(qtySelect.value, 10);
@@ -2906,6 +3092,7 @@ function bindCustomEventPage() {
       } finally {
         submitBtn.innerHTML = 'Confirm & Book Reservation';
         submitBtn.disabled = false;
+        isSubmitting = false;
       }
     });
   }
@@ -3588,7 +3775,10 @@ function bindAdminDashboard() {
         bannerImage: document.getElementById('adm-custom-banner').value.trim(),
         description: document.getElementById('adm-custom-desc').value.trim(),
         schedule: state.customPage.schedule || DEFAULT_CUSTOM_PAGE.schedule,
-        pricingTiers: tiers.length > 0 ? tiers : DEFAULT_CUSTOM_PAGE.pricingTiers
+        pricingTiers: tiers.length > 0 ? tiers : DEFAULT_CUSTOM_PAGE.pricingTiers,
+        paymentStripe: document.getElementById('adm-custom-pay-stripe') ? document.getElementById('adm-custom-pay-stripe').checked : true,
+        paymentPaypal: document.getElementById('adm-custom-pay-paypal') ? document.getElementById('adm-custom-pay-paypal').checked : true,
+        paymentDoor: document.getElementById('adm-custom-pay-door') ? document.getElementById('adm-custom-pay-door').checked : false
       };
 
       saveCustomPage(updatedPage);
@@ -4137,7 +4327,7 @@ function bindMyTicketsEvents() {
     lookupBtn.addEventListener('click', async () => {
       const q = queryInput.value.trim();
       if (!q) {
-        alert("Please enter your email, Ticket ID (e.g., H4H-TKT-...), or Confirmation Token.");
+        alert("Please enter your Ticket ID (e.g., H4H-TKT-...) or Confirmation Token. (Email is only valid for tickets saved to this device).");
         return;
       }
       
@@ -4149,13 +4339,13 @@ function bindMyTicketsEvents() {
       let tickets = [];
       try {
         if (q.includes('@')) {
-          const res = await API.lookupTicket(null, null, q);
-          tickets = Array.isArray(res) ? res : (res ? [res] : []);
+          // Email lookups are only local for security reasons
+          console.log("Email query detected. Skipping backend lookup for security.");
         } else if (q.toUpperCase().startsWith('H4H-') || q.startsWith('tkt-')) {
-          const res = await API.lookupTicket(q, null, null);
+          const res = await API.lookupTicket(q, null);
           tickets = Array.isArray(res) ? res : (res ? [res] : []);
         } else {
-          const res = await API.lookupTicket(null, q, null);
+          const res = await API.lookupTicket(null, q);
           tickets = Array.isArray(res) ? res : (res ? [res] : []);
         }
       } catch (e) {
@@ -4178,9 +4368,10 @@ function bindMyTicketsEvents() {
       lookupBtn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Search Pass`;
       
       if (tickets.length === 0) {
+        const sanitizedQ = q.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         resultsContainer.innerHTML = `
           <div style="padding: 18px; border-radius: 8px; background: rgba(239, 68, 68, 0.05); color: var(--danger); font-size: 0.9rem; font-weight: 600; text-align: center; border: 1px solid rgba(239, 68, 68, 0.15);">
-            <i class="fa-solid fa-triangle-exclamation"></i> No verified ticket found matching "<strong>${q}</strong>". Please verify your credentials or email info@howards4hope.org.
+            <i class="fa-solid fa-triangle-exclamation"></i> No verified ticket found matching "<strong>${sanitizedQ}</strong>". Please verify your credentials or email info@howards4hope.org.
           </div>
         `;
       } else {
@@ -4327,3 +4518,97 @@ function initCommunityCarousel() {
 // Call Community Carousel on DOM load
 window.addEventListener('DOMContentLoaded', initCommunityCarousel);
 setTimeout(initCommunityCarousel, 300);
+
+function initHeroCarousel() {
+  const track = document.getElementById('hero-carousel-track');
+  const dotsContainer = document.getElementById('hero-carousel-dots');
+  if (!track) return;
+
+  const slides = [
+    { image: "assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18.webp", alt: "Hope Community", title: "Join Our Community", desc: "Discover the impactful work we do together.", btnText: "Learn More", link: "#/about" },
+    { image: "assets/2026/MMW/WEBP/349fe65d-df74-46ec-9a52-98abc6b240e2.webp", alt: "Youth Mentorship", title: "Empowering Youth", desc: "Mentorship that builds resilience and confidence.", btnText: "Our Programs", link: "#/programs" },
+    { image: "assets/2026/Links of Hope/WEBP/WhatsApp Image 2026-03-31 at 02.00.11.webp", alt: "Caregiver Support", title: "Supporting Caregivers", desc: "Providing respite and advocacy for families.", btnText: "Get Support", link: "#/programs" }
+  ];
+
+  let currentIndex = 0;
+  track.innerHTML = slides.map(s => `
+    <div class="hero-carousel-slide">
+      <img src="${s.image}" alt="${s.alt}">
+      <div class="hero-carousel-overlay">
+        <h3>${s.title}</h3>
+        <p>${s.desc}</p>
+        <a href="${s.link}" class="btn btn-primary" style="margin-top: 15px;">${s.btnText}</a>
+      </div>
+    </div>
+  `).join('');
+
+  if (dotsContainer) {
+    dotsContainer.innerHTML = slides.map((_, i) => `
+      <div class="carousel-dot ${i === 0 ? 'active' : ''}" style="width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.5); cursor: pointer;" data-index="${i}"></div>
+    `).join('');
+
+    dotsContainer.querySelectorAll('.carousel-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        currentIndex = parseInt(dot.getAttribute('data-index'));
+        updateCarousel();
+      });
+    });
+  }
+
+  function updateCarousel() {
+    track.style.transform = `translateX(-${currentIndex * 100}%)`;
+    if (dotsContainer) {
+      dotsContainer.querySelectorAll('.carousel-dot').forEach((dot, i) => {
+        dot.style.background = i === currentIndex ? '#fff' : 'rgba(255,255,255,0.5)';
+      });
+    }
+  }
+
+  const prevBtn = document.getElementById('hero-carousel-prev');
+  const nextBtn = document.getElementById('hero-carousel-next');
+  let autoTimer;
+
+  function startAuto() {
+    if (autoTimer) clearInterval(autoTimer);
+    autoTimer = setInterval(() => {
+      currentIndex = (currentIndex + 1) % slides.length;
+      updateCarousel();
+    }, 5000);
+  }
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+      updateCarousel();
+      startAuto();
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      currentIndex = (currentIndex + 1) % slides.length;
+      updateCarousel();
+      startAuto();
+    });
+  }
+
+  const container = document.getElementById('hero-carousel-container');
+  if (container) {
+    container.addEventListener('mouseenter', () => clearInterval(autoTimer));
+    container.addEventListener('mouseleave', startAuto);
+  }
+
+  startAuto();
+}
+
+function initScrollAnimations() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('fade-in-visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  });
+  document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
+}
