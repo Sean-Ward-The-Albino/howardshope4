@@ -392,9 +392,33 @@ async function fetchWithTimeout(resource, options = {}, timeoutMs = 2500) {
   }
 }
 
+// --- Output sanitization (XSS defense) ---
+// Event/ticket fields are interpolated into innerHTML in several places.
+// Escape them so a malicious title/desc/banner can't run scripts for visitors.
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+// Banner URLs land inside a style="background-image: url('...')" attribute.
+// Block javascript: URLs and characters that could break out of the attribute.
+function safeUrl(u) {
+  if (typeof u !== 'string') return '';
+  const t = u.trim();
+  if (/^\s*javascript:/i.test(t)) return '';
+  if (/['"`()<>\\]/.test(t)) return '';
+  return t;
+}
+
 // Backend API Service Client
 const API = {
-  baseUrl: 'http://localhost:8080/api',
+  // Production backend (Cloud Run). Local mock fallbacks for money/data flows
+  // have been removed: an honest error is always safer than a fabricated success.
+  baseUrl: 'https://howards4hope-api-1055785276298.us-central1.run.app/api',
   
   async getHeaders() {
     const headers = { 'Content-Type': 'application/json' };
@@ -466,10 +490,17 @@ const API = {
         return ticket;
       }
     } catch (e) {
-      console.warn("Spring Boot API offline/timed out, saving confirmed pass locally.", e);
+      console.warn("Spring Boot API offline/timed out.", e);
     }
-    
+
+    // Paid bookings must NEVER be fabricated locally: a fake CONFIRMED ticket
+    // with no payment is worse than an honest error. Fail loudly instead.
+    if (paymentMethod !== 'FREE') {
+      throw new Error('Our booking system is temporarily unavailable. No payment was processed and no ticket was issued. Please try again in a few minutes.');
+    }
+
     // Simulate booking ticket locally with guaranteed non-null fields
+    // (FREE events only — no money moves, so a local RSVP record is acceptable)
     const event = state.events.find(e => 
       e.id.toString() === eventId.toString() || 
       e.id.toString().replace('evt-', '') === eventId.toString().replace('evt-', '')
@@ -525,8 +556,17 @@ const API = {
         return ticket;
       }
     } catch (e) {
-      console.warn("Guest booking REST API failed, using fallback.", e);
+      console.warn("Guest booking REST API failed.", e);
     }
+
+    // Paid bookings must NEVER be fabricated locally: a fake CONFIRMED ticket
+    // with no payment is worse than an honest error. Fail loudly instead.
+    if (paymentMethod !== 'FREE') {
+      throw new Error('Our booking system is temporarily unavailable. No payment was processed and no ticket was issued. Please try again in a few minutes.');
+    }
+
+    // Local fallback for FREE events only — no money moves, so a local RSVP
+    // record is acceptable. Callers must not claim emails were sent.
 
     const event = state.events.find(e => 
       e.id.toString() === eventId.toString() || 
@@ -583,10 +623,11 @@ const API = {
     }
     
     // Local fallback search from saved state
-    return state.myTickets.filter(t => 
+    // (email lookups are handled locally by the caller; this method only
+    // receives ticketId / confirmationToken — no bare `email` reference.)
+    return state.myTickets.filter(t =>
       (ticketId && t.ticketId && t.ticketId.toLowerCase() === ticketId.toLowerCase()) ||
-      (confirmationToken && t.confirmationToken && t.confirmationToken.toLowerCase() === confirmationToken.toLowerCase()) ||
-      (email && t.userEmail && t.userEmail.toLowerCase() === email.toLowerCase())
+      (confirmationToken && t.confirmationToken && t.confirmationToken.toLowerCase() === confirmationToken.toLowerCase())
     );
   },
 
@@ -599,24 +640,13 @@ const API = {
       });
       if (response.ok) return await response.json();
     } catch (e) {
-      console.warn("Donation API offline, simulating 501(c)(3) receipt.", e);
+      console.warn("Donation API offline.", e);
     }
 
-    const receiptNum = 'H4H-TAX-' + new Date().getFullYear() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    return {
-      taxReceiptNumber: receiptNum,
-      donation: {
-        donorName: donationData.donorName || 'Generous Donor',
-        donorEmail: donationData.donorEmail,
-        amount: donationData.amount,
-        frequency: donationData.frequency || 'ONE_TIME',
-        paymentMethod: donationData.paymentMethod || 'STRIPE',
-        taxReceiptNumber: receiptNum,
-        donationDate: new Date().toISOString().split('T')[0],
-        ein: '86-1910919'
-      },
-      message: 'Donation successfully simulated and 501(c)(3) tax receipt generated!'
-    };
+    // NEVER fabricate a donation or a 501(c)(3) tax receipt locally.
+    // Telling a donor their gift was received when no money moved and no
+    // receipt was generated is worse than an honest error. Fail loudly.
+    throw new Error('Our donation system is temporarily unavailable. No payment was processed and no donation was recorded. Please try again in a few minutes.');
   },
 
   async getTaxReceipt(taxReceiptNumber) {
@@ -710,7 +740,17 @@ const API = {
 };
 
 /* --- FIREBASE AUTHENTICATION LISTENERS --- */
+// The auth loader overlay blocks ALL page clicks while visible, so it must
+// ALWAYS be hidden once auth state resolves — even if something below throws.
+function hideAuthLoader() {
+  const authLoader = document.getElementById('auth-loader');
+  if (authLoader) authLoader.classList.remove('active');
+}
+// Safety net: never trap the user behind the loader for more than 8 seconds.
+setTimeout(hideAuthLoader, 8000);
+
 firebase.auth().onAuthStateChanged(async (user) => {
+  try {
   const userMenu = document.getElementById('user-menu-container');
   const loginBtn = document.getElementById('login-trigger-btn');
   const mobileLoginBtn = document.getElementById('mobile-login-btn');
@@ -726,10 +766,11 @@ firebase.auth().onAuthStateChanged(async (user) => {
       state.isAdmin = user.email === 'avlorycorp@gmail.com';
     }
     
-    document.getElementById('user-display-email').innerText = user.email;
-    
+    const userDisplayEmail = document.getElementById('user-display-email');
+    if (userDisplayEmail) userDisplayEmail.innerText = user.email;
+
     // Toggle active display
-    loginBtn.style.display = 'none';
+    if (loginBtn) loginBtn.style.display = 'none';
     if (mobileLoginBtn) mobileLoginBtn.style.display = 'none';
     
     // Render My Tickets / Admin links
@@ -797,11 +838,12 @@ firebase.auth().onAuthStateChanged(async (user) => {
     state.isAdmin = false;
     // Do NOT wipe state.myTickets here; keep device-saved tickets for guests.
     
-    loginBtn.style.display = 'flex';
+    if (loginBtn) loginBtn.style.display = 'flex';
     if (mobileLoginBtn) mobileLoginBtn.style.display = 'block';
     const oldTrigger = document.getElementById('user-avatar-trigger');
     if (oldTrigger) oldTrigger.remove();
-    document.getElementById('user-dropdown-menu').classList.remove('active');
+    const userDropdown = document.getElementById('user-dropdown-menu');
+    if (userDropdown) userDropdown.classList.remove('active');
 
     // Reset mobile profile & admin links
     const mobProfCard = document.getElementById('mobile-user-profile-card');
@@ -820,9 +862,12 @@ firebase.auth().onAuthStateChanged(async (user) => {
   // Refresh page shell context
   router();
   
-  // Fade out loader after auth state resolves
-  const authLoader = document.getElementById('auth-loader');
-  if (authLoader) authLoader.classList.remove('active');
+  } catch (e) {
+    console.error('Auth state handler error:', e);
+  } finally {
+    // Fade out loader after auth state resolves — always, even on error.
+    hideAuthLoader();
+  }
 });
 
 // Close dropdown on click outside
@@ -865,6 +910,18 @@ if (authClose) {
     authModal.classList.remove('active');
   });
 }
+
+// Dismiss the auth dialog by clicking the backdrop or pressing Escape.
+if (authModal) {
+  authModal.addEventListener('click', (e) => {
+    if (e.target === authModal) authModal.classList.remove('active');
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && authModal && authModal.classList.contains('active')) {
+    authModal.classList.remove('active');
+  }
+});
 
 if (authToggleLink) {
   authToggleLink.addEventListener('click', () => {
@@ -926,10 +983,10 @@ function applyTheme(isDark) {
   }
 }
 
-// Explicit Light Mode Default (Clean Pearl White baseline)
-// Force light mode explicitly to clear any stuck dark mode states
-localStorage.setItem('theme', 'light');
-applyTheme(false);
+// Respect the user's saved theme preference (default to light on first visit).
+// Previously this forced 'light' on every load, wiping the saved preference.
+const savedTheme = localStorage.getItem('theme');
+applyTheme(savedTheme === 'dark');
 
 if (themeBtn) {
   themeBtn.addEventListener('click', () => {
@@ -980,26 +1037,36 @@ if (authForm) {
 }
 
 // Google Authentication with Popup + Redirect Fallback & Environment Diagnostics
-const googleBtn = document.getElementById('google-login-btn');
-if (googleBtn) {
-  googleBtn.addEventListener('click', async () => {
-    const provider = new firebase.auth.GoogleAuthProvider();
+// Bound via event delegation (not a one-time getElementById) so the button keeps
+// working even if the login dialog is re-rendered by the SPA router.
+async function handleGoogleSignIn(btn) {
+  // Provider construction MUST be inside try/catch: if it throws here, the
+  // failure was previously completely silent (no alert, no popup, nothing).
+  let provider;
+  try {
+    provider = new firebase.auth.GoogleAuthProvider();
     provider.addScope('email');
     provider.addScope('profile');
     provider.setCustomParameters({ prompt: 'select_account' });
-    const authLoader = document.getElementById('auth-loader');
-    
-    try {
-      if (authLoader) authLoader.classList.add('active');
-      googleBtn.disabled = true;
-      await firebase.auth().signInWithPopup(provider);
-      if (authLoader) authLoader.classList.remove('active');
-      googleBtn.disabled = false;
-      authModal.classList.remove('active');
-    } catch (err) {
+  } catch (err) {
+    console.error('Google auth provider init failed:', err);
+    alert('Google Sign-In could not start (authentication library issue). Please refresh the page and try again.');
+    return;
+  }
+
+  const authLoader = document.getElementById('auth-loader');
+
+  try {
+    if (authLoader) authLoader.classList.add('active');
+    if (btn) btn.disabled = true;
+    await firebase.auth().signInWithPopup(provider);
+    if (authLoader) authLoader.classList.remove('active');
+    if (btn) btn.disabled = false;
+    authModal.classList.remove('active');
+  } catch (err) {
       console.warn("Google signInWithPopup encountered an issue:", err);
       if (authLoader) authLoader.classList.remove('active');
-      googleBtn.disabled = false;
+      if (btn) btn.disabled = false;
 
       // Handle Popup Blocked or Closed by User -> Prompted Redirect Fallback
       if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
@@ -1024,9 +1091,13 @@ if (googleBtn) {
       } else {
         alert("Google Sign-In Error: " + (err.message || err));
       }
-    }
-  });
+  }
 }
+// Delegated binding: works even if the login dialog HTML is re-rendered later.
+document.addEventListener('click', (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('#google-login-btn') : null;
+  if (btn) handleGoogleSignIn(btn);
+});
 
 // Process any pending OAuth redirect result on startup
 try {
@@ -2852,7 +2923,7 @@ function initApp() {
           alert("Could not subscribe. Please try again.");
         }
       } catch (err) {
-        alert("Subscribed locally (backend unavailable). Thank you for staying connected!");
+        alert("We couldn't subscribe you just now — our system is unreachable and your email was not saved. Please try again in a few minutes.");
         nlForm.reset();
       }
       btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
@@ -2863,12 +2934,25 @@ function initApp() {
   // Footer Outreach & Volunteer Form binding (available globally on every page)
   const footerOutreach = document.getElementById('footer-outreach-form');
   if (footerOutreach) {
-    footerOutreach.addEventListener('submit', (e) => {
+    footerOutreach.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('footer-name')?.value || 'Friend';
+      const email = document.getElementById('footer-email')?.value || '';
       const role = document.getElementById('footer-role')?.value || 'Involvement';
-      alert(`Thank you ${name}! Your outreach inquiry regarding "${role}" has been successfully sent to Howards 4 Hope. Our team will contact you shortly.`);
-      footerOutreach.reset();
+      const message = document.getElementById('footer-message')?.value || '';
+      try {
+        const res = await fetch(`${API.baseUrl}/contact/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, role, message, type: 'OUTREACH' })
+        });
+        if (!res.ok) throw new Error('Contact endpoint unavailable: ' + res.status);
+        alert(`Thank you ${name}! Your outreach inquiry regarding "${role}" has been sent to Howards 4 Hope. Our team will contact you shortly.`);
+        footerOutreach.reset();
+      } catch (err) {
+        console.warn('Footer outreach could not be submitted:', err);
+        alert(`We couldn't send your inquiry just now — our system is unreachable and nothing was sent. Please email us directly at info@howards4hope.org.`);
+      }
     });
   }
 }
@@ -3051,44 +3135,24 @@ function bindCustomEventPage() {
       try {
         const unitPrice = parseFloat(priceInput ? priceInput.value : '0') || 0;
         const totalPrice = qty * unitPrice;
-        const confirmationNumber = 'H4H-GALA-' + Math.floor(100000 + Math.random() * 900000);
-        const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const paymentMethod = totalPrice === 0 ? 'FREE' : 'STRIPE';
 
-        const galaTicket = {
-          id: Math.floor(100000 + Math.random() * 900000),
-          ticketId: confirmationNumber,
-          confirmationToken: token,
-          eventId: 9999,
-          eventTitle: `${state.customPage.title} - ${tierName}`,
-          eventDate: state.customPage.date,
-          eventLocation: state.customPage.location,
-          guestName: name,
-          userEmail: email,
-          quantity: qty,
-          pricePaid: totalPrice,
-          paymentMethod: totalPrice === 0 ? 'FREE' : 'STRIPE',
-          status: 'CONFIRMED',
-          paymentPlanType: 'FULL',
-          installmentCycles: 1,
-          installmentsPaid: 1,
-          remainingBalance: 0,
-          purchaseDate: new Date().toISOString().split('T')[0]
-        };
+        // The backend is the source of truth for paid passes. bookTicketGuest
+        // throws for paid bookings when the backend is unreachable, so a gala
+        // pass can never be minted locally without payment going through.
+        const booked = await API.bookTicketGuest(9999, qty, paymentMethod, email, name);
 
-        saveTicketRecord(galaTicket);
-
-        // Attempt guest booking call on backend if available
-        API.bookTicketGuest(9999, qty, galaTicket.paymentMethod, email, name).catch(() => {});
+        const confirmationNumber = booked.ticketId || booked.confirmationToken || 'H4H-GALA-CONFIRMED';
+        const token = booked.confirmationToken || '';
 
         alert(`🎉 Gala Pass Confirmed!\n\nThank you ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nConfirmation ID: ${confirmationNumber}\nVerification Token: ${token}\n\nYour pass is now saved and available under "My Tickets" for verification or printing.`);
-        
+
         if (modal) modal.classList.remove('active');
         form.reset();
         window.location.hash = '#/my-tickets';
       } catch (err) {
         console.error("Error booking gala pass:", err);
-        alert("Reservation received! Our team will contact you directly to confirm.");
-        if (modal) modal.classList.remove('active');
+        alert(err.message || "Booking failed. No payment was processed and no pass was issued. Please try again.");
       } finally {
         submitBtn.innerHTML = 'Confirm & Book Reservation';
         submitBtn.disabled = false;
@@ -3217,18 +3281,18 @@ function bindCalendarEvents(targetEventId) {
     if (placeholder) {
       placeholder.innerHTML = `
         <div class="event-hifi-card" style="margin: 0; animation: modalEnter var(--transition-fast);">
-          <div class="event-banner" style="background-image: url('${event.banner}')">
-            <span class="event-badge" style="background-color: ${catColor}; color: white; border: 1px solid rgba(255,255,255,0.3);">${event.category}</span>
+          <div class="event-banner" style="background-image: url('${safeUrl(event.banner)}')">
+            <span class="event-badge" style="background-color: ${escapeHtml(catColor)}; color: white; border: 1px solid rgba(255,255,255,0.3);">${escapeHtml(event.category)}</span>
           </div>
           <div class="event-body">
             <div class="event-meta">
-              <span class="event-meta-item"><i class="fa-solid fa-calendar-days"></i> ${event.date}</span>
-              <span class="event-meta-item"><i class="fa-solid fa-clock"></i> ${event.time}</span>
+              <span class="event-meta-item"><i class="fa-solid fa-calendar-days"></i> ${escapeHtml(event.date)}</span>
+              <span class="event-meta-item"><i class="fa-solid fa-clock"></i> ${escapeHtml(event.time)}</span>
             </div>
-            <h3>${event.title}</h3>
-            <p class="event-desc">${event.desc}</p>
+            <h3>${escapeHtml(event.title)}</h3>
+            <p class="event-desc">${escapeHtml(event.desc)}</p>
             <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
-              <i class="fa-solid fa-location-dot" style="margin-right: 6px;"></i> ${event.location}
+              <i class="fa-solid fa-location-dot" style="margin-right: 6px;"></i> ${escapeHtml(event.location)}
             </div>
             <div class="event-footer">
               <span class="event-price ${event.price === 0 ? 'free' : ''}" style="font-size: 1.5rem;">${event.price === 0 ? 'FREE' : '$' + event.price.toFixed(2)}</span>
@@ -3314,9 +3378,9 @@ function openRSVPModal(event) {
       <span class="modal-close" id="rsvp-close-btn">&times;</span>
       <h3 class="modal-title"><i class="fa-solid fa-ticket-simple" style="color: var(--secondary);"></i> Event Ticket Registration</h3>
       
-      <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary); margin-bottom: 8px;">${event.title}</div>
+      <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary); margin-bottom: 8px;">${escapeHtml(event.title)}</div>
       <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-bottom: 16px;">
-        <i class="fa-regular fa-calendar"></i> ${event.date} &nbsp;|&nbsp; <i class="fa-regular fa-clock"></i> ${event.time || ''}
+        <i class="fa-regular fa-calendar"></i> ${escapeHtml(event.date)} &nbsp;|&nbsp; <i class="fa-regular fa-clock"></i> ${escapeHtml(event.time || '')}
       </div>
       
       ${guestFields}
@@ -3437,7 +3501,7 @@ function openRSVPModal(event) {
 
       if (!state.user) {
         const ticket = await API.bookTicketGuest(event.id, qty, 'FREE', details.email, details.name);
-        alert(`RSVP Confirmed! Entry Pass Code: ${ticket.ticketId || ticket.confirmationToken || 'H4H-TKT-CONFIRMED'}. Confirmation sent to ${details.email}.`);
+        alert(`RSVP Confirmed! Entry Pass Code: ${ticket.ticketId || ticket.confirmationToken || 'H4H-TKT-CONFIRMED'}. Your pass is saved under "My Tickets" on this device.`);
       } else {
         const ticket = await API.bookTicket(event.id, qty, 'FREE');
         alert(`Free seat reservation confirmed! Ticket ID: ${ticket.ticketId || 'H4H-TKT-CONFIRMED'}.`);
@@ -3457,16 +3521,20 @@ function openRSVPModal(event) {
       const qty = parseInt(qtySelect.value);
       const plan = getSelectedPlan();
 
-      if (!state.user) {
-        const ticket = await API.bookTicketGuest(event.id, qty, 'STRIPE', details.email, details.name, plan.planType, plan.cycles);
-        alert(`Credit Card payment successful! Ticket Code: ${ticket.ticketId || ticket.confirmationToken}. Payment receipt & entry token sent to ${details.email}.`);
-      } else {
-        const ticket = await API.bookTicket(event.id, qty, 'STRIPE', plan.planType, plan.cycles);
-        alert(`Payment processed via Stripe! Ticket ID: ${ticket.ticketId}.`);
+      try {
+        if (!state.user) {
+          const ticket = await API.bookTicketGuest(event.id, qty, 'STRIPE', details.email, details.name, plan.planType, plan.cycles);
+          alert(`Credit Card payment successful! Ticket Code: ${ticket.ticketId || ticket.confirmationToken}. Payment receipt & entry token sent to ${details.email}.`);
+        } else {
+          const ticket = await API.bookTicket(event.id, qty, 'STRIPE', plan.planType, plan.cycles);
+          alert(`Payment processed via Stripe! Ticket ID: ${ticket.ticketId}.`);
+        }
+
+        rsvpModal.remove();
+        window.location.hash = '#/my-tickets';
+      } catch (err) {
+        alert(err.message || 'Booking failed. No payment was processed and no ticket was issued.');
       }
-      
-      rsvpModal.remove();
-      window.location.hash = '#/my-tickets';
     });
   }
   
@@ -3479,16 +3547,20 @@ function openRSVPModal(event) {
       const qty = parseInt(qtySelect.value);
       const plan = getSelectedPlan();
 
-      if (!state.user) {
-        const ticket = await API.bookTicketGuest(event.id, qty, 'PAYPAL', details.email, details.name, plan.planType, plan.cycles);
-        alert(`PayPal order verified! Ticket Code: ${ticket.ticketId || ticket.confirmationToken}. Pass sent to ${details.email}.`);
-      } else {
-        const ticket = await API.bookTicket(event.id, qty, 'PAYPAL', plan.planType, plan.cycles);
-        alert(`Payment processed via PayPal! Ticket ID: ${ticket.ticketId}.`);
+      try {
+        if (!state.user) {
+          const ticket = await API.bookTicketGuest(event.id, qty, 'PAYPAL', details.email, details.name, plan.planType, plan.cycles);
+          alert(`PayPal order verified! Ticket Code: ${ticket.ticketId || ticket.confirmationToken}. Pass sent to ${details.email}.`);
+        } else {
+          const ticket = await API.bookTicket(event.id, qty, 'PAYPAL', plan.planType, plan.cycles);
+          alert(`Payment processed via PayPal! Ticket ID: ${ticket.ticketId}.`);
+        }
+
+        rsvpModal.remove();
+        window.location.hash = '#/my-tickets';
+      } catch (err) {
+        alert(err.message || 'Booking failed. No payment was processed and no ticket was issued.');
       }
-      
-      rsvpModal.remove();
-      window.location.hash = '#/my-tickets';
     });
   }
 }
@@ -3606,13 +3678,19 @@ function bindDonationPortal() {
     const donorName = inputDonorName?.value.trim() || (state.user ? state.user.displayName : 'Generous Donor');
     const donorEmail = inputDonorEmail?.value.trim() || (state.user ? state.user.email : 'donor@example.com');
 
-    const result = await API.createDonationCheckout({
-      donorName,
-      donorEmail,
-      amount: amt,
-      frequency: selectedFreq,
-      paymentMethod: method === 'PayPal' ? 'PAYPAL' : 'STRIPE'
-    });
+    let result;
+    try {
+      result = await API.createDonationCheckout({
+        donorName,
+        donorEmail,
+        amount: amt,
+        frequency: selectedFreq,
+        paymentMethod: method === 'PayPal' ? 'PAYPAL' : 'STRIPE'
+      });
+    } catch (err) {
+      alert(err.message || 'Donation failed. No payment was processed and no donation was recorded.');
+      return;
+    }
 
     const receiptNo = result.taxReceiptNumber || ('H4H-TAX-' + new Date().getFullYear() + '-00921');
     const receiptNoEl = document.getElementById('tax-letter-receipt-no');
@@ -3638,13 +3716,30 @@ function bindDonationPortal() {
 function bindInvolvementForm() {
   const form = document.getElementById('involvement-form');
   if (form) {
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('inv-name')?.value || 'Friend';
       const role = document.getElementById('inv-role')?.value || 'Involvement';
-      alert(`Application submitted! Thank you ${name} for standing with Howards 4 Hope as a ${role}. Our coordinate team will contact you within 48 hours.`);
-      form.reset();
-      window.location.hash = '#/';
+      const email = document.getElementById('inv-email')?.value || '';
+      const phone = document.getElementById('inv-phone')?.value || '';
+      const message = document.getElementById('inv-message')?.value || '';
+      // Try the backend contact endpoint; fail honestly if unreachable.
+      // (If the backend has no /contact/submit endpoint yet, every submit
+      // lands here — wire one up server-side to make this form live.)
+      try {
+        const res = await fetch(`${API.baseUrl}/contact/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, phone, role, message, type: 'VOLUNTEER' })
+        });
+        if (!res.ok) throw new Error('Contact endpoint unavailable: ' + res.status);
+        alert(`Application submitted! Thank you ${name} for standing with Howards 4 Hope as a ${role}. Our team will contact you within 48 hours.`);
+        form.reset();
+        window.location.hash = '#/';
+      } catch (err) {
+        console.warn('Volunteer application could not be submitted:', err);
+        alert(`We couldn't submit your application just now — our system is unreachable and nothing was sent. Please email us directly at info@howards4hope.org and our team will contact you within 48 hours.`);
+      }
     });
   }
 }
@@ -4209,14 +4304,28 @@ function bindAdminDashboard() {
         console.error("Failed downloading real CSV from server, trying fallback", err);
       }
 
-      // Fallback local generator for offline modes
+      // Fallback: export the ACTUAL tickets saved on this device for the event.
+      // Never invent attendee rows — fake people in a guest list are worse
+      // than an honest "unavailable" message.
+      const localTickets = (state.myTickets || []).filter(t =>
+        t.eventId && (t.eventId.toString() === id.toString() || t.eventId.toString().replace('evt-', '') === cleanId)
+      );
+      if (localTickets.length === 0) {
+        alert('Attendee list is unavailable right now — our server could not be reached and no passes for this event are saved on this device. Please try again later.');
+        return;
+      }
       const event = state.events.find(x => x.id.toString() === id.toString() || x.id.toString().replace('evt-', '') === cleanId);
       const evtTitle = event ? event.title : 'Event';
-      const evtPrice = event ? event.price : 0;
       const csvRows = [
         ['Ticket ID', 'Purchaser Email', 'Quantity Purchased', 'Payment Method', 'Price Paid', 'Status'],
-        ['tkt-281948', 'volunteer.core@example.org', '2', evtPrice === 0 ? 'FREE' : 'STRIPE', `$${(evtPrice * 2).toFixed(2)}`, 'CONFIRMED'],
-        ['tkt-902183', 'supporter.mentor@gmail.com', '1', evtPrice === 0 ? 'FREE' : 'PAYPAL', `$${evtPrice.toFixed(2)}`, 'CONFIRMED']
+        ...localTickets.map(t => [
+          t.ticketId || t.confirmationToken || t.id,
+          t.userEmail || t.guestName || '',
+          t.quantity || 1,
+          t.paymentMethod || '',
+          t.pricePaid != null ? `$${Number(t.pricePaid).toFixed(2)}` : '',
+          t.status || ''
+        ])
       ];
       const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(row => row.join(",")).join("\n");
       const encodedUri = encodeURI(csvContent);
@@ -4337,6 +4446,7 @@ function bindMyTicketsEvents() {
       resultsContainer.innerHTML = '';
       
       let tickets = [];
+      let verifiedByBackend = false;
       try {
         if (q.includes('@')) {
           // Email lookups are only local for security reasons
@@ -4344,15 +4454,18 @@ function bindMyTicketsEvents() {
         } else if (q.toUpperCase().startsWith('H4H-') || q.startsWith('tkt-')) {
           const res = await API.lookupTicket(q, null);
           tickets = Array.isArray(res) ? res : (res ? [res] : []);
+          verifiedByBackend = tickets.length > 0;
         } else {
           const res = await API.lookupTicket(null, q);
           tickets = Array.isArray(res) ? res : (res ? [res] : []);
+          verifiedByBackend = tickets.length > 0;
         }
       } catch (e) {
         console.error("Ticket verification error", e);
       }
       
-      // Fallback local lookup if backend returned empty or offline
+      // Fallback local lookup if backend returned empty or offline.
+      // Device-only passes are NOT backend-verified — label them honestly below.
       if (tickets.length === 0) {
         const qLower = q.toLowerCase();
         tickets = state.myTickets.filter(t => 
@@ -4378,7 +4491,7 @@ function bindMyTicketsEvents() {
         resultsContainer.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 15px;">
             <h4 style="font-weight: 800; color: var(--primary); font-size: 1rem; margin: 0;">
-              <i class="fa-solid fa-circle-check" style="color: var(--success); margin-right: 6px;"></i> Verified Pass Record (${tickets.length})
+              <i class="fa-solid fa-circle-check" style="color: var(--success); margin-right: 6px;"></i> ${verifiedByBackend ? `Verified Pass Record (${tickets.length})` : `Pass Record (${tickets.length}) — device copy only, not verified with our system`}
             </h4>
             <button class="btn btn-outline" onclick="window.print()" style="font-size: 0.75rem; padding: 4px 10px;">
               <i class="fa-solid fa-print"></i> Print Passes
@@ -4388,14 +4501,14 @@ function bindMyTicketsEvents() {
             ${tickets.map(tkt => `
               <div style="padding: 20px; border-radius: 12px; background: #f8fafc; border-left: 6px solid var(--accent); border-top: 1px solid rgba(15,23,42,0.06); border-right: 1px solid rgba(15,23,42,0.06); border-bottom: 1px solid rgba(15,23,42,0.06); box-shadow: var(--shadow-sm);">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                  <span style="font-weight: 800; color: var(--primary); font-size: 1.05rem;">${tkt.eventTitle || 'Community Workshop'}</span>
+                  <span style="font-weight: 800; color: var(--primary); font-size: 1.05rem;">${escapeHtml(tkt.eventTitle) || 'Community Workshop'}</span>
                   <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 3px 10px; background: var(--accent); color: var(--primary); font-weight: 700;">${tkt.quantity || 1} Pass(es)</span>
                 </div>
                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
-                  <i class="fa-regular fa-calendar" style="margin-right: 4px;"></i> ${tkt.eventDate || 'Scheduled'} &bull; 3711 Long Beach Blvd, Long Beach, CA
+                  <i class="fa-regular fa-calendar" style="margin-right: 4px;"></i> ${escapeHtml(tkt.eventDate) || 'Scheduled'} &bull; 3711 Long Beach Blvd, Long Beach, CA
                 </div>
                 <div style="font-size: 0.8rem; color: var(--text-main); margin-bottom: 10px;">
-                  <strong>Attendee:</strong> ${tkt.guestName || tkt.userEmail || 'Valued Guest'}
+                  <strong>Attendee:</strong> ${escapeHtml(tkt.guestName || tkt.userEmail) || 'Valued Guest'}
                 </div>
                 ${tkt.paymentPlanType === 'INSTALLMENT' ? `
                   <div class="installment-badge" style="margin-bottom: 10px;">
@@ -4403,8 +4516,10 @@ function bindMyTicketsEvents() {
                   </div>
                 ` : ''}
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 700; color: var(--primary); border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 10px; margin-top: 10px;">
-                  <span style="font-family: monospace;">TOKEN: ${tkt.ticketId || tkt.confirmationToken || 'H4H-TKT-CONFIRMED'}</span>
-                  <span style="color: var(--success);"><i class="fa-solid fa-shield-check"></i> VALID ENTRY</span>
+                  <span style="font-family: monospace;">TOKEN: ${escapeHtml(tkt.ticketId || tkt.confirmationToken) || 'H4H-TKT-CONFIRMED'}</span>
+                  ${verifiedByBackend
+                    ? `<span style="color: var(--success);"><i class="fa-solid fa-shield-check"></i> VALID ENTRY</span>`
+                    : `<span style="color: #b45309;"><i class="fa-solid fa-triangle-exclamation"></i> NOT VERIFIED — DEVICE COPY ONLY</span>`}
                 </div>
               </div>
             `).join('')}
