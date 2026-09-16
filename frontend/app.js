@@ -1021,6 +1021,15 @@ if (googleBtn) {
         );
       } else if (err.code === 'auth/operation-not-supported-in-this-environment') {
         alert("Google Sign-In is not supported in file:// mode. Please run this website through a web server (e.g. http://localhost:8080, Firebase Hosting, or your live domain).");
+      } else if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/internal-error') {
+        alert(
+          "Google Sign-In is not enabled yet in your Firebase Console.\n\n" +
+          "To enable Google Sign-In:\n" +
+          "1. Go to https://console.firebase.google.com/project/howards4hope-b06f6/authentication/providers\n" +
+          "2. Click 'Google' under Sign-in providers and toggle Enable ON\n" +
+          "3. Select a 'Project support email' from the dropdown\n" +
+          "4. Click Save"
+        );
       } else {
         alert("Google Sign-In Error: " + (err.message || err));
       }
