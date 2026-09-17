@@ -1246,9 +1246,9 @@ const templates = {
             <a href="#/events" class="btn btn-outline" style="color: white; border-color: white;"><i class="fa-regular fa-calendar"></i> Events Calendar</a>
           </div>
         </div>
-        <div class="hero-image-wrapper divine-light" style="border-radius: 12px; padding: 0; overflow: hidden; position: relative; height: 100%; min-height: 400px; max-height: 500px;">
-          <div style="width: 100%; height: 100%; position: absolute; inset: 0; overflow: hidden;" id="hero-carousel-container">
-            <div id="hero-carousel-track" style="display: flex; height: 100%; transition: transform 0.5s ease-in-out;"></div>
+        <div class="hero-image-wrapper divine-light">
+          <div id="hero-carousel-container" class="hero-carousel-container">
+            <div id="hero-carousel-track" class="hero-carousel-track"></div>
             
             <button class="hero-carousel-nav hero-carousel-prev" id="hero-carousel-prev" aria-label="Previous slide">
               <i class="fa-solid fa-chevron-left"></i>
@@ -1257,8 +1257,8 @@ const templates = {
               <i class="fa-solid fa-chevron-right"></i>
             </button>
 
-            <div style="position: absolute; bottom: 15px; width: 100%; display: flex; justify-content: center; z-index: 10;">
-              <div id="hero-carousel-dots" style="display: flex; gap: 8px;"></div>
+            <div class="hero-carousel-dots-container">
+              <div id="hero-carousel-dots" class="hero-carousel-dots"></div>
             </div>
           </div>
         </div>
@@ -2018,7 +2018,7 @@ const templates = {
       return `<div class="section" style="padding-top: 140px; text-align: center;"><h3 style="color: var(--danger);">Access Denied</h3></div>`;
     }
     return `
-      <section class="section" style="padding-top: 140px;">
+      <section class="section admin-dashboard-section">
         <div class="section-header">
           <span class="section-tag">Admin Panel</span>
           <h2 class="section-title">Control Dashboard</h2>
@@ -2039,7 +2039,7 @@ const templates = {
           <button type="button" class="admin-tab-btn" data-tab="adm-pane-roles">
             <i class="fa-solid fa-shield-halved"></i> Roles & System
           </button>
-          <button type="button" class="admin-tab-btn" data-tab="adm-pane-gala" style="margin-left: auto; border-left: 1px solid rgba(15,23,42,0.1);">
+          <button type="button" class="admin-tab-btn" data-tab="adm-pane-gala">
             <i class="fa-solid fa-crown" style="color: var(--accent);"></i> Gala & Campaign Studio <span class="tab-badge">Gala</span>
           </button>
         </div>
@@ -2049,64 +2049,64 @@ const templates = {
         <!-- ========================================================= -->
         <div class="admin-tab-pane active" id="adm-pane-overview">
           <!-- Top KPI Metrics Grid -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2.5rem; max-width: 1200px; margin-left: auto; margin-right: auto;">
-            <div class="calendar-card" style="padding: 18px 20px; border-left: 4px solid #10B981; text-align: left; display: flex; align-items: center; gap: 15px;">
-              <div style="font-size: 2rem; color: #10B981; position: relative;">
+          <div class="admin-kpi-grid">
+            <div class="calendar-card admin-kpi-card" style="border-left: 4px solid #10B981;">
+              <div class="kpi-icon" style="color: #10B981; position: relative;">
                 <i class="fa-solid fa-tower-broadcast"></i>
               </div>
               <div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                   <span class="live-pulse-dot"></span>
-                  <span id="metric-active-now" style="font-size: 1.8rem; font-weight: 800; color: #10B981;">1</span>
+                  <span id="metric-active-now" class="kpi-value" style="color: #10B981;">1</span>
                 </div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Active Now (15m)</div>
+                <div class="kpi-label">Active Now (15m)</div>
               </div>
             </div>
 
-            <div class="calendar-card" style="padding: 18px 20px; border-left: 4px solid #6366F1; text-align: left; display: flex; align-items: center; gap: 15px;">
-              <div style="font-size: 2rem; color: #6366F1;"><i class="fa-solid fa-users"></i></div>
+            <div class="calendar-card admin-kpi-card" style="border-left: 4px solid #6366F1;">
+              <div class="kpi-icon" style="color: #6366F1;"><i class="fa-solid fa-users"></i></div>
               <div>
-                <div id="metric-unique-visitors" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">--</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Unique Visitors</div>
+                <div id="metric-unique-visitors" class="kpi-value">--</div>
+                <div class="kpi-label">Unique Visitors</div>
               </div>
             </div>
 
-            <div class="calendar-card" style="padding: 18px 20px; border-left: 4px solid var(--primary); text-align: left; display: flex; align-items: center; gap: 15px;">
-              <div style="font-size: 2rem; color: var(--primary);"><i class="fa-solid fa-chart-line-up"></i></div>
+            <div class="calendar-card admin-kpi-card" style="border-left: 4px solid var(--primary);">
+              <div class="kpi-icon" style="color: var(--primary);"><i class="fa-solid fa-chart-line-up"></i></div>
               <div>
-                <div id="metric-total-views" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">--</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total Site Views</div>
+                <div id="metric-total-views" class="kpi-value">--</div>
+                <div class="kpi-label">Total Site Views</div>
               </div>
             </div>
 
-            <div class="calendar-card" style="padding: 18px 20px; border-left: 4px solid var(--accent); text-align: left; display: flex; align-items: center; gap: 15px;">
-              <div style="font-size: 2rem; color: var(--accent);"><i class="fa-solid fa-ticket"></i></div>
+            <div class="calendar-card admin-kpi-card" style="border-left: 4px solid var(--accent);">
+              <div class="kpi-icon" style="color: var(--accent);"><i class="fa-solid fa-ticket"></i></div>
               <div>
-                <div id="metric-total-attendees" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.totalAttendees}</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Event Passes</div>
+                <div id="metric-total-attendees" class="kpi-value">${state.adminMetrics.totalAttendees}</div>
+                <div class="kpi-label">Event Passes</div>
               </div>
             </div>
 
-            <div class="calendar-card" style="padding: 18px 20px; border-left: 4px solid var(--success); text-align: left; display: flex; align-items: center; gap: 15px;">
-              <div style="font-size: 2rem; color: var(--success);"><i class="fa-solid fa-circle-dollar-to-slot"></i></div>
+            <div class="calendar-card admin-kpi-card" style="border-left: 4px solid var(--success);">
+              <div class="kpi-icon" style="color: var(--success);"><i class="fa-solid fa-circle-dollar-to-slot"></i></div>
               <div>
-                <div id="metric-total-revenue" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">$${state.adminMetrics.totalRevenue.toFixed(2)}</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Gross Revenue</div>
+                <div id="metric-total-revenue" class="kpi-value">$${state.adminMetrics.totalRevenue.toFixed(2)}</div>
+                <div class="kpi-label">Gross Revenue</div>
               </div>
             </div>
 
-            <div class="calendar-card" style="padding: 18px 20px; border-left: 4px solid var(--secondary); text-align: left; display: flex; align-items: center; gap: 15px;">
-              <div style="font-size: 2rem; color: var(--secondary);"><i class="fa-solid fa-percent"></i></div>
+            <div class="calendar-card admin-kpi-card" style="border-left: 4px solid var(--secondary);">
+              <div class="kpi-icon" style="color: var(--secondary);"><i class="fa-solid fa-percent"></i></div>
               <div>
-                <div id="metric-rsvp-conversion" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">${state.adminMetrics.rsvpConversion}</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Conversion Rate</div>
+                <div id="metric-rsvp-conversion" class="kpi-value">${state.adminMetrics.rsvpConversion}</div>
+                <div class="kpi-label">Conversion Rate</div>
               </div>
             </div>
           </div>
 
           <!-- Real-Time Traffic & Visitor Overtime Analytics Panel -->
-          <div class="calendar-card" style="max-width: 1200px; margin: 0 auto 3rem auto; padding: 26px; border-top: 4px solid var(--primary);">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 20px;">
+          <div class="calendar-card admin-analytics-card">
+            <div class="admin-analytics-header">
               <div>
                 <h3 style="margin: 0; font-size: 1.35rem; color: var(--primary); display: flex; align-items: center; gap: 10px;">
                   <i class="fa-solid fa-chart-column" style="color: var(--accent);"></i> Real-Time Traffic & Visitor Overtime Analytics
@@ -2117,14 +2117,14 @@ const templates = {
               </div>
 
               <!-- Export and Control Actions -->
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                <button type="button" id="adm-export-csv-btn" class="btn btn-primary" style="font-size: 0.85rem; padding: 8px 16px;">
-                  <i class="fa-solid fa-file-csv" style="margin-right: 6px;"></i> Download CSV Report
+              <div class="admin-analytics-actions">
+                <button type="button" id="adm-export-csv-btn" class="btn btn-primary">
+                  <i class="fa-solid fa-file-csv" style="margin-right: 4px;"></i> Download CSV
                 </button>
-                <button type="button" id="adm-export-json-btn" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 14px;">
-                  <i class="fa-solid fa-file-code" style="margin-right: 6px;"></i> Export JSON
+                <button type="button" id="adm-export-json-btn" class="btn btn-outline">
+                  <i class="fa-solid fa-file-code" style="margin-right: 4px;"></i> Export JSON
                 </button>
-                <button type="button" id="adm-refresh-analytics-btn" class="btn btn-outline" style="font-size: 0.85rem; padding: 8px 12px;" title="Refresh live telemetry">
+                <button type="button" id="adm-refresh-analytics-btn" class="btn btn-outline" title="Refresh live telemetry">
                   <i class="fa-solid fa-rotate"></i>
                 </button>
               </div>
@@ -2134,7 +2134,7 @@ const templates = {
             <div class="analytics-toolbar">
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Range:</span>
-                <div class="analytics-timeframe-group" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <div class="analytics-timeframe-group">
                   <button type="button" class="analytics-filter-btn" data-timeframe="7d">7 Days</button>
                   <button type="button" class="analytics-filter-btn active" data-timeframe="30d">30 Days</button>
                   <button type="button" class="analytics-filter-btn" data-timeframe="90d">90 Days</button>
@@ -2144,7 +2144,7 @@ const templates = {
 
               <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Metric:</span>
-                <div class="analytics-metric-group" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <div class="analytics-metric-group">
                   <button type="button" class="analytics-filter-btn active" data-metric="dual">
                     <i class="fa-solid fa-layer-group"></i> Views & Uniques
                   </button>
@@ -2159,7 +2159,7 @@ const templates = {
             </div>
 
             <!-- Chart Canvas -->
-            <div style="position: relative; height: 320px; width: 100%;">
+            <div class="analytics-chart-wrapper">
               <canvas id="analytics-chart"></canvas>
             </div>
 
@@ -2212,7 +2212,7 @@ const templates = {
             <h3 style="margin-bottom: 16px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">
               <i class="fa-solid fa-bolt" style="color: var(--accent); margin-right: 8px;"></i> Quick Admin Navigation Shortcuts
             </h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+            <div class="admin-shortcuts-grid">
               <button type="button" class="btn btn-primary admin-tab-jump-btn" data-target-tab="adm-pane-gala" style="text-align: left; justify-content: flex-start; padding: 12px 16px;">
                 <i class="fa-solid fa-crown" style="color: var(--accent); margin-right: 8px;"></i> Open Gala & Campaign Studio
               </button>
@@ -2284,16 +2284,16 @@ const templates = {
           </div>
 
           <!-- EVENT CREATOR & LIST -->
-          <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 3rem; align-items: start; max-width: 1200px; margin: 0 auto 3rem auto;">
+          <div class="admin-split-layout" style="align-items: start; max-width: 1200px; margin: 0 auto 3rem auto;">
             <!-- Event Creator Card -->
-            <div class="form-card" style="margin: 0; padding: 30px;">
+            <div class="form-card" style="margin: 0; padding: 24px;">
               <h3 style="margin-bottom: 20px;"><i class="fa-regular fa-calendar-plus" style="color: var(--secondary); margin-right: 8px;"></i> Create New Event</h3>
               <form id="admin-create-event-form">
                 <div class="form-group">
                   <label class="form-label">Event Title</label>
                   <input type="text" class="form-control" id="adm-evt-title" required placeholder="E.g., Links of Hope Support Summit">
                 </div>
-                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group admin-form-row-2">
                   <div>
                     <label class="form-label">Date</label>
                     <input type="date" class="form-control" id="adm-evt-date" required>
@@ -2303,7 +2303,7 @@ const templates = {
                     <input type="text" class="form-control" id="adm-evt-time" required placeholder="4:00 PM">
                   </div>
                 </div>
-                <div class="form-group" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px;">
+                <div class="form-group admin-form-row-2">
                   <div>
                     <label class="form-label">Location</label>
                     <input type="text" class="form-control" id="adm-evt-loc" required value="3711 Long Beach Blvd, #4055, Long Beach, CA 90807">
@@ -2321,7 +2321,7 @@ const templates = {
                     <span><i class="fa-solid fa-hand-holding-dollar"></i> Enable Payment Splitting / Installment Plan</span>
                   </label>
                   <div id="adm-evt-installment-fields" style="display: none; padding-top: 8px; border-top: 1px dashed rgba(37,99,235,0.2);">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                    <div class="admin-form-row-2" style="margin-bottom: 8px;">
                       <div>
                         <label style="font-size: 0.8rem; font-weight: 600;">Payment Cycles:</label>
                         <select class="form-control" id="adm-evt-installment-cycles" style="padding: 6px 10px;">
@@ -2348,7 +2348,7 @@ const templates = {
                   <input type="text" class="form-control" id="adm-evt-banner" placeholder="https://..." value="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=1000">
                 </div>
 
-                <div class="form-group" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 15px;">
+                <div class="form-group admin-form-row-2">
                   <div>
                     <label class="form-label">Event Category</label>
                     <select class="form-control" id="adm-evt-category" style="background-image: none;" onchange="
@@ -2390,11 +2390,11 @@ const templates = {
             </div>
             
             <!-- Event List and Exporter -->
-            <div class="calendar-card">
+            <div class="calendar-card" style="padding: 24px;">
               <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Active Event Records</h3>
               
-              <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+              <div class="admin-table-container">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; min-width: 500px;">
                   <thead>
                     <tr style="border-bottom: 2px solid rgba(15, 23, 42, 0.08);">
                       <th style="padding: 12px 6px;">Event Details</th>
@@ -2433,7 +2433,7 @@ const templates = {
               </div>
               
               <h3 style="margin-top: 40px; margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Event Calendar Preview</h3>
-              <div id="admin-calendar" style="min-height: 400px; background: white; border-radius: 8px; padding: 10px;"></div>
+              <div id="admin-calendar" style="min-height: 360px; background: white; border-radius: 8px; padding: 10px;"></div>
             </div>
           </div>
         </div>
@@ -2442,16 +2442,16 @@ const templates = {
         <!-- TAB PANE 3: BLOG ARTICLES MANAGEMENT                      -->
         <!-- ========================================================= -->
         <div class="admin-tab-pane" id="adm-pane-blog">
-          <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 3rem; align-items: start; max-width: 1200px; margin-left: auto; margin-right: auto;">
+          <div class="admin-split-layout" style="align-items: start; max-width: 1200px; margin-left: auto; margin-right: auto;">
             <!-- Blog Creator Card -->
-            <div class="form-card" style="margin: 0; padding: 30px;">
+            <div class="form-card" style="margin: 0; padding: 24px;">
               <h3 style="margin-bottom: 20px;"><i class="fa-regular fa-pen-to-square" style="color: var(--secondary); margin-right: 8px;"></i> Create Blog Post</h3>
               <form id="admin-create-blog-form">
                 <div class="form-group">
                   <label class="form-label">Article Title</label>
                   <input type="text" class="form-control" id="adm-blog-title" required placeholder="Milestones, recap, announcements...">
                 </div>
-                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group admin-form-row-2">
                   <div>
                     <label class="form-label">Author</label>
                     <input type="text" class="form-control" id="adm-blog-author" value="LaCreashia Willis-Howard, President" required>
@@ -2486,11 +2486,11 @@ const templates = {
             </div>
             
             <!-- Blog List & Delete Control -->
-            <div class="calendar-card">
+            <div class="calendar-card" style="padding: 24px;">
               <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Active Blog Posts</h3>
               
-              <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+              <div class="admin-table-container">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; min-width: 450px;">
                   <thead>
                     <tr style="border-bottom: 2px solid rgba(15, 23, 42, 0.08);">
                       <th style="padding: 12px 6px;">Title & Author</th>
@@ -2526,13 +2526,13 @@ const templates = {
         <!-- TAB PANE 4: ROLES & SYSTEM ACTIONS                        -->
         <!-- ========================================================= -->
         <div class="admin-tab-pane" id="adm-pane-roles">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1200px; margin: 0 auto; align-items: start;">
+          <div class="admin-two-col-grid" style="max-width: 1200px; margin: 0 auto; align-items: start;">
             <div class="calendar-card" style="padding: 24px;">
               <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">User & Admin Role Management</h3>
               <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px;">Grant administrative dashboard access to verified staff or board members via Firebase Auth custom claims.</p>
-              <form id="grant-admin-form" style="display: flex; gap: 10px;">
-                <input type="email" id="grant-admin-email" class="form-control" required placeholder="User Email (e.g. staff@howards4hope.org)" style="flex: 1;">
-                <button type="submit" class="btn btn-primary">Grant Admin</button>
+              <form id="grant-admin-form" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <input type="email" id="grant-admin-email" class="form-control" required placeholder="User Email (e.g. staff@howards4hope.org)" style="flex: 1; min-width: 200px;">
+                <button type="submit" class="btn btn-primary" style="white-space: nowrap;">Grant Admin</button>
               </form>
             </div>
 
@@ -2553,7 +2553,7 @@ const templates = {
           <div class="calendar-card" style="max-width: 1200px; margin: 0 auto 3rem auto; padding: 25px; border-top: 4px solid var(--accent);">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 14px; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
               <div>
-                <h3 style="font-size: 1.4rem; color: var(--primary); margin: 0; font-weight: 800;">
+                <h3 style="font-size: 1.3rem; color: var(--primary); margin: 0; font-weight: 800;">
                   <i class="fa-solid fa-crown" style="color: var(--accent); margin-right: 8px;"></i> Special Event Page & Pricing Studio
                 </h3>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
@@ -2561,7 +2561,7 @@ const templates = {
                 </p>
               </div>
               
-              <div style="display: flex; align-items: center; gap: 16px;">
+              <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                 <!-- VISIBILITY SWITCH -->
                 <div class="admin-switch-container">
                   <span style="font-weight: 700; font-size: 0.9rem; color: ${state.customPage.enabled ? 'var(--success)' : 'var(--text-muted)'};" id="adm-switch-status-label">
@@ -2580,7 +2580,7 @@ const templates = {
             </div>
 
             <form id="adm-custom-page-form">
-              <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;">
+              <div class="admin-form-row-2" style="margin-bottom: 18px;">
                 <div class="form-group">
                   <label style="font-size: 0.85rem; font-weight: 700;">Navigation Link Label (Appears in Navbar & Mobile Drawer)</label>
                   <input type="text" id="adm-custom-nav-label" class="form-control" value="${state.customPage.navLabel || 'Featured Gala'}" required style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
@@ -2596,7 +2596,7 @@ const templates = {
                 <textarea id="adm-custom-subtitle" class="form-control" rows="2" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">${state.customPage.subtitle || ''}</textarea>
               </div>
 
-              <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 18px;">
+              <div class="admin-form-row-3" style="margin-bottom: 18px;">
                 <div class="form-group">
                   <label style="font-size: 0.85rem; font-weight: 700;">Date</label>
                   <input type="date" id="adm-custom-date" class="form-control" value="${state.customPage.date || ''}" required style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
@@ -2623,7 +2623,7 @@ const templates = {
 
               <!-- TIERED PRICING MANAGER -->
               <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                   <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0; font-weight: 800;">
                     <i class="fa-solid fa-tags" style="color: var(--secondary); margin-right: 6px;"></i> Custom Pricing & Feature Tiers
                   </h4>
@@ -2634,7 +2634,7 @@ const templates = {
 
                 <div id="adm-tiers-container" style="display: flex; flex-direction: column; gap: 12px;">
                   ${(state.customPage.pricingTiers || []).map((t, idx) => `
-                    <div class="calendar-card adm-tier-row" style="padding: 16px; display: grid; grid-template-columns: 2fr 1fr 1fr 3fr auto; gap: 10px; align-items: center;">
+                    <div class="calendar-card adm-tier-row" style="padding: 16px;">
                       <input type="text" class="form-control tier-name-input" value="${t.name}" placeholder="Tier Name" style="padding: 8px;">
                       <input type="number" class="form-control tier-price-input" value="${t.price}" placeholder="Price ($)" style="padding: 8px;">
                       <input type="text" class="form-control tier-badge-input" value="${t.badge || ''}" placeholder="Badge" style="padding: 8px;">
@@ -2668,7 +2668,7 @@ const templates = {
 
               <!-- SAVE BUTTON -->
               <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                <button type="submit" class="btn btn-donate" id="adm-save-custom-page-btn" style="padding: 12px 28px; font-weight: 800;">
+                <button type="submit" class="btn btn-donate" id="adm-save-custom-page-btn" style="padding: 12px 28px; font-weight: 800; width: 100%; max-width: 320px;">
                   <i class="fa-solid fa-floppy-disk" style="margin-right: 6px;"></i> Save & Publish Studio Changes
                 </button>
               </div>
@@ -5169,6 +5169,34 @@ function initHeroCarousel() {
   if (container) {
     container.addEventListener('mouseenter', () => clearInterval(autoTimer));
     container.addEventListener('mouseleave', startAuto);
+
+    // Mobile touch swipe gestures
+    let touchStartX = 0;
+    let touchEndX = 0;
+    container.addEventListener('touchstart', (e) => {
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        touchStartX = e.changedTouches[0].screenX;
+      }
+      clearInterval(autoTimer);
+    }, { passive: true });
+
+    container.addEventListener('touchend', (e) => {
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        touchEndX = e.changedTouches[0].screenX;
+        const diff = touchStartX - touchEndX;
+        if (Math.abs(diff) > 40) {
+          if (diff > 0) {
+            // Swipe Left -> Next slide
+            currentIndex = (currentIndex + 1) % slides.length;
+          } else {
+            // Swipe Right -> Previous slide
+            currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+          }
+          updateCarousel();
+        }
+      }
+      startAuto();
+    }, { passive: true });
   }
 
   startAuto();
