@@ -52,7 +52,7 @@ public class AccountCacheService {
                 
                 List<String> roles = new ArrayList<>();
                 roles.add("ROLE_USER");
-                if (isAdmin || "avlorycorp@gmail.com".equalsIgnoreCase(email)) {
+                if (isAdmin || org.howards4hope.security.FirebaseTokenFilter.ADMIN_WHITELIST.stream().anyMatch(email::equalsIgnoreCase)) {
                     roles.add("ROLE_ADMIN");
                 }
 
@@ -69,7 +69,7 @@ public class AccountCacheService {
         }
 
         // Fallback profile for mock/dev environment
-        boolean isAdmin = "avlorycorp@gmail.com".equalsIgnoreCase(email) || "admin@howards4hope.org".equalsIgnoreCase(email);
+        boolean isAdmin = org.howards4hope.security.FirebaseTokenFilter.ADMIN_WHITELIST.stream().anyMatch(email::equalsIgnoreCase);
         List<String> roles = new ArrayList<>();
         roles.add("ROLE_USER");
         if (isAdmin) roles.add("ROLE_ADMIN");

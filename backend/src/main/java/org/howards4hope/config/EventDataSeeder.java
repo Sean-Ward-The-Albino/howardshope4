@@ -2,20 +2,29 @@ package org.howards4hope.config;
 
 import org.howards4hope.model.Event;
 import org.howards4hope.model.BlogPost;
+import org.howards4hope.model.PageAnalytics;
 import org.howards4hope.repository.EventRepository;
 import org.howards4hope.repository.BlogRepository;
+import org.howards4hope.repository.AnalyticsRepository;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+import java.util.Random;
 
 @Component
 public class EventDataSeeder implements CommandLineRunner {
     private final EventRepository eventRepository;
     private final BlogRepository blogRepository;
+    private final AnalyticsRepository analyticsRepository;
 
-    public EventDataSeeder(EventRepository eventRepository, BlogRepository blogRepository) {
+    public EventDataSeeder(EventRepository eventRepository,
+                           BlogRepository blogRepository,
+                           AnalyticsRepository analyticsRepository) {
         this.eventRepository = eventRepository;
         this.blogRepository = blogRepository;
+        this.analyticsRepository = analyticsRepository;
     }
     @Override
     public void run(String... args) throws Exception {
@@ -95,6 +104,29 @@ public class EventDataSeeder implements CommandLineRunner {
             ));
 
             System.out.println(">>> Blog seeding complete. " + blogRepository.count() + " blog posts seeded.");
+        }
+
+        if (analyticsRepository.count() == 0) {
+            System.out.println(">>> Seeding baseline traffic analytics for overtime usage and unique reporting...");
+            String[] paths = {"/", "/#events", "/#programs", "/#about", "/#gala", "/#contact", "/#blog"};
+            Random random = new Random();
+            LocalDateTime now = LocalDateTime.now();
+
+            for (int day = 30; day >= 0; day--) {
+                LocalDateTime dayTime = now.minusDays(day);
+                // Daily baseline volume: 15 to 45 page views across 8 to 25 unique visitors
+                int uniqueCount = 8 + random.nextInt(18);
+                int viewsCount = uniqueCount + random.nextInt(20);
+
+                for (int v = 0; v < viewsCount; v++) {
+                    int visIndex = random.nextInt(uniqueCount) + 1;
+                    String visitorId = "vis_" + String.format("%03d", (day * 100) + visIndex);
+                    String path = paths[random.nextInt(paths.length)];
+                    LocalDateTime timestamp = dayTime.plusHours(random.nextInt(23)).plusMinutes(random.nextInt(59));
+                    analyticsRepository.save(new PageAnalytics(path, visitorId, timestamp));
+                }
+            }
+            System.out.println(">>> Traffic analytics seeding complete. " + analyticsRepository.count() + " records available.");
         }
     }
 }

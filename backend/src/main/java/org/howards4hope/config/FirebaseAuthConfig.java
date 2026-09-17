@@ -32,12 +32,23 @@ public class FirebaseAuthConfig {
                 FirebaseApp.initializeApp(options);
                 System.out.println(">>> Firebase Admin SDK initialized successfully with service account credentials.");
             } else {
-                // Graceful fallback for local offline development without crashing server startup!
-                System.out.println(">>> WARNING: firebase-service-account.json not found on classpath.");
-                System.out.println(">>> Backend is running in MOCK AUTHENTICATION MODE for local rapid development.");
+                // Check if Google Application Default Credentials are available (e.g. Cloud Run / GCP runtime)
+                try {
+                    FirebaseOptions options = FirebaseOptions.builder()
+                            .setCredentials(GoogleCredentials.getApplicationDefault())
+                            .setProjectId("howards4hope-b06f6")
+                            .build();
+
+                    FirebaseApp.initializeApp(options);
+                    System.out.println(">>> Firebase Admin SDK initialized successfully with Google Application Default Credentials (Cloud Run / GCP).");
+                } catch (Exception adcEx) {
+                    // Graceful fallback for local offline development without crashing server startup!
+                    System.out.println(">>> WARNING: firebase-service-account.json not found on classpath and Google ADC unavailable.");
+                    System.out.println(">>> Backend is running in MOCK AUTHENTICATION MODE for local rapid development.");
+                }
             }
-        } catch (IOException e) {
-            System.err.println(">>> ERROR: Failed to read Firebase Service Account credentials: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println(">>> ERROR: Failed to initialize Firebase Admin SDK: " + e.getMessage());
         }
     }
 }

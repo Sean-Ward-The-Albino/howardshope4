@@ -10,7 +10,13 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.admin == true ||
-        request.auth.token.email == 'avlorycorp@gmail.com'
+        request.auth.token.email in [
+          'avlorycorp@gmail.com',
+          'howards4hope@gmail.com',
+          'staff@howards4hope.org',
+          'lacreashia@howards4hope.org',
+          'lamar@howards4hope.org'
+        ]
       );
     }
     

@@ -4929,3 +4929,134 @@ input:checked + .admin-slider:before {
 }
 .hero-carousel-prev { left: 15px; }
 .hero-carousel-next { right: 15px; }
+
+/* --- TRAFFIC & OVERTIME ANALYTICS DASHBOARD --- */
+.live-pulse-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  background-color: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseGreen 1.8s infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+@keyframes pulseGreen {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.analytics-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.analytics-filter-btn {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  background: white;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analytics-filter-btn:hover {
+  background: rgba(30, 39, 97, 0.06);
+  border-color: var(--primary);
+}
+
+.analytics-filter-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 2px 6px rgba(30, 39, 97, 0.25);
+}
+
+.overtime-table-container {
+  overflow-x: auto;
+  margin-top: 25px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.overtime-analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.overtime-analytics-table th {
+  background: rgba(30, 39, 97, 0.04);
+  color: var(--primary);
+  font-weight: 700;
+  padding: 12px 16px;
+  border-bottom: 2px solid rgba(15, 23, 42, 0.08);
+  white-space: nowrap;
+}
+
+.overtime-analytics-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.overtime-analytics-table tr:last-child td {
+  border-bottom: none;
+}
+
+.overtime-analytics-table tr:hover {
+  background: rgba(30, 39, 97, 0.02);
+}
+
+.badge-uniques {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.badge-views {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563EB;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+

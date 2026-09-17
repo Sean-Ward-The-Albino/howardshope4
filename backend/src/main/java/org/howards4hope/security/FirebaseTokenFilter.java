@@ -34,7 +34,7 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP_TYPE_REF = new TypeReference<>() {};
 
-    private static final List<String> ADMIN_WHITELIST = List.of(
+    public static final List<String> ADMIN_WHITELIST = List.of(
         "howards4hope@gmail.com",
         "staff@howards4hope.org",
         "lacreashia@howards4hope.org",

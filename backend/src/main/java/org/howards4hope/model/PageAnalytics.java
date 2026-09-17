@@ -32,6 +32,12 @@ public class PageAnalytics {
         this.timestamp = LocalDateTime.now();
     }
 
+    public PageAnalytics(String path, String visitorId, LocalDateTime timestamp) {
+        this.path = path;
+        this.visitorId = visitorId;
+        this.timestamp = timestamp;
+    }
+
     public Long getId() { return id; }
     public String getPath() { return path; }
     public void setPath(String path) { this.path = path; }

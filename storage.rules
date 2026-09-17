@@ -2,16 +2,29 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email in [
+          'avlorycorp@gmail.com',
+          'howards4hope@gmail.com',
+          'staff@howards4hope.org',
+          'lacreashia@howards4hope.org',
+          'lamar@howards4hope.org'
+        ]
+      );
+    }
+
     // Public read for website static assets and event photos
     match /assets/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null && (request.auth.token.admin == true || request.auth.token.email == 'avlorycorp@gmail.com');
+      allow write: if isAdmin();
     }
 
     // Community gallery and blog image uploads
     match /gallery/{imageId} {
       allow read: if true;
-      allow write: if request.auth != null && (request.auth.token.admin == true || request.auth.token.email == 'avlorycorp@gmail.com')
+      allow write: if isAdmin()
                     && request.resource.size < 10 * 1024 * 1024
                     && request.resource.contentType.matches('image/.*');
     }
