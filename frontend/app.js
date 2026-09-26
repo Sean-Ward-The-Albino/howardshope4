@@ -6597,13 +6597,130 @@ function initHeroCarousel() {
 }
 
 function initScrollAnimations() {
+  const elements = document.querySelectorAll('.animate-on-scroll, .card, .calendar-card, .program-card, .corporate-tier-card, .section-header, .stat-card, .impact-stat-item');
+  elements.forEach((el, index) => {
+    if (!el.classList.contains('reveal-on-scroll')) {
+      el.classList.add('reveal-on-scroll');
+      el.style.setProperty('--stagger-index', index % 4);
+    }
+  });
+
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
+        entry.target.classList.add('is-revealed');
         entry.target.classList.add('fade-in-visible');
         observer.unobserve(entry.target);
       }
     });
+  }, {
+    rootMargin: '0px 0px -40px 0px',
+    threshold: 0.08
   });
-  document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
+
+  document.querySelectorAll('.reveal-on-scroll').forEach(el => observer.observe(el));
 }
+
+// --- LIVING AMBIENT PARTICLES & INTERACTIVE ATMOSPHERE ENGINE ---
+function initAmbientLivingAtmosphere() {
+  const canvas = document.getElementById('ambient-particles-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  const particles = [];
+  const particleCount = Math.min(36, Math.floor(window.innerWidth / 40));
+  const colors = [
+    'rgba(245, 158, 11, ', // Golden hope
+    'rgba(37, 99, 235, ',  // Royal Blue
+    'rgba(16, 185, 129, ', // Emerald Growth
+    'rgba(255, 255, 255, ' // Celestial White
+  ];
+
+  for (let i = 0; i < particleCount; i++) {
+    particles.push({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      radius: Math.random() * 2.2 + 0.8,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      alpha: Math.random() * 0.35 + 0.1,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: -(Math.random() * 0.45 + 0.15),
+      pulseSpeed: Math.random() * 0.02 + 0.008,
+      pulsePhase: Math.random() * Math.PI * 2
+    });
+  }
+
+  let mouseX = -1000;
+  let mouseY = -1000;
+  window.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+  }, { passive: true });
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  }, { passive: true });
+
+  let isVisible = true;
+  document.addEventListener('visibilitychange', () => {
+    isVisible = !document.hidden;
+    if (isVisible) requestAnimationFrame(render);
+  });
+
+  function render() {
+    if (!isVisible) return;
+    ctx.clearRect(0, 0, width, height);
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.pulsePhase += p.pulseSpeed;
+      const currentAlpha = p.alpha + Math.sin(p.pulsePhase) * 0.12;
+
+      // Mouse gentle repulse aura
+      const dx = mouseX - p.x;
+      const dy = mouseY - p.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 120 && dist > 0) {
+        const force = (120 - dist) / 120;
+        p.x -= (dx / dist) * force * 1.5;
+        p.y -= (dy / dist) * force * 1.5;
+      }
+
+      p.x += p.vx;
+      p.y += p.vy;
+
+      // Wrap around screen seamlessly
+      if (p.y < -10) { p.y = height + 10; p.x = Math.random() * width; }
+      if (p.x < -10) p.x = width + 10;
+      if (p.x > width + 10) p.x = -10;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = p.color + Math.max(0.04, currentAlpha) + ')';
+      ctx.shadowBlur = p.radius * 3;
+      ctx.shadowColor = p.color + '0.4)';
+      ctx.fill();
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+// Initialize ambient atmosphere on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initAmbientLivingAtmosphere();
+    initScrollAnimations();
+  });
+} else {
+  initAmbientLivingAtmosphere();
+  initScrollAnimations();
+}
+

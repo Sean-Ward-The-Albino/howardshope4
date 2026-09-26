@@ -79,8 +79,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
 
   <!-- Preload Critical Assets -->
-  <link rel="preload" href="style.css?v=28" as="style">
-  <link rel="stylesheet" href="style.css?v=28">
+  <link rel="preload" href="style.css?v=29" as="style">
+  <link rel="stylesheet" href="style.css?v=29">
   <!-- Modern SVG Icons library via FontAwesome Free CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
   
@@ -91,6 +91,14 @@
   <script src="https://js.stripe.com/v3/" defer></script>
 </head>
 <body>
+  <!-- Global Living Ambient Atmosphere Canvas & Mesh -->
+  <div class="ambient-mesh-canvas" aria-hidden="true">
+    <div class="ambient-orb ambient-orb-1"></div>
+    <div class="ambient-orb ambient-orb-2"></div>
+    <div class="ambient-orb ambient-orb-3"></div>
+    <canvas id="ambient-particles-canvas"></canvas>
+  </div>
+
   <!-- Skip to Main Content Landmark for Screen Readers & Keyboard Navigation (ADA WCAG 2.1 AA) -->
   <a href="#app-content" class="skip-to-content">Skip to main content</a>
 
@@ -493,6 +501,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js" defer></script>
   
   <!-- --- APPLICATION ENTRY SCRIPT --- -->
-  <script src="app.js?v=30" defer></script>
+  <script src="app.js?v=31" defer></script>
 </body>
 </html>
