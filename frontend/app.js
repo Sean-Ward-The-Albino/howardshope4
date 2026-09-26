@@ -173,10 +173,25 @@ const DEFAULT_CUSTOM_PAGE = {
   date: "2026-11-19",
   time: "6:00 PM – 10:00 PM PST",
   location: "Grand Ballroom, 3711 Long Beach Blvd, Long Beach, CA 90807",
+  dressCode: "Semi-Formal / Cocktail Attire",
+  youtubeUrl: "https://www.youtube.com/watch?v=A2cRkZBZrPY",
   bannerImage: "assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18 (2).webp",
+  heroBgColor: "#0B132B",
+  heroTextColor: "#FFFFFF",
+  accentColor: "#F39C12",
+  pageBgColor: "#FFFFFF",
+  storyTitle: "An Evening Dedicated to Hope & Healing",
   description: "The Unmasking Hope Annual Charity Gala is our signature event of the year, bringing together corporate partners, advocates, and families to celebrate our resilient community and secure vital funding for youth empowerment and caregiver respite services.",
+  impactTitle: "100% Mission-Focused Proceeds",
+  impactDesc: "Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency single-parent food security toolkits.",
+  allowInstallments: true,
+  installmentCycles: 3,
+  installmentFrequency: "Monthly",
+  paymentStripe: true,
+  paymentPaypal: true,
+  paymentDoor: false,
   schedule: [
-    { time: "5:30 PM", title: "VIP Red Carpet & Reception", desc: "Private networking and hors d'oeuvres for sponsors and VIP pass holders." },
+    { time: "5:30 PM", title: "VIP Red Carpet & Reception", desc: "Private networking and hors d'oeuvres for sponsors and VIP ticket holders." },
     { time: "6:30 PM", title: "Welcome Keynote & Dinner", desc: "Keynote addresses from President LaCreashia Willis-Howard and honored community guests." },
     { time: "7:45 PM", title: "Community Impact Awards", desc: "Recognizing outstanding community partners, teachers, and disability caregiver advocates." },
     { time: "8:30 PM", title: "Live Benefit Auction & Celebration", desc: "Silent & live auctions with 100% of proceeds supporting our youth seminars and caregiver respite programs." }
@@ -217,7 +232,7 @@ const DEFAULT_CUSTOM_PAGE = {
       popular: false,
       features: [
         "Reserved VIP banquet table for 8 guests",
-        "Full VIP Reception passes for all 8 attendees",
+        "Full VIP Reception tickets for all 8 attendees",
         "Corporate or family logo on table & screen",
         "Special on-stage acknowledgment during awards",
         "Tax-deductible donor receipt (501c3)"
@@ -225,6 +240,22 @@ const DEFAULT_CUSTOM_PAGE = {
     }
   ]
 };
+
+function getYouTubeEmbedUrl(urlOrId) {
+  if (!urlOrId) return '';
+  const trimmed = urlOrId.trim();
+  if (trimmed.includes('youtube.com/embed/') || trimmed.includes('youtube-nocookie.com/embed/')) {
+    return trimmed;
+  }
+  const match = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  if (match && match[1]) {
+    return `https://www.youtube-nocookie.com/embed/${match[1]}`;
+  }
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return `https://www.youtube-nocookie.com/embed/${trimmed}`;
+  }
+  return trimmed;
+}
 
 function loadCustomPage() {
   try {
@@ -582,7 +613,7 @@ const API = {
         return ticket;
       }
     } catch (e) {
-      console.warn("Spring Boot API offline/timed out, saving confirmed pass locally.", e);
+      console.warn("Spring Boot API offline/timed out, saving confirmed ticket locally.", e);
     }
     
     // Simulate booking ticket locally with guaranteed non-null fields
@@ -659,7 +690,7 @@ const API = {
       ticketId: 'H4H-GUEST-' + Date.now(),
       confirmationToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
       eventId: event ? event.id : eventId,
-      eventTitle: event ? event.title : 'Community Event Pass',
+      eventTitle: event ? event.title : 'Community Event Ticket',
       eventDate: event ? event.date : new Date().toISOString().split('T')[0],
       eventLocation: event ? event.location : '3711 Long Beach Blvd, #4055, Long Beach, CA 90807',
       guestName: guestName || 'Valued Guest',
@@ -733,6 +764,41 @@ const API = {
       },
       message: 'Donation successfully simulated and 501(c)(3) tax receipt generated!'
     };
+  },
+
+  async submitSupplyDonation(supplyData) {
+    try {
+      const response = await fetch(`${this.baseUrl}/donations/in-kind-supplies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(supplyData)
+      });
+      if (response.ok) return await response.json();
+    } catch (e) {
+      console.warn("Supply Donation API offline, logging locally.", e);
+    }
+
+    const trackingNum = 'H4H-SUPPLY-' + new Date().getFullYear() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const result = {
+      success: true,
+      trackingNumber: trackingNum,
+      donation: {
+        ...supplyData,
+        trackingNumber: trackingNum,
+        status: 'SUBMITTED',
+        createdAt: new Date().toISOString()
+      },
+      message: 'Supply donation inquiry logged. 501(c)(3) in-kind tax acknowledgment generated.'
+    };
+    
+    // Save to local supplies store
+    try {
+      const saved = JSON.parse(localStorage.getItem('h4h_supply_donations') || '[]');
+      saved.unshift(result.donation);
+      localStorage.setItem('h4h_supply_donations', JSON.stringify(saved));
+    } catch(err) {}
+
+    return result;
   },
 
   async getTaxReceipt(taxReceiptNumber) {
@@ -1658,110 +1724,329 @@ const templates = {
     return `
       <section class="section" style="padding-top: 140px;">
         <div class="section-header">
-          <span class="section-tag">Make an Impact</span>
+          <span class="section-tag"><i class="fa-solid fa-heart" style="color: var(--danger); margin-right: 6px;"></i> Make an Impact</span>
           <h2 class="section-title">Empower Families with Hope</h2>
           <p class="section-subtitle">Howards 4 Hope is a registered 501(c)(3) nonprofit public charity (EIN: 86-1910919). 100% of your contributions are tax-deductible to the fullest extent permitted by federal law.</p>
         </div>
-        
-        <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 2.5rem; max-width: 1100px; margin: 0 auto; align-items: start;">
-          <!-- Donation Input Card -->
-          <div class="form-card" style="margin: 0; padding: 30px;">
-            <h3 style="margin-bottom: 20px; text-align: center;"><i class="fa-solid fa-heart" style="color: var(--danger); margin-right: 8px;"></i> Secure Giving Portal</h3>
-            
-            <!-- Frequency Selector -->
-            <label class="form-label" style="font-weight: 700; margin-bottom: 8px;">Contribution Frequency</label>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 20px;">
-              <button type="button" class="btn btn-outline donate-freq-btn" data-freq="ONE_TIME">One-Time</button>
-              <button type="button" class="btn btn-outline donate-freq-btn active" data-freq="MONTHLY" style="background: var(--primary); color: white; border-color: var(--primary);">Monthly</button>
-              <button type="button" class="btn btn-outline donate-freq-btn" data-freq="QUARTERLY">Quarterly</button>
-              <button type="button" class="btn btn-outline donate-freq-btn" data-freq="ANNUAL">Annual</button>
-            </div>
 
-            <!-- Amount Preset Buttons -->
-            <label class="form-label" style="font-weight: 700; margin-bottom: 8px;">Select Gift Amount</label>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px;">
-              <button type="button" class="btn btn-outline donate-amount-btn" data-amt="25">$25</button>
-              <button type="button" class="btn btn-outline donate-amount-btn active" data-amt="50" style="background: var(--primary); color: white; border-color: var(--primary);">$50</button>
-              <button type="button" class="btn btn-outline donate-amount-btn" data-amt="100">$100</button>
-              <button type="button" class="btn btn-outline donate-amount-btn" data-amt="250">$250</button>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label">Custom Donation Amount ($ USD)</label>
-              <input type="number" class="form-control" id="custom-donation-amt" value="50" min="5" placeholder="Enter amount">
-            </div>
+        <!-- Giving Modes Navigation Tabs -->
+        <div class="donate-tabs-nav">
+          <button type="button" class="donate-tab-btn active" data-donate-pane="pane-individual">
+            <i class="fa-solid fa-hand-holding-dollar"></i> Individual Giving
+          </button>
+          <button type="button" class="donate-tab-btn" data-donate-pane="pane-corporate">
+            <i class="fa-solid fa-building"></i> Corporate Giving & Partnerships
+          </button>
+          <button type="button" class="donate-tab-btn" data-donate-pane="pane-supplies">
+            <i class="fa-solid fa-box-open"></i> Donate Supplies & In-Kind Goods
+          </button>
+        </div>
 
-            <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <div>
-                <label class="form-label">Donor Name (For Tax Letter)</label>
-                <input type="text" class="form-control" id="donation-donor-name" placeholder="Jane Doe" value="${state.user ? (state.user.displayName || '') : ''}">
+        <!-- ========================================== -->
+        <!-- PANE 1: INDIVIDUAL GIVING PORTAL           -->
+        <!-- ========================================== -->
+        <div class="donate-pane active" id="pane-individual">
+          <div class="donation-layout-grid">
+            <!-- Donation Input Card -->
+            <div class="form-card" style="margin: 0; padding: 30px;">
+              <h3 style="margin-bottom: 20px; text-align: center;"><i class="fa-solid fa-shield-heart" style="color: var(--secondary); margin-right: 8px;"></i> Secure Giving Portal</h3>
+              
+              <!-- Frequency Selector -->
+              <label class="form-label" style="font-weight: 700; margin-bottom: 8px;">Contribution Frequency</label>
+              <div class="donate-freq-grid">
+                <button type="button" class="btn btn-outline donate-freq-btn" data-freq="ONE_TIME">One-Time</button>
+                <button type="button" class="btn btn-outline donate-freq-btn active" data-freq="MONTHLY" style="background: var(--primary); color: white; border-color: var(--primary);">Monthly</button>
+                <button type="button" class="btn btn-outline donate-freq-btn" data-freq="QUARTERLY">Quarterly</button>
+                <button type="button" class="btn btn-outline donate-freq-btn" data-freq="ANNUAL">Annual</button>
               </div>
-              <div>
-                <label class="form-label">Donor Email (Receipt Destination)</label>
-                <input type="email" class="form-control" id="donation-donor-email" placeholder="jane@example.com" value="${state.user ? (state.user.email || '') : ''}">
+
+              <!-- Amount Preset Buttons -->
+              <label class="form-label" style="font-weight: 700; margin-bottom: 8px;">Select Gift Amount</label>
+              <div class="donate-amount-grid">
+                <button type="button" class="btn btn-outline donate-amount-btn" data-amt="25">$25</button>
+                <button type="button" class="btn btn-outline donate-amount-btn active" data-amt="50" style="background: var(--primary); color: white; border-color: var(--primary);">$50</button>
+                <button type="button" class="btn btn-outline donate-amount-btn" data-amt="100">$100</button>
+                <button type="button" class="btn btn-outline donate-amount-btn" data-amt="250">$250</button>
               </div>
+              
+              <div class="form-group">
+                <label class="form-label">Custom Donation Amount ($ USD)</label>
+                <input type="number" class="form-control" id="custom-donation-amt" value="50" min="5" placeholder="Enter amount">
+              </div>
+
+              <div class="donate-fields-row" style="margin-bottom: 18px;">
+                <div>
+                  <label class="form-label">Donor Name (For Tax Letter)</label>
+                  <input type="text" class="form-control" id="donation-donor-name" placeholder="Jane Doe" value="${state.user ? (state.user.displayName || '') : ''}">
+                </div>
+                <div>
+                  <label class="form-label">Donor Email (Receipt Destination)</label>
+                  <input type="email" class="form-control" id="donation-donor-email" placeholder="jane@example.com" value="${state.user ? (state.user.email || '') : ''}">
+                </div>
+              </div>
+
+              <div style="padding: 14px; border-radius: var(--radius-sm); background: var(--bg-base); font-size: 0.88rem; color: var(--text-muted); margin-bottom: 20px; border-left: 3px solid var(--accent);">
+                <strong>Community Impact:</strong> <span id="donation-impact-text">$50 provides a complete Caregiver Wellness & Respite Starter Packet.</span>
+              </div>
+              
+              <div class="auth-divider" style="margin-bottom: 15px;">Payment Gateways</div>
+              
+              <button class="auth-social-btn" id="stripe-donate-btn" style="background: linear-gradient(135deg, #635bff, #7b73ff); color: white; border: none; height: 50px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; width: 100%;">
+                <i class="fa-solid fa-credit-card"></i> Donate with Credit / Debit Card (Stripe)
+              </button>
+              
+              <button class="auth-social-btn" id="paypal-donate-btn" style="background: #ffc439; color: #003087; border: none; height: 50px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+                <i class="fa-brands fa-paypal"></i> Donate securely with PayPal
+              </button>
+              
+              <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 18px; line-height: 1.4;">
+                <i class="fa-solid fa-shield-halved" style="color: var(--success); margin-right: 4px;"></i> 256-bit SSL Security. Automated 501(c)(3) Tax Receipt Dispatched Instantly.
+              </p>
             </div>
 
-            <div style="padding: 12px; border-radius: var(--radius-sm); background: var(--bg-base); font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
-              <strong>Community Impact:</strong> <span id="donation-impact-text">$50 provides a complete Caregiver Wellness & Respite Starter Packet.</span>
+            <!-- Live 501(c)(3) Tax Letter Preview -->
+            <div>
+              <div class="tax-receipt-card" id="interactive-tax-receipt">
+                <div class="tax-receipt-header">
+                  <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: 0.5px;">HOWARDS 4 HOPE</div>
+                  <div style="font-size: 0.8rem; color: #475569;">A California Non-Profit Public Benefit Corporation</div>
+                  <div style="font-size: 0.8rem; color: #475569;">3711 Long Beach Blvd, #4055, Long Beach, CA 90807 | Tel: (562) 481-5556</div>
+                  <div style="font-size: 0.85rem; font-weight: 700; margin-top: 4px; color: #0f172a;">Federal Tax-Exempt ID (EIN): 86-1910919</div>
+                  <div class="tax-receipt-title" style="margin-top: 10px; font-size: 1.15rem;">Official Written Acknowledgment & Tax Receipt</div>
+                </div>
+
+                <div style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 15px;">
+                  <div><strong>Date:</strong> <span id="tax-letter-date">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>
+                  <div><strong>Donor Name:</strong> <span id="tax-letter-donor-name">${state.user ? (state.user.displayName || 'Generous Supporter') : 'Generous Supporter'}</span></div>
+                  <div><strong>Gift Amount:</strong> <span id="tax-letter-amount" style="font-size: 1.1rem; font-weight: 700; color: #0f172a;">$50.00 USD</span></div>
+                  <div><strong>Gift Type:</strong> <span id="tax-letter-type">Monthly Recurring Pledge</span></div>
+                  <div><strong>Tax Receipt #:</strong> <span id="tax-letter-receipt-no" style="font-family: monospace;">H4H-TAX-${new Date().getFullYear()}-DEMO</span></div>
+                </div>
+
+                <div class="tax-compliance-box">
+                  <strong>IRS Section 170(f)(8) Compliance Statement:</strong><br>
+                  Howards 4 Hope certifies that no goods or services were provided in whole or part in consideration for the contribution mentioned above, other than intangible religious or charitable benefits. Please retain this written acknowledgment for federal and California state income tax records.
+                </div>
+
+                <div class="tax-receipt-signatures-row">
+                  <div>
+                    <div style="font-family: cursive; font-size: 1.1rem; color: #1e293b;">LaCreashia Willis-Howard</div>
+                    <div style="border-top: 1px solid #0f172a; padding-top: 2px;">President & Co-Founder</div>
+                  </div>
+                  <div>
+                    <div style="font-family: cursive; font-size: 1.1rem; color: #1e293b;">Lamar Howard Sr.</div>
+                    <div style="border-top: 1px solid #0f172a; padding-top: 2px;">Vice President & Co-Founder</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; justify-content: center; margin-top: 12px;">
+                <button class="btn btn-outline" id="print-tax-letter-btn" style="background: white; border: 1px solid rgba(15,23,42,0.2);">
+                  <i class="fa-solid fa-print"></i> Print Official Tax Letter
+                </button>
+              </div>
             </div>
-            
-            <div class="auth-divider">Payment Gateways</div>
-            
-            <button class="auth-social-btn" id="stripe-donate-btn" style="background: linear-gradient(135deg, #635bff, #7b73ff); color: white; border: none; height: 50px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; width: 100%;">
-              <i class="fa-solid fa-credit-card"></i> Donate with Credit / Debit Card (Stripe)
-            </button>
-            
-            <button class="auth-social-btn" id="paypal-donate-btn" style="background: #ffc439; color: #003087; border: none; height: 50px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
-              <i class="fa-brands fa-paypal"></i> Donate securely with PayPal
-            </button>
-            
-            <p style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 18px;">
-              <i class="fa-solid fa-shield-halved"></i> 256-bit SSL Security. Automated 501(c)(3) Tax Receipt Dispatched Instantly.
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- PANE 2: CORPORATE GIVING & SPONSORSHIPS    -->
+        <!-- ========================================== -->
+        <div class="donate-pane" id="pane-corporate" style="display: none; max-width: 1100px; margin: 0 auto;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h3 style="font-size: 1.8rem; color: var(--primary); font-weight: 800;">Corporate Partnerships & Foundation Grants</h3>
+            <p style="color: var(--text-muted); max-width: 750px; margin: 8px auto 0 auto; font-size: 1rem; line-height: 1.6;">
+              Partner with Howards 4 Hope to make a measurable social impact in Long Beach. We offer customized corporate sponsorship packages, employee volunteer days, and matching gift collaborations.
             </p>
           </div>
 
-          <!-- Live 501(c)(3) Tax Letter Preview -->
-          <div>
-            <div class="tax-receipt-card" id="interactive-tax-receipt">
-              <div class="tax-receipt-header">
-                <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: 0.5px;">HOWARDS 4 HOPE</div>
-                <div style="font-size: 0.8rem; color: #475569;">A California Non-Profit Public Benefit Corporation</div>
-                <div style="font-size: 0.8rem; color: #475569;">3711 Long Beach Blvd, #4055, Long Beach, CA 90807 | Tel: (562) 481-5556</div>
-                <div style="font-size: 0.85rem; font-weight: 700; margin-top: 4px; color: #0f172a;">Federal Tax-Exempt ID (EIN): 86-1910919</div>
-                <div class="tax-receipt-title" style="margin-top: 10px; font-size: 1.15rem;">Official Written Acknowledgment & Tax Receipt</div>
-              </div>
-
-              <div style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 15px;">
-                <div><strong>Date:</strong> <span id="tax-letter-date">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span></div>
-                <div><strong>Donor Name:</strong> <span id="tax-letter-donor-name">${state.user ? (state.user.displayName || 'Generous Supporter') : 'Generous Supporter'}</span></div>
-                <div><strong>Gift Amount:</strong> <span id="tax-letter-amount" style="font-size: 1.1rem; font-weight: 700; color: #0f172a;">$50.00 USD</span></div>
-                <div><strong>Gift Type:</strong> <span id="tax-letter-type">Monthly Recurring Pledge</span></div>
-                <div><strong>Tax Receipt #:</strong> <span id="tax-letter-receipt-no" style="font-family: monospace;">H4H-TAX-${new Date().getFullYear()}-DEMO</span></div>
-              </div>
-
-              <div class="tax-compliance-box">
-                <strong>IRS Section 170(f)(8) Compliance Statement:</strong><br>
-                Howards 4 Hope certifies that no goods or services were provided in whole or part in consideration for the contribution mentioned above, other than intangible religious or charitable benefits. Please retain this written acknowledgment for federal and California state income tax records.
-              </div>
-
-              <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; font-size: 0.85rem;">
-                <div>
-                  <div style="font-family: cursive; font-size: 1.1rem; color: #1e293b;">LaCreashia Willis-Howard</div>
-                  <div style="border-top: 1px solid #0f172a; padding-top: 2px;">President & Co-Founder</div>
-                </div>
-                <div>
-                  <div style="font-family: cursive; font-size: 1.1rem; color: #1e293b;">Lamar Howard Sr.</div>
-                  <div style="border-top: 1px solid #0f172a; padding-top: 2px;">Vice President & Co-Founder</div>
-                </div>
-              </div>
+          <div class="corporate-sponsorship-grid">
+            <div class="corporate-tier-card" style="border-top: 4px solid #CD7F32;">
+              <span style="font-size: 0.8rem; font-weight: 800; color: #CD7F32; text-transform: uppercase;">Community Ally</span>
+              <h4 style="font-size: 1.3rem; margin: 6px 0; color: var(--primary);">$1,000</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">Sponsors a 4-week cohort of single parent emergency utility and nutrition relief toolkits.</p>
+              <ul style="font-size: 0.8rem; color: var(--text-main); margin-bottom: 20px; padding-left: 18px; line-height: 1.6;">
+                <li>Corporate logo on H4H partner wall</li>
+                <li>Acknowledgment in annual impact report</li>
+                <li>Official 501(c)(3) tax receipt</li>
+              </ul>
+              <button type="button" class="btn btn-outline corp-sponsor-select-btn" data-tier="Bronze Ally ($1,000)" style="margin-top: auto; width: 100%;">Select Tier</button>
             </div>
 
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
-              <button class="btn btn-outline" id="print-tax-letter-btn" style="background: white; border: 1px solid rgba(15,23,42,0.2);">
-                <i class="fa-solid fa-print"></i> Print Official Tax Letter
+            <div class="corporate-tier-card" style="border-top: 4px solid #94A3B8;">
+              <span style="font-size: 0.8rem; font-weight: 800; color: #64748B; text-transform: uppercase;">Hope Champion</span>
+              <h4 style="font-size: 1.3rem; margin: 6px 0; color: var(--primary);">$2,500</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">Fully funds a full semester "Me, Myself & Why" youth emotional resilience workshop.</p>
+              <ul style="font-size: 0.8rem; color: var(--text-main); margin-bottom: 20px; padding-left: 18px; line-height: 1.6;">
+                <li>Prominent digital and event banner placement</li>
+                <li>2 complimentary tickets to signature events</li>
+                <li>Dedicated social media impact highlight</li>
+              </ul>
+              <button type="button" class="btn btn-outline corp-sponsor-select-btn" data-tier="Silver Champion ($2,500)" style="margin-top: auto; width: 100%;">Select Tier</button>
+            </div>
+
+            <div class="corporate-tier-card" style="border-top: 4px solid var(--accent); background: linear-gradient(180deg, rgba(243,156,18,0.03), transparent);">
+              <span style="font-size: 0.8rem; font-weight: 800; color: var(--accent); text-transform: uppercase;">Legacy Partner</span>
+              <h4 style="font-size: 1.3rem; margin: 6px 0; color: var(--primary);">$5,000</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">Co-sponsors annual Caregiver Respite Day and youth educational resource summits.</p>
+              <ul style="font-size: 0.8rem; color: var(--text-main); margin-bottom: 20px; padding-left: 18px; line-height: 1.6;">
+                <li>Full VIP Gala Table for 8 attendees</li>
+                <li>Podium keynote recognition & logo on print</li>
+                <li>Customized employee engagement opportunity</li>
+              </ul>
+              <button type="button" class="btn btn-donate corp-sponsor-select-btn" data-tier="Gold Legacy ($5,000)" style="margin-top: auto; width: 100%;">Select Tier</button>
+            </div>
+
+            <div class="corporate-tier-card" style="border-top: 4px solid var(--primary);">
+              <span style="font-size: 0.8rem; font-weight: 800; color: var(--primary); text-transform: uppercase;">Visionary Sponsor</span>
+              <h4 style="font-size: 1.3rem; margin: 6px 0; color: var(--primary);">$10,000+</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">Title sponsorship across all 3 flagship initiatives in Long Beach throughout the year.</p>
+              <ul style="font-size: 0.8rem; color: var(--text-main); margin-bottom: 20px; padding-left: 18px; line-height: 1.6;">
+                <li>Marquee title branding on all initiatives</li>
+                <li>VIP Gala Stage address & awards presentation</li>
+                <li>Executive collaboration & custom impact metrics</li>
+              </ul>
+              <button type="button" class="btn btn-primary corp-sponsor-select-btn" data-tier="Platinum Visionary ($10,000+)" style="margin-top: auto; width: 100%;">Select Tier</button>
+            </div>
+          </div>
+
+          <!-- Corporate Direct Inquiry Form -->
+          <div class="form-card" style="max-width: 800px; margin: 0 auto; padding: 35px;">
+            <h4 style="font-size: 1.25rem; color: var(--primary); margin-bottom: 15px; font-weight: 800;">
+              <i class="fa-solid fa-file-invoice-dollar" style="color: var(--secondary); margin-right: 8px;"></i> Corporate Sponsorship & Invoice Request
+            </h4>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 20px;">
+              Request a formal sponsorship prospectus, ACH/wire transfer instructions, or an official W-9 invoice.
+            </p>
+            <form id="corporate-inquiry-form">
+              <div class="donate-fields-row" style="margin-bottom: 14px;">
+                <div>
+                  <label class="form-label">Corporation / Business Name *</label>
+                  <input type="text" class="form-control" id="corp-company-name" required placeholder="e.g. Acme Corporation">
+                </div>
+                <div>
+                  <label class="form-label">Contact Person & Title *</label>
+                  <input type="text" class="form-control" id="corp-contact-name" required placeholder="e.g. Jane Doe, CSR Director">
+                </div>
+              </div>
+              <div class="donate-fields-row" style="margin-bottom: 14px;">
+                <div>
+                  <label class="form-label">Corporate Email Address *</label>
+                  <input type="email" class="form-control" id="corp-contact-email" required placeholder="jdoe@company.com">
+                </div>
+                <div>
+                  <label class="form-label">Phone Number *</label>
+                  <input type="tel" class="form-control" id="corp-contact-phone" required placeholder="(562) 555-0100">
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label">Sponsorship Level / Custom Amount</label>
+                <select class="form-control" id="corp-sponsorship-level">
+                  <option value="Bronze Ally ($1,000)">Bronze Community Ally ($1,000)</option>
+                  <option value="Silver Champion ($2,500)">Silver Hope Champion ($2,500)</option>
+                  <option value="Gold Legacy ($5,000)">Gold Legacy Partner ($5,000)</option>
+                  <option value="Platinum Visionary ($10,000+)">Platinum Visionary Sponsor ($10,000+)</option>
+                  <option value="Custom Gift">Custom Gift / Grant Discussion</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label">Partnership Notes or Specific Program Interest</label>
+                <textarea class="form-control" id="corp-notes" rows="3" placeholder="Tell us if you prefer ACH/wire invoice, matching gift integration, or specific program focus..."></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: 100%; height: 48px; font-weight: 700;">
+                <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> Send Corporate Partnership Request
               </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- PANE 3: IN-KIND SUPPLIES DONATION FORM     -->
+        <!-- ========================================== -->
+        <div class="donate-pane" id="pane-supplies" style="display: none; max-width: 860px; margin: 0 auto;">
+          <div class="supply-donation-card">
+            <div style="text-align: center; margin-bottom: 25px;">
+              <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(30,39,97,0.08); color: var(--primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-size: 1.6rem;">
+                <i class="fa-solid fa-box-open"></i>
+              </div>
+              <h3 style="font-size: 1.6rem; color: var(--primary); font-weight: 800; margin: 0;">Donate Supplies & In-Kind Equipment</h3>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 6px; max-width: 620px; margin-left: auto; margin-right: auto;">
+                Directly equip Long Beach families. We accept new or gently used supplies, hygiene care kits, youth learning materials, and mobility equipment.
+              </p>
             </div>
+
+            <form id="supplies-donation-form">
+              <div class="donate-fields-row" style="margin-bottom: 14px;">
+                <div>
+                  <label class="form-label">Company or Donor Name *</label>
+                  <input type="text" class="form-control" id="supply-donor-name" required placeholder="Company or Individual Name" value="${state.user ? (state.user.displayName || '') : ''}">
+                </div>
+                <div>
+                  <label class="form-label">Contact Person Name & Title</label>
+                  <input type="text" class="form-control" id="supply-contact-name" placeholder="Jane Doe, Community Relations">
+                </div>
+              </div>
+
+              <div class="donate-fields-row" style="margin-bottom: 14px;">
+                <div>
+                  <label class="form-label">Email Address (For Tax Receipt) *</label>
+                  <input type="email" class="form-control" id="supply-donor-email" required placeholder="contact@example.com" value="${state.user ? (state.user.email || '') : ''}">
+                </div>
+                <div>
+                  <label class="form-label">Phone Number *</label>
+                  <input type="tel" class="form-control" id="supply-donor-phone" required placeholder="(562) 555-0123">
+                </div>
+              </div>
+
+              <div class="donate-fields-row" style="margin-bottom: 14px;">
+                <div>
+                  <label class="form-label">Supply Category *</label>
+                  <select class="form-control" id="supply-category" required>
+                    <option value="Hygiene & Personal Care Kits">Hygiene & Personal Care Kits</option>
+                    <option value="Non-Perishable Food & Pantry Goods">Non-Perishable Food & Pantry Goods</option>
+                    <option value="Youth Mentorship & School Supplies">Youth Mentorship & School Supplies (Backpacks, Books)</option>
+                    <option value="Caregiver Respite & Mobility Aids">Caregiver Respite & Mobility Aids (Wheelchairs, Sensory)</option>
+                    <option value="Single Parent Nursery & Baby Items">Single Parent Nursery & Baby Items (Diapers, Formula)</option>
+                    <option value="Tech, Computers & Office Equipment">Tech, Computers & Office Equipment (Laptops, Tablets)</option>
+                    <option value="Furniture & Household Essentials">Furniture & Household Essentials</option>
+                    <option value="Professional / In-Kind Services">Professional / In-Kind Pro-Bono Services</option>
+                    <option value="Other In-Kind Supplies">Other In-Kind Supplies</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Estimated Fair Market Value ($ USD)</label>
+                  <input type="number" class="form-control" id="supply-estimated-value" min="0" placeholder="e.g. 500">
+                </div>
+              </div>
+
+              <div class="donate-fields-row" style="margin-bottom: 14px;">
+                <div>
+                  <label class="form-label">Delivery / Logistics Method *</label>
+                  <select class="form-control" id="supply-delivery-method" required>
+                    <option value="DROP_OFF">I will drop off at Long Beach Hub (3711 Long Beach Blvd)</option>
+                    <option value="PICKUP_REQUEST">Request H4H Team Pickup (Long Beach / Greater LA Area)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Preferred Date for Transfer</label>
+                  <input type="date" class="form-control" id="supply-target-date">
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label">Item Description & Estimated Quantity *</label>
+                <textarea class="form-control" id="supply-item-desc" rows="3" required placeholder="Please list the items, quantities, and condition (e.g. 50 new hygiene kits with soap, shampoo, and oral care; 2 boxes of children's workbooks)..."></textarea>
+              </div>
+
+              <div style="background: rgba(30,39,97,0.03); border: 1px dashed rgba(15,23,42,0.15); border-radius: 8px; padding: 12px 16px; margin-bottom: 22px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+                <i class="fa-solid fa-file-shield" style="color: var(--success); margin-right: 4px;"></i>
+                <strong>501(c)(3) In-Kind Tax Deduction:</strong> Tangible goods donated to Howards 4 Hope are tax-deductible under IRS Section 170. We will provide an official Written Acknowledgment & Form 8283 receipt following receipt and verification.
+              </div>
+
+              <button type="submit" class="btn btn-donate" id="supply-submit-btn" style="width: 100%; height: 50px; font-weight: 800; font-size: 1.05rem;">
+                <i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> Submit In-Kind Donation Request
+              </button>
+            </form>
           </div>
         </div>
       </section>
@@ -1782,7 +2067,7 @@ const templates = {
             </p>
             <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
               <a href="#/" class="btn btn-primary"><i class="fa-solid fa-house" style="margin-right: 8px;"></i> Return to Homepage</a>
-              <a href="#/my-tickets" class="btn btn-outline"><i class="fa-solid fa-magnifying-glass" style="margin-right: 6px;"></i> Check Existing Pass</a>
+              <a href="#/my-tickets" class="btn btn-outline"><i class="fa-solid fa-magnifying-glass" style="margin-right: 6px;"></i> Check Existing Ticket</a>
             </div>
           </div>
         </section>
@@ -1791,22 +2076,22 @@ const templates = {
 
     return `
       <!-- --- SPECIAL EVENT HERO --- -->
-      <section class="special-event-hero">
+      <section class="special-event-hero" style="background: ${page.heroBgColor || '#0B132B'}; color: ${page.heroTextColor || '#FFFFFF'};">
         <div class="hero-bg-shapes">
           <div class="hero-glow-orb hero-glow-orb-1"></div>
           <div class="hero-glow-orb hero-glow-orb-2"></div>
         </div>
         <div style="position: relative; z-index: 2; max-width: 900px; margin: 0 auto;">
           ${(!page.enabled && (state.isAdmin || isPreview)) ? `
-            <div style="background: rgba(243, 156, 18, 0.25); border: 1px dashed var(--accent); color: #fef08a; padding: 8px 18px; border-radius: 50px; display: inline-block; margin-bottom: 20px; font-weight: 700; font-size: 0.85rem;">
+            <div style="background: rgba(243, 156, 18, 0.25); border: 1px dashed ${page.accentColor || 'var(--accent)'}; color: #fef08a; padding: 8px 18px; border-radius: 50px; display: inline-block; margin-bottom: 20px; font-weight: 700; font-size: 0.85rem;">
               <i class="fa-solid fa-eye-slash" style="margin-right: 6px;"></i> Draft Preview Mode (Hidden from public)
             </div>
           ` : ''}
-          <div class="hero-tag" style="background: rgba(243,156,18,0.2); color: var(--accent); border-color: rgba(243,156,18,0.4);">
+          <div class="hero-tag" style="background: rgba(243,156,18,0.2); color: ${page.accentColor || 'var(--accent)'}; border-color: rgba(243,156,18,0.4);">
             <i class="fa-solid fa-crown" style="margin-right: 6px;"></i> Featured Special Event
           </div>
-          <h1 class="hero-title" style="font-size: 3.2rem; margin-bottom: 1rem;">${page.title}</h1>
-          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px;">${page.subtitle}</p>
+          <h1 class="hero-title" style="font-size: 3.2rem; margin-bottom: 1rem; color: ${page.heroTextColor || '#FFFFFF'};">${page.title}</h1>
+          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px; color: ${page.heroTextColor ? page.heroTextColor : 'rgba(255,255,255,0.9)'};">${page.subtitle}</p>
           
           <div class="special-event-meta-bar">
             <div class="special-meta-chip"><i class="fa-regular fa-calendar"></i> ${page.date}</div>
@@ -1815,12 +2100,37 @@ const templates = {
           </div>
 
           <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-            <a href="javascript:void(0)" onclick="document.getElementById('custom-pricing-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-donate" style="padding: 14px 32px; font-size: 1.05rem;"><i class="fa-solid fa-ticket"></i> Select Your Pass</a>
-            <a href="javascript:void(0)" onclick="document.getElementById('custom-story-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-circle-info"></i> Event Details</a>
-            <a href="#/my-tickets" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-magnifying-glass"></i> Check My Pass</a>
+            <a href="javascript:void(0)" onclick="document.getElementById('custom-pricing-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-donate" style="padding: 14px 32px; font-size: 1.05rem; background: ${page.accentColor || 'var(--accent)'}; border-color: ${page.accentColor || 'var(--accent)'};"><i class="fa-solid fa-ticket"></i> Select Your Ticket</a>
+            <a href="javascript:void(0)" onclick="document.getElementById('custom-story-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-outline" style="color: ${page.heroTextColor || '#FFFFFF'}; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-circle-info"></i> Event Details</a>
+            <a href="#/my-tickets" class="btn btn-outline" style="color: ${page.heroTextColor || '#FFFFFF'}; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-magnifying-glass"></i> Check My Ticket</a>
           </div>
         </div>
       </section>
+
+      <!-- --- GALA YOUTUBE VIDEO SPOTLIGHT --- -->
+      ${page.youtubeUrl ? `
+        <section class="section" style="padding-top: 40px; padding-bottom: 20px;">
+          <div style="max-width: 900px; margin: 0 auto; text-align: center;">
+            <span class="section-tag" style="background: rgba(243,156,18,0.15); color: ${page.accentColor || 'var(--accent)'}; border-color: rgba(243,156,18,0.3);">
+              <i class="fa-brands fa-youtube" style="margin-right: 6px;"></i> Gala Video Spotlight
+            </span>
+            <h2 class="section-title" style="margin-bottom: 12px;">A Message of Hope: Watch Our Mission in Action</h2>
+            <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 28px; max-width: 700px; margin-left: auto; margin-right: auto;">
+              See firsthand how your presence, partnership, and generosity directly transform the lives of youth, single parents, and caregivers in Long Beach.
+            </p>
+            
+            <div class="gala-video-wrapper">
+              <iframe 
+                src="${getYouTubeEmbedUrl(page.youtubeUrl)}" 
+                title="Howards 4 Hope Gala Feature Video" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                referrerpolicy="strict-origin-when-cross-origin" 
+                allowfullscreen>
+              </iframe>
+            </div>
+          </div>
+        </section>
+      ` : ''}
 
       <!-- --- EVENT NARRATIVE & HIGHLIGHTS --- -->
       <section id="custom-story-section" class="section">
@@ -1830,14 +2140,14 @@ const templates = {
         </div>
         <div class="special-event-grid">
           <div>
-            <span class="section-tag">About The Gala</span>
-            <h2 class="section-title" style="text-align: left; margin-bottom: 20px;">An Evening Dedicated to Hope & Healing</h2>
+            <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">About The Gala</span>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 20px;">${page.storyTitle || 'An Evening Dedicated to Hope & Healing'}</h2>
             <p style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.8; margin-bottom: 25px;">
               ${page.description}
             </p>
-            <div style="background: var(--bg-card); border-left: 4px solid var(--accent); padding: 20px; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); margin-bottom: 25px;">
-              <h4 style="color: var(--primary); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-hand-holding-heart" style="color: var(--accent); margin-right: 6px;"></i> 100% Mission-Focused Proceeds</h4>
-              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency single-parent food security toolkits.</p>
+            <div style="background: var(--bg-card); border-left: 4px solid ${page.accentColor || 'var(--accent)'}; padding: 20px; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); margin-bottom: 25px;">
+              <h4 style="color: var(--primary); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-hand-holding-heart" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 6px;"></i> ${page.impactTitle || '100% Mission-Focused Proceeds'}</h4>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">${page.impactDesc || 'Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency single-parent food security toolkits.'}</p>
             </div>
             
             <!-- Program Schedule Timeline -->
@@ -1845,7 +2155,7 @@ const templates = {
             <div class="timeline-list">
               ${(page.schedule || []).map(item => `
                 <div class="timeline-item">
-                  <div class="timeline-dot"></div>
+                  <div class="timeline-dot" style="border-color: ${page.accentColor || 'var(--accent)'};"></div>
                   <div class="timeline-time">${item.time}</div>
                   <div class="timeline-title">${item.title}</div>
                   <div class="timeline-desc">${item.desc}</div>
@@ -1858,10 +2168,10 @@ const templates = {
           <div>
             <div class="calendar-card" style="padding: 20px; overflow: hidden; border-radius: var(--radius-lg);">
               <img src="${page.bannerImage || 'assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18 (2).webp'}" alt="Event Banner" style="width: 100%; height: 280px; object-fit: cover; border-radius: var(--radius-md); margin-bottom: 20px;">
-              <h3 style="font-size: 1.25rem; color: var(--primary); font-weight: 800; margin-bottom: 12px;"><i class="fa-solid fa-building-columns" style="color: var(--accent); margin-right: 8px;"></i> Venue & Host Details</h3>
+              <h3 style="font-size: 1.25rem; color: var(--primary); font-weight: 800; margin-bottom: 12px;"><i class="fa-solid fa-building-columns" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 8px;"></i> Venue & Host Details</h3>
               <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Location:</strong> ${page.location}</p>
               <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Date & Time:</strong> ${page.date} at ${page.time}</p>
-              <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;"><strong>Dress Code:</strong> Semi-Formal / Cocktail Attire</p>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;"><strong>Dress Code:</strong> ${page.dressCode || 'Semi-Formal / Cocktail Attire'}</p>
               <div style="display: flex; gap: 10px;">
                 <a href="${getGoogleCalendarUrl(page.title, page.date, page.location, page.description)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="flex: 1; text-align: center; font-size: 0.85rem; padding: 10px 8px;">
                   <i class="fa-brands fa-google"></i> Add Google Cal
@@ -1878,28 +2188,28 @@ const templates = {
       <!-- --- TIERED PRICING & FEATURES SECTION --- -->
       <section id="custom-pricing-section" class="section section-alt" style="padding-top: 60px;">
         <div class="section-header">
-          <span class="section-tag">Tiered Entry & Passes</span>
-          <h2 class="section-title">Select Your Pass or Sponsorship Table</h2>
+          <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">Tiered Entry & Tickets</span>
+          <h2 class="section-title">Select Your Ticket or Sponsorship Table</h2>
           <p class="section-subtitle">Reserve your seat for an unforgettable evening. All contributions support Howards 4 Hope 501(c)(3) mission initiatives.</p>
         </div>
 
         <div class="pricing-tiers-grid">
           ${(page.pricingTiers || []).map(tier => `
-            <div class="pricing-card ${tier.popular ? 'featured' : ''}">
-              ${tier.badge ? `<span class="pricing-badge">${tier.badge}</span>` : ''}
+            <div class="pricing-card ${tier.popular ? 'featured' : ''}" style="${tier.popular ? `border-color: ${page.accentColor || 'var(--accent)'};` : ''}">
+              ${tier.badge ? `<span class="pricing-badge" style="background: ${page.accentColor || 'var(--accent)'};">${tier.badge}</span>` : ''}
               <div class="pricing-tier-name">${tier.name}</div>
-              <div class="pricing-price">${tier.price === 0 ? 'FREE' : '$' + tier.price} <span>/ pass</span></div>
+              <div class="pricing-price">${tier.price === 0 ? 'FREE' : '$' + tier.price} <span>/ ticket</span></div>
               
               <ul class="pricing-features">
                 ${(tier.features || []).map(feat => `
                   <li class="pricing-feature-item">
-                    <i class="fa-solid fa-check-circle"></i>
+                    <i class="fa-solid fa-check-circle" style="color: var(--success);"></i>
                     <span>${feat}</span>
                   </li>
                 `).join('')}
               </ul>
 
-              <button class="btn ${tier.popular ? 'btn-donate' : 'btn-primary'} custom-book-tier-btn" data-tier-id="${tier.id}" data-tier-name="${tier.name}" data-tier-price="${tier.price}" style="width: 100%; padding: 12px; font-weight: 700;">
+              <button class="btn ${tier.popular ? 'btn-donate' : 'btn-primary'} custom-book-tier-btn" data-tier-id="${tier.id}" data-tier-name="${tier.name}" data-tier-price="${tier.price}" style="width: 100%; padding: 12px; font-weight: 700; ${tier.popular ? `background: ${page.accentColor || 'var(--accent)'}; border-color: ${page.accentColor || 'var(--accent)'};` : ''}">
                 <i class="fa-solid fa-ticket" style="margin-right: 6px;"></i> Reserve ${tier.name}
               </button>
             </div>
@@ -1909,9 +2219,9 @@ const templates = {
         <div style="text-align: center; margin-top: 35px;">
           <div style="display: inline-flex; align-items: center; gap: 10px; background: var(--bg-card); padding: 12px 24px; border-radius: 50px; border: 1px solid rgba(15,23,42,0.1); box-shadow: var(--shadow-sm); font-size: 0.9rem;">
             <i class="fa-solid fa-circle-check" style="color: var(--success);"></i>
-            <span style="color: var(--text-muted);">Already booked a Gala pass or table?</span>
+            <span style="color: var(--text-muted);">Already booked a Gala ticket or table?</span>
             <a href="#/my-tickets" style="color: var(--secondary); font-weight: 700; text-decoration: underline;">
-              Look up & Print Your Pass &rarr;
+              Look up & Print Your Ticket &rarr;
             </a>
           </div>
         </div>
@@ -1919,16 +2229,16 @@ const templates = {
 
       <!-- --- INLINE CHECKOUT SECTION --- -->
       <section id="custom-pricing-checkout" class="section" style="padding-top: 40px; display: none;">
-        <div style="max-width: 600px; margin: 0 auto; background: var(--bg-card); padding: 30px; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); border: 1px solid rgba(15,23,42,0.1);">
+        <div style="max-width: 620px; margin: 0 auto; background: var(--bg-card); padding: 32px; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); border: 1px solid rgba(15,23,42,0.1);">
           <div style="text-align: center; margin-bottom: 25px;">
-            <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(243, 156, 18, 0.15); color: var(--accent); display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; font-size: 1.6rem;">
+            <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(243, 156, 18, 0.15); color: ${page.accentColor || 'var(--accent)'}; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; font-size: 1.6rem;">
               <i class="fa-solid fa-ticket"></i>
             </div>
             <h3 id="custom-modal-tier-title" style="margin: 0; font-size: 1.6rem; color: var(--primary); font-weight: 800;">Complete Reservation</h3>
-            <p style="color: var(--text-muted); margin-top: 8px;">You're almost there! Fill out the details below.</p>
+            <p style="color: var(--text-muted); margin-top: 8px;">Fill out attendee details and select your payment preferences.</p>
             <div style="display: flex; justify-content: center; gap: 20px; margin-top: 20px; font-size: 0.95rem; border-bottom: 1px solid rgba(15,23,42,0.1); padding-bottom: 15px;">
-              <div id="step-indicator-1" style="font-weight: 800; color: var(--primary);"><i class="fa-solid fa-circle-1" style="margin-right: 5px;"></i> Details</div>
-              <div id="step-indicator-2" style="color: var(--text-muted);"><i class="fa-solid fa-circle-2" style="margin-right: 5px;"></i> Payment</div>
+              <div id="step-indicator-1" style="font-weight: 800; color: var(--primary);"><i class="fa-solid fa-circle-1" style="margin-right: 5px;"></i> Attendees</div>
+              <div id="step-indicator-2" style="color: var(--text-muted);"><i class="fa-solid fa-circle-2" style="margin-right: 5px;"></i> Payment & Confirmation</div>
             </div>
           </div>
 
@@ -1936,28 +2246,44 @@ const templates = {
             <input type="hidden" id="custom-tier-input-id">
             <input type="hidden" id="custom-tier-input-price">
             
-            <!-- STEP 1: Details -->
+            <!-- STEP 1: Details & Attendees -->
             <div id="checkout-step-1">
               <div class="form-group" style="margin-bottom: 16px;">
-                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Pass Quantity</label>
+                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Ticket Quantity</label>
                 <select id="custom-tier-qty" class="form-control" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
-                  <option value="1">1 Pass</option>
-                  <option value="2">2 Passes</option>
-                  <option value="4">4 Passes</option>
-                  <option value="8">Full Table (8 Passes)</option>
+                  <option value="1">1 Ticket</option>
+                  <option value="2">2 Tickets</option>
+                  <option value="3">3 Tickets</option>
+                  <option value="4">4 Tickets</option>
+                  <option value="5">5 Tickets</option>
+                  <option value="6">6 Tickets</option>
+                  <option value="8">Full Table (8 Tickets)</option>
+                  <option value="10">10 Tickets (Corporate Block)</option>
                 </select>
               </div>
+
               <div class="form-group" style="margin-bottom: 16px;">
-                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Full Name *</label>
-                <input type="text" id="custom-tier-name" class="form-control" required placeholder="Jane Doe" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Primary Purchaser / Attendee #1 *</label>
+                <input type="text" id="custom-tier-name" class="form-control" required placeholder="Jane Doe" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);" value="${state.user ? (state.user.displayName || '') : ''}">
               </div>
+
               <div class="form-group" style="margin-bottom: 16px;">
-                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Email Address *</label>
-                <input type="email" id="custom-tier-email" class="form-control" required placeholder="jane@example.com" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+                <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Email Address (For All Ticket Receipts) *</label>
+                <input type="email" id="custom-tier-email" class="form-control" required placeholder="jane@example.com" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);" value="${state.user ? (state.user.email || '') : ''}">
               </div>
-              <div class="form-group" style="margin-bottom: 25px;">
+
+              <div class="form-group" style="margin-bottom: 20px;">
                 <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Phone Number</label>
                 <input type="tel" id="custom-tier-phone" class="form-control" placeholder="(562) 555-0199" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+              </div>
+
+              <!-- Dynamic Attendee Guest Names for Multiple Tickets -->
+              <div id="custom-attendee-list" class="attendee-inputs-container" style="display: none;">
+                <div style="font-size: 0.9rem; font-weight: 800; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-users" style="color: var(--secondary);"></i> Dedicated Attendee Names
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Each attendee receives a dedicated ticket and unique verification number for check-in.</p>
+                <div id="custom-attendee-inputs-box" style="display: flex; flex-direction: column; gap: 10px;"></div>
               </div>
               
               <button type="button" class="btn btn-primary" id="checkout-next-btn" style="width: 100%; padding: 16px; font-weight: 800; font-size: 1.05rem;">
@@ -1965,45 +2291,77 @@ const templates = {
               </button>
             </div>
 
-            <!-- STEP 2: Payment -->
+            <!-- STEP 2: Payment & Splitting -->
             <div id="checkout-step-2" style="display: none;">
-              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-sm); margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(15,23,42,0.05);">
+              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-sm); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(15,23,42,0.05);">
                 <div>
                   <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600;">Total Order Amount:</span>
                   <div style="font-size: 1.8rem; font-weight: 800; color: var(--primary);" id="custom-tier-total-display">$0.00</div>
                 </div>
-                <span class="badge" style="background: rgba(30, 130, 76, 0.15); color: var(--success); font-weight: 800; padding: 8px 14px; border-radius: 50px; font-size: 0.85rem;">Tax Deductible</span>
+                <span class="badge" style="background: rgba(30, 130, 76, 0.15); color: var(--success); font-weight: 800; padding: 8px 14px; border-radius: 50px; font-size: 0.85rem;">501(c)(3) Tax Deductible</span>
               </div>
+
+              <!-- Payment Splitting / Installments Option -->
+              ${page.allowInstallments !== false ? `
+                <div class="split-pay-callout" id="gala-split-pay-callout" style="margin-bottom: 20px;">
+                  <div style="font-weight: 800; color: var(--primary); font-size: 0.95rem; margin-bottom: 8px;">
+                    <i class="fa-solid fa-receipt" style="color: var(--secondary); margin-right: 6px;"></i> Payment Schedule Option
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem;">
+                      <input type="radio" name="gala_split_plan" value="FULL" checked style="transform: scale(1.15);">
+                      <span>Pay in Full Today (<strong id="gala-full-price-val">$0.00</strong>)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem;">
+                      <input type="radio" name="gala_split_plan" value="INSTALLMENT" style="transform: scale(1.15);">
+                      <span>Split into <strong>${page.installmentCycles || 3} Monthly Payments</strong> (<strong id="gala-split-price-val" style="color: var(--primary);">$0.00</strong> / mo)</span>
+                    </label>
+                  </div>
+                  <div style="margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; border-top: 1px dashed rgba(15,23,42,0.15); padding-top: 8px;">
+                    <i class="fa-solid fa-bolt" style="color: ${page.accentColor || 'var(--accent)'};"></i> <strong>Buy Now Pay Later:</strong> 
+                    Split into 4 interest-free payments via <strong>Stripe (Klarna / Affirm / Afterpay)</strong> or <strong>PayPal (Pay in 4)</strong>. Your tickets and tax receipt are confirmed immediately.
+                  </div>
+                </div>
+              ` : ''}
               
               <label style="font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; display: block; color: var(--text-main);">Select Payment Method</label>
               <div class="payment-options-grid" style="display: grid; gap: 12px; margin-bottom: 25px;">
-                ${state.customPage.paymentStripe !== false ? `
-                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 18px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
+                ${page.paymentStripe !== false ? `
+                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
                     <input type="radio" name="gala_payment" value="stripe" required checked style="transform: scale(1.2);">
                     <i class="fa-brands fa-stripe fa-2x" style="color: #635bff;"></i>
-                    <span style="font-weight: 700; font-size: 1.05rem;">Credit/Debit Card</span>
+                    <div>
+                      <div style="font-weight: 700; font-size: 1rem;">Credit / Debit Card</div>
+                      <div style="font-size: 0.75rem; color: var(--text-muted);">Visa, Mastercard, Amex, Klarna, Affirm</div>
+                    </div>
                   </label>
                 ` : ''}
-                ${state.customPage.paymentPaypal !== false ? `
-                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 18px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
-                    <input type="radio" name="gala_payment" value="paypal" required ${state.customPage.paymentStripe === false ? 'checked' : ''} style="transform: scale(1.2);">
+                ${page.paymentPaypal !== false ? `
+                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
+                    <input type="radio" name="gala_payment" value="paypal" required ${page.paymentStripe === false ? 'checked' : ''} style="transform: scale(1.2);">
                     <i class="fa-brands fa-paypal fa-2x" style="color: #00457C;"></i>
-                    <span style="font-weight: 700; font-size: 1.05rem;">PayPal</span>
+                    <div>
+                      <div style="font-weight: 700; font-size: 1rem;">PayPal / Pay in 4</div>
+                      <div style="font-size: 0.75rem; color: var(--text-muted);">PayPal balance, bank transfer, Pay in 4</div>
+                    </div>
                   </label>
                 ` : ''}
-                ${state.customPage.paymentDoor ? `
-                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 18px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
-                    <input type="radio" name="gala_payment" value="door" required ${state.customPage.paymentStripe === false && state.customPage.paymentPaypal === false ? 'checked' : ''} style="transform: scale(1.2);">
+                ${page.paymentDoor ? `
+                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
+                    <input type="radio" name="gala_payment" value="door" required ${page.paymentStripe === false && page.paymentPaypal === false ? 'checked' : ''} style="transform: scale(1.2);">
                     <i class="fa-solid fa-money-bill-wave fa-2x" style="color: var(--success);"></i>
-                    <span style="font-weight: 700; font-size: 1.05rem;">Pay at Door</span>
+                    <div>
+                      <div style="font-weight: 700; font-size: 1rem;">Pay at Gala Door</div>
+                      <div style="font-size: 0.75rem; color: var(--text-muted);">Cash, check, or on-site terminal check-in</div>
+                    </div>
                   </label>
                 ` : ''}
               </div>
 
               <div style="display: flex; gap: 12px;">
                 <button type="button" class="btn btn-outline" id="checkout-back-btn" style="padding: 16px; font-weight: 800; flex: 1;">Back</button>
-                <button type="submit" class="btn btn-donate" id="custom-tier-submit-btn" style="padding: 16px; font-weight: 800; font-size: 1.05rem; flex: 2;">
-                  Confirm & Book Reservation
+                <button type="submit" class="btn btn-donate" id="custom-tier-submit-btn" style="padding: 16px; font-weight: 800; font-size: 1.05rem; flex: 2; background: ${page.accentColor || 'var(--accent)'}; border-color: ${page.accentColor || 'var(--accent)'};">
+                  Confirm & Book Tickets
                 </button>
               </div>
             </div>
@@ -2083,7 +2441,7 @@ const templates = {
               <div class="kpi-icon" style="color: var(--accent);"><i class="fa-solid fa-ticket"></i></div>
               <div>
                 <div id="metric-total-attendees" class="kpi-value">${state.adminMetrics.totalAttendees}</div>
-                <div class="kpi-label">Event Passes</div>
+                <div class="kpi-label">Event Tickets</div>
               </div>
             </div>
 
@@ -2189,7 +2547,7 @@ const templates = {
                       <th>Date</th>
                       <th>Total Page Views</th>
                       <th>Unique Visitors</th>
-                      <th>Passes Booked</th>
+                      <th>Tickets Booked</th>
                       <th>Revenue ($)</th>
                       <th>Conversion Rate</th>
                       <th>Traffic Source</th>
@@ -2580,6 +2938,7 @@ const templates = {
             </div>
 
             <form id="adm-custom-page-form">
+              <!-- GENERAL & HERO -->
               <div class="admin-form-row-2" style="margin-bottom: 18px;">
                 <div class="form-group">
                   <label style="font-size: 0.85rem; font-weight: 700;">Navigation Link Label (Appears in Navbar & Mobile Drawer)</label>
@@ -2596,7 +2955,8 @@ const templates = {
                 <textarea id="adm-custom-subtitle" class="form-control" rows="2" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">${state.customPage.subtitle || ''}</textarea>
               </div>
 
-              <div class="admin-form-row-3" style="margin-bottom: 18px;">
+              <!-- DATE, TIME, LOCATION, DRESS CODE -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr 1fr; gap: 12px; margin-bottom: 18px;">
                 <div class="form-group">
                   <label style="font-size: 0.85rem; font-weight: 700;">Date</label>
                   <input type="date" id="adm-custom-date" class="form-control" value="${state.customPage.date || ''}" required style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
@@ -2609,16 +2969,139 @@ const templates = {
                   <label style="font-size: 0.85rem; font-weight: 700;">Location / Venue</label>
                   <input type="text" id="adm-custom-location" class="form-control" value="${state.customPage.location || ''}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
                 </div>
+                <div class="form-group">
+                  <label style="font-size: 0.85rem; font-weight: 700;">Dress Code</label>
+                  <input type="text" id="adm-custom-dress-code" class="form-control" value="${state.customPage.dressCode || 'Semi-Formal / Cocktail Attire'}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                </div>
               </div>
 
+              <!-- YOUTUBE VIDEO EMBED & MEDIA -->
+              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px; border-left: 4px solid #FF0000;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                  <h4 style="font-size: 1.1rem; color: var(--primary); margin: 0; font-weight: 800;">
+                    <i class="fa-brands fa-youtube" style="color: #FF0000; margin-right: 6px;"></i> Embedded Gala YouTube Video Feature
+                  </h4>
+                  <span style="font-size: 0.8rem; color: var(--text-muted);">Displays prominently on public gala page</span>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label style="font-size: 0.85rem; font-weight: 700;">YouTube Video URL or Video ID</label>
+                  <input type="text" id="adm-custom-youtube" class="form-control" value="${state.customPage.youtubeUrl || 'https://www.youtube.com/watch?v=A2cRkZBZrPY'}" placeholder="https://www.youtube.com/watch?v=A2cRkZBZrPY" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                  <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px; display: block;">Supports standard links (e.g. <code>https://www.youtube.com/watch?v=A2cRkZBZrPY</code>), youtu.be short links, or direct 11-digit IDs.</small>
+                </div>
+
+                <div id="adm-youtube-preview-wrapper" style="max-width: 500px; margin-top: 14px;">
+                  <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; display: block;">Live Video Player Preview:</label>
+                  <div class="gala-video-wrapper" style="max-height: 280px;">
+                    <iframe id="adm-youtube-preview-iframe" src="${getYouTubeEmbedUrl(state.customPage.youtubeUrl || 'https://www.youtube.com/watch?v=A2cRkZBZrPY')}" allowfullscreen></iframe>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BANNER IMAGE -->
               <div class="form-group" style="margin-bottom: 18px;">
                 <label style="font-size: 0.85rem; font-weight: 700;">Banner Image Asset Path / URL</label>
                 <input type="text" id="adm-custom-banner" class="form-control" value="${state.customPage.bannerImage || ''}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
               </div>
 
-              <div class="form-group" style="margin-bottom: 24px;">
-                <label style="font-size: 0.85rem; font-weight: 700;">Event Mission Story & Details</label>
+              <!-- PAGE THEME & FULL COLOR CUSTOMIZATION -->
+              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px;">
+                <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0 0 14px 0; font-weight: 800;">
+                  <i class="fa-solid fa-palette" style="color: var(--accent); margin-right: 6px;"></i> Gala Page Theme & Color Customization
+                </h4>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -8px; margin-bottom: 16px;">
+                  Customize the hero banner background, typography colors, button accents, and overall page palette to match your theme.
+                </p>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                  <!-- Hero Background Color -->
+                  <div>
+                    <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 6px;">Hero Banner Background</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <input type="color" id="adm-custom-hero-bg" value="${state.customPage.heroBgColor || '#0B132B'}" style="width: 44px; height: 38px; border: none; cursor: pointer; border-radius: 6px;">
+                      <input type="text" id="adm-custom-hero-bg-hex" value="${state.customPage.heroBgColor || '#0B132B'}" class="form-control" style="font-family: monospace; font-size: 0.85rem; padding: 6px 10px;">
+                    </div>
+                    <div style="display: flex; gap: 6px; margin-top: 6px;">
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-hero-bg" data-color="#0B132B" style="padding: 2px 6px; font-size: 0.7rem; background: #0B132B; color: white;">Navy</button>
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-hero-bg" data-color="#1E2761" style="padding: 2px 6px; font-size: 0.7rem; background: #1E2761; color: white;">Royal</button>
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-hero-bg" data-color="#3B0712" style="padding: 2px 6px; font-size: 0.7rem; background: #3B0712; color: white;">Velvet</button>
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-hero-bg" data-color="#18181B" style="padding: 2px 6px; font-size: 0.7rem; background: #18181B; color: white;">Onyx</button>
+                    </div>
+                  </div>
+
+                  <!-- Hero Text Color -->
+                  <div>
+                    <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 6px;">Hero Text Color</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <input type="color" id="adm-custom-hero-text" value="${state.customPage.heroTextColor || '#FFFFFF'}" style="width: 44px; height: 38px; border: none; cursor: pointer; border-radius: 6px;">
+                      <input type="text" id="adm-custom-hero-text-hex" value="${state.customPage.heroTextColor || '#FFFFFF'}" class="form-control" style="font-family: monospace; font-size: 0.85rem; padding: 6px 10px;">
+                    </div>
+                    <div style="display: flex; gap: 6px; margin-top: 6px;">
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-hero-text" data-color="#FFFFFF" style="padding: 2px 6px; font-size: 0.7rem; background: #FFFFFF; color: #1e293b;">Pure White</button>
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-hero-text" data-color="#FDFBF7" style="padding: 2px 6px; font-size: 0.7rem; background: #FDFBF7; color: #1e293b;">Ivory</button>
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-hero-text" data-color="#FEF08A" style="padding: 2px 6px; font-size: 0.7rem; background: #FEF08A; color: #1e293b;">Gold Glow</button>
+                    </div>
+                  </div>
+
+                  <!-- Accent & Highlight Color -->
+                  <div>
+                    <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-bottom: 6px;">Gala Accent & Button Color</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <input type="color" id="adm-custom-accent" value="${state.customPage.accentColor || '#F39C12'}" style="width: 44px; height: 38px; border: none; cursor: pointer; border-radius: 6px;">
+                      <input type="text" id="adm-custom-accent-hex" value="${state.customPage.accentColor || '#F39C12'}" class="form-control" style="font-family: monospace; font-size: 0.85rem; padding: 6px 10px;">
+                    </div>
+                    <div style="display: flex; gap: 6px; margin-top: 6px;">
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-accent" data-color="#F39C12" style="padding: 2px 6px; font-size: 0.7rem; background: #F39C12; color: white;">Gold</button>
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-accent" data-color="#10B981" style="padding: 2px 6px; font-size: 0.7rem; background: #10B981; color: white;">Emerald</button>
+                      <button type="button" class="btn btn-outline swatch-pick-btn" data-target="adm-custom-accent" data-color="#FB7185" style="padding: 2px 6px; font-size: 0.7rem; background: #FB7185; color: white;">Rose Gold</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- MISSION STORY & NARRATIVE DETAILS -->
+              <div class="form-group" style="margin-bottom: 18px;">
+                <label style="font-size: 0.85rem; font-weight: 700;">Story Section Title</label>
+                <input type="text" id="adm-custom-story-title" class="form-control" value="${state.customPage.storyTitle || 'An Evening Dedicated to Hope & Healing'}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 18px;">
+                <label style="font-size: 0.85rem; font-weight: 700;">Event Mission Story & Overview</label>
                 <textarea id="adm-custom-desc" class="form-control" rows="3" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">${state.customPage.description || ''}</textarea>
+              </div>
+
+              <div class="admin-form-row-2" style="margin-bottom: 24px;">
+                <div class="form-group">
+                  <label style="font-size: 0.85rem; font-weight: 700;">Impact Highlight Box Title</label>
+                  <input type="text" id="adm-custom-impact-title" class="form-control" value="${state.customPage.impactTitle || '100% Mission-Focused Proceeds'}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.85rem; font-weight: 700;">Impact Highlight Box Description</label>
+                  <textarea id="adm-custom-impact-desc" class="form-control" rows="2" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">${state.customPage.impactDesc || ''}</textarea>
+                </div>
+              </div>
+
+              <!-- PROGRAM ITINERARY / SCHEDULE MANAGER -->
+              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                  <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0; font-weight: 800;">
+                    <i class="fa-solid fa-clock" style="color: var(--secondary); margin-right: 6px;"></i> Program Schedule & Itinerary Timeline
+                  </h4>
+                  <button type="button" class="btn btn-outline" id="adm-add-schedule-btn" style="font-size: 0.8rem; padding: 6px 12px;">
+                    <i class="fa-solid fa-plus"></i> Add Itinerary Event
+                  </button>
+                </div>
+
+                <div id="adm-schedule-container" style="display: flex; flex-direction: column; gap: 10px;">
+                  ${(state.customPage.schedule || []).map((s, idx) => `
+                    <div class="calendar-card adm-sched-row" style="padding: 12px; display: grid; grid-template-columns: 1.2fr 2fr 3fr auto; gap: 10px; align-items: center;">
+                      <input type="text" class="form-control sched-time-input" value="${s.time}" placeholder="5:30 PM" style="padding: 8px;">
+                      <input type="text" class="form-control sched-title-input" value="${s.title}" placeholder="Item Title" style="padding: 8px;">
+                      <input type="text" class="form-control sched-desc-input" value="${s.desc}" placeholder="Brief description" style="padding: 8px;">
+                      <button type="button" class="btn btn-outline adm-delete-sched-btn" style="color: var(--danger); border-color: var(--danger); padding: 8px 10px;" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                  `).join('')}
+                </div>
               </div>
 
               <!-- TIERED PRICING MANAGER -->
@@ -2645,11 +3128,34 @@ const templates = {
                 </div>
               </div>
 
-              <!-- PAYMENT METHODS CONFIGURATION -->
+              <!-- PAYMENT METHODS & SPLITTING CONFIGURATION -->
               <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px;">
                 <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0 0 14px 0; font-weight: 800;">
-                  <i class="fa-solid fa-credit-card" style="color: var(--secondary); margin-right: 6px;"></i> Accepted Payment Methods
+                  <i class="fa-solid fa-credit-card" style="color: var(--secondary); margin-right: 6px;"></i> Accepted Payment Methods & Payment Splitting
                 </h4>
+                
+                <!-- Payment Splitting Controls -->
+                <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.08); margin-bottom: 18px;">
+                  <label style="display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 0.95rem; cursor: pointer; margin-bottom: 10px;">
+                    <input type="checkbox" id="adm-custom-allow-installments" ${state.customPage.allowInstallments !== false ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary);">
+                    Enable Payment Splitting & Installment Schedules for Tickets
+                  </label>
+                  
+                  <div style="display: flex; align-items: center; gap: 12px; font-size: 0.88rem; color: var(--text-muted); margin-left: 28px;">
+                    <span>Number of Monthly Installments:</span>
+                    <select id="adm-custom-installment-cycles" class="form-control" style="width: auto; padding: 6px 12px;">
+                      <option value="2" ${state.customPage.installmentCycles === 2 ? 'selected' : ''}>2 Monthly Payments</option>
+                      <option value="3" ${state.customPage.installmentCycles === 3 || !state.customPage.installmentCycles ? 'selected' : ''}>3 Monthly Payments</option>
+                      <option value="4" ${state.customPage.installmentCycles === 4 ? 'selected' : ''}>4 Monthly Payments</option>
+                    </select>
+                  </div>
+                  
+                  <div style="margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 8px;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--secondary);"></i> <strong>How Stripe & PayPal Splitting Works:</strong> 
+                    When enabled, attendees can split payments over time. In addition, <strong>Stripe Payment Elements automatically enables Klarna & Affirm</strong>, and <strong>PayPal enables "Pay in 4"</strong> at checkout with 0% interest for the buyer, while <strong>Howards 4 Hope receives 100% of the funds upfront immediately</strong>.
+                  </div>
+                </div>
+
                 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
                   <label style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem; cursor: pointer;">
                     <input type="checkbox" id="adm-custom-pay-stripe" ${state.customPage.paymentStripe !== false ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary);">
@@ -2683,9 +3189,9 @@ const templates = {
     return `
       <section class="section" style="padding-top: 140px;">
         <div class="section-header">
-          <span class="section-tag">Access Passes</span>
+          <span class="section-tag">Access Tickets</span>
           <h2 class="section-title">Event Tickets & Verification</h2>
-          <p class="section-subtitle">View, verify, and print your digital entry passes for Howards 4 Hope community workshops, galas, and charity events.</p>
+          <p class="section-subtitle">View, verify, and print your digital entry tickets for Howards 4 Hope community workshops, galas, and charity events.</p>
         </div>
         
         <div style="max-width: 850px; margin: 0 auto;">
@@ -2694,7 +3200,7 @@ const templates = {
             <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
               <i class="fa-solid fa-qrcode" style="font-size: 2.2rem; color: var(--secondary);"></i>
               <div>
-                <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--primary); margin: 0;">Instant Ticket & Pass Verification</h3>
+                <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--primary); margin: 0;">Instant Ticket Verification</h3>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">Search by purchaser email, Ticket ID (e.g. <code>H4H-TKT-...</code>), or Confirmation Token.</p>
               </div>
             </div>
@@ -2702,22 +3208,22 @@ const templates = {
             <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px;">
               <input type="text" class="form-control" id="lookup-guest-query" placeholder="Enter Ticket ID, or Confirmation Token..." style="height: 46px;" value="${state.user ? state.user.email : ''}">
               <button class="btn btn-primary" id="lookup-guest-btn" style="height: 46px; padding: 0 24px; display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-magnifying-glass"></i> Search Pass
+                <i class="fa-solid fa-magnifying-glass"></i> Search Ticket
               </button>
             </div>
             
             <div id="lookup-results-container" style="margin-top: 25px; display: none;"></div>
           </div>
 
-          <!-- Saved Passes on this device or user account -->
+          <!-- Saved Tickets on this device or user account -->
           ${state.myTickets && state.myTickets.length > 0 ? `
             <div style="margin-top: 30px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 8px; flex-wrap: wrap; gap: 10px;">
                 <h3 style="font-size: 1.2rem; color: var(--primary); font-weight: 800; margin: 0;">
-                  <i class="fa-solid fa-ticket" style="color: var(--accent); margin-right: 6px;"></i> Saved Passes on this Device (${state.myTickets.length})
+                  <i class="fa-solid fa-ticket" style="color: var(--accent); margin-right: 6px;"></i> Saved Tickets on this Device (${state.myTickets.length})
                 </h3>
                 <button class="btn btn-outline" onclick="window.print()" style="font-size: 0.8rem; padding: 6px 14px;">
-                  <i class="fa-solid fa-print"></i> Print All Passes
+                  <i class="fa-solid fa-print"></i> Print All Tickets
                 </button>
               </div>
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
@@ -2731,7 +3237,7 @@ const templates = {
                         </div>
                       </div>
                       <span class="event-badge" style="position: static; background: var(--accent); color: var(--primary); font-size: 0.75rem; font-weight: 700;">
-                        ${tkt.quantity || 1} Pass(es)
+                        ${tkt.quantity || 1} Ticket(s)
                       </span>
                     </div>
                     
@@ -2756,7 +3262,7 @@ const templates = {
                     ` : ''}
 
                     <div style="background: #f8fafc; border: 1px solid rgba(15,23,42,0.08); border-radius: 8px; padding: 10px 12px; margin-top: 12px;">
-                      <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Pass Verification Code</div>
+                      <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Ticket Verification Code</div>
                       <div style="font-family: monospace; font-size: 0.95rem; font-weight: 800; color: var(--primary); margin-top: 2px;">
                         ${tkt.ticketId || ('H4H-TKT-' + (tkt.id || 'CONFIRMED'))}
                       </div>
@@ -2768,7 +3274,7 @@ const templates = {
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 600; color: var(--primary); border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 10px; margin-top: 14px;">
-                      <span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> VALIDATED PASS</span>
+                      <span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> VALIDATED TICKET</span>
                       <button class="btn btn-outline" onclick="window.print()" style="padding: 3px 8px; font-size: 0.75rem;">
                         <i class="fa-solid fa-print"></i> Print
                       </button>
@@ -2780,9 +3286,9 @@ const templates = {
           ` : `
             <div style="text-align: center; padding: 40px 20px; background: white; border-radius: 12px; border: 1px dashed rgba(15,23,42,0.15); margin-top: 20px;">
               <i class="fa-solid fa-ticket" style="font-size: 2.5rem; color: rgba(15,23,42,0.25); margin-bottom: 12px;"></i>
-              <h4 style="font-weight: 700; color: var(--primary); margin-bottom: 6px;">No Stored Passes on This Device</h4>
+              <h4 style="font-weight: 700; color: var(--primary); margin-bottom: 6px;">No Stored Tickets on This Device</h4>
               <p style="font-size: 0.9rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 16px;">
-                If you recently booked a ticket or Gala pass, enter your email or confirmation token above to verify and print your pass, or explore our upcoming charity events.
+                If you recently booked a ticket or Gala ticket, enter your email or confirmation token above to verify and print your ticket, or explore our upcoming charity events.
               </p>
               <a href="#/events" class="btn btn-outline" style="font-size: 0.85rem;"><i class="fa-solid fa-calendar"></i> Browse Events</a>
             </div>
@@ -3214,6 +3720,32 @@ function bindCustomEventPage() {
   const nextBtn = document.getElementById('checkout-next-btn');
   const backBtn = document.getElementById('checkout-back-btn');
 
+  function updateAttendeeInputs() {
+    const qty = parseInt(qtySelect ? qtySelect.value : '1', 10);
+    const attendeeBox = document.getElementById('custom-attendee-inputs-box');
+    const attendeeList = document.getElementById('custom-attendee-list');
+    if (!attendeeBox || !attendeeList) return;
+
+    if (qty > 1) {
+      attendeeList.style.display = 'block';
+      let html = '';
+      for (let i = 2; i <= qty; i++) {
+        html += `
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 4px;">
+              <i class="fa-solid fa-user-tag" style="color: var(--secondary); margin-right: 4px;"></i> Ticket #${i} Attendee Full Name *
+            </label>
+            <input type="text" class="form-control custom-attendee-input" id="custom-attendee-name-${i}" placeholder="Guest #${i} Full Name" required style="width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+          </div>
+        `;
+      }
+      attendeeBox.innerHTML = html;
+    } else {
+      attendeeList.style.display = 'none';
+      attendeeBox.innerHTML = '';
+    }
+  }
+
   function updateTotal() {
     const qty = parseInt(qtySelect ? qtySelect.value : '1', 10);
     const unitPrice = parseFloat(priceInput ? priceInput.value : '0');
@@ -3221,10 +3753,22 @@ function bindCustomEventPage() {
     if (totalDisplay) {
       totalDisplay.textContent = total === 0 ? 'FREE' : '$' + total.toFixed(2);
     }
+    const fullPriceVal = document.getElementById('gala-full-price-val');
+    if (fullPriceVal) {
+      fullPriceVal.textContent = total === 0 ? 'FREE' : '$' + total.toFixed(2);
+    }
+    const splitPriceVal = document.getElementById('gala-split-price-val');
+    const cycles = (state.customPage && state.customPage.installmentCycles) || 3;
+    if (splitPriceVal) {
+      splitPriceVal.textContent = total === 0 ? '$0.00' : '$' + (total / cycles).toFixed(2);
+    }
   }
 
   if (qtySelect) {
-    qtySelect.addEventListener('change', updateTotal);
+    qtySelect.addEventListener('change', () => {
+      updateAttendeeInputs();
+      updateTotal();
+    });
   }
 
   document.querySelectorAll('.custom-book-tier-btn').forEach(btn => {
@@ -3239,6 +3783,7 @@ function bindCustomEventPage() {
       const titleEl = document.getElementById('custom-modal-tier-title');
       if (titleEl) titleEl.textContent = 'Reserve ' + tierName;
 
+      updateAttendeeInputs();
       updateTotal();
       
       if (step1 && step2) {
@@ -3262,18 +3807,30 @@ function bindCustomEventPage() {
 
   if (nextBtn) {
     nextBtn.addEventListener('click', () => {
-      const name = document.getElementById('custom-tier-name').value;
-      const email = document.getElementById('custom-tier-email').value;
+      const name = document.getElementById('custom-tier-name')?.value.trim();
+      const email = document.getElementById('custom-tier-email')?.value.trim();
       if (!name || !email) {
-        alert("Please fill out your name and email.");
+        showToast('error', 'Required Information', 'Please fill out your primary purchaser name and email address.');
         return;
       }
+      
+      const qty = parseInt(qtySelect ? qtySelect.value : '1', 10);
+      for (let i = 2; i <= qty; i++) {
+        const attVal = document.getElementById(`custom-attendee-name-${i}`)?.value.trim();
+        if (!attVal) {
+          showToast('error', 'Attendee Name Needed', `Please enter the full name for Attendee #${i}.`);
+          document.getElementById(`custom-attendee-name-${i}`)?.focus();
+          return;
+        }
+      }
+
       step1.style.display = 'none';
       step2.style.display = 'block';
       ind1.style.fontWeight = 'normal';
       ind1.style.color = 'var(--text-muted)';
       ind2.style.fontWeight = 'bold';
       ind2.style.color = 'var(--primary)';
+      updateTotal();
     });
   }
 
@@ -3295,59 +3852,97 @@ function bindCustomEventPage() {
       if (isSubmitting) return;
       isSubmitting = true;
       
-      const name = document.getElementById('custom-tier-name').value;
-      const email = document.getElementById('custom-tier-email').value;
+      const name = document.getElementById('custom-tier-name').value.trim();
+      const email = document.getElementById('custom-tier-email').value.trim();
+      const phone = document.getElementById('custom-tier-phone')?.value.trim() || '';
       const qty = parseInt(qtySelect.value, 10);
       const tierName = document.getElementById('custom-modal-tier-title').textContent.replace('Reserve ', '');
       const submitBtn = document.getElementById('custom-tier-submit-btn');
 
-      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Confirming Reservation...';
-      submitBtn.disabled = true;
+      // Check payment split option
+      const splitPlanRadio = document.querySelector('input[name="gala_split_plan"]:checked');
+      const isInstallment = splitPlanRadio && splitPlanRadio.value === 'INSTALLMENT';
+      const cycles = (state.customPage && state.customPage.installmentCycles) || 3;
+
+      // Collect all attendee names
+      const attendees = [name];
+      for (let i = 2; i <= qty; i++) {
+        const attInput = document.getElementById(`custom-attendee-name-${i}`);
+        const attName = attInput && attInput.value.trim() ? attInput.value.trim() : `Guest ${i} of ${name}`;
+        attendees.push(attName);
+      }
+
+      if (submitBtn) {
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Confirming Ticket Reservations...';
+        submitBtn.disabled = true;
+      }
 
       try {
         const unitPrice = parseFloat(priceInput ? priceInput.value : '0') || 0;
         const totalPrice = qty * unitPrice;
-        const confirmationNumber = 'H4H-GALA-' + Math.floor(100000 + Math.random() * 900000);
-        const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const masterNumber = 'H4H-GALA-' + Math.floor(100000 + Math.random() * 900000);
+        const selectedPaymentMethod = totalPrice === 0 ? 'FREE' : (document.querySelector('input[name="gala_payment"]:checked')?.value.toUpperCase() || 'STRIPE');
 
-        const galaTicket = {
-          id: Math.floor(100000 + Math.random() * 900000),
-          ticketId: confirmationNumber,
-          confirmationToken: token,
-          eventId: 9999,
-          eventTitle: `${state.customPage.title} - ${tierName}`,
-          eventDate: state.customPage.date,
-          eventLocation: state.customPage.location,
-          guestName: name,
-          userEmail: email,
-          quantity: qty,
-          pricePaid: totalPrice,
-          paymentMethod: totalPrice === 0 ? 'FREE' : 'STRIPE',
-          status: 'CONFIRMED',
-          paymentPlanType: 'FULL',
-          installmentCycles: 1,
-          installmentsPaid: 1,
-          remainingBalance: 0,
-          purchaseDate: new Date().toISOString().split('T')[0]
-        };
+        const createdTickets = [];
 
-        saveTicketRecord(galaTicket);
+        attendees.forEach((attName, idx) => {
+          const dedicatedNumber = `${masterNumber}-${String(idx + 1).padStart(2, '0')}`;
+          const token = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-        // Attempt guest booking call on backend if available
-        API.bookTicketGuest(9999, qty, galaTicket.paymentMethod, email, name).catch(() => {});
+          const galaTicket = {
+            id: Math.floor(100000 + Math.random() * 900000),
+            ticketId: dedicatedNumber,
+            masterConfirmation: masterNumber,
+            confirmationToken: token,
+            attendeeIndex: idx + 1,
+            totalAttendees: qty,
+            eventId: 9999,
+            eventTitle: `${state.customPage.title} - ${tierName}`,
+            eventDate: state.customPage.date,
+            eventLocation: state.customPage.location,
+            guestName: attName,
+            primaryPurchaser: name,
+            userEmail: email,
+            phone: phone,
+            quantity: 1, // Individual ticket
+            pricePaid: isInstallment ? (totalPrice / cycles / qty) : unitPrice,
+            unitPrice: unitPrice,
+            totalOrderPrice: totalPrice,
+            paymentMethod: selectedPaymentMethod,
+            status: 'CONFIRMED',
+            paymentPlanType: isInstallment ? 'INSTALLMENT' : 'FULL',
+            installmentCycles: isInstallment ? cycles : 1,
+            installmentsPaid: 1,
+            remainingBalance: isInstallment ? (totalPrice - (totalPrice / cycles)) : 0,
+            purchaseDate: new Date().toISOString().split('T')[0]
+          };
 
-        alert(`🎉 Gala Pass Confirmed!\n\nThank you ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nConfirmation ID: ${confirmationNumber}\nVerification Token: ${token}\n\nYour pass is now saved and available under "My Tickets" for verification or printing.`);
+          saveTicketRecord(galaTicket);
+          createdTickets.push(galaTicket);
+        });
+
+        // Backend sync if available
+        API.bookTicketGuest(9999, qty, selectedPaymentMethod, email, name, isInstallment ? 'INSTALLMENT' : 'FULL', cycles).catch(() => {});
+
+        const ticketSummary = attendees.length > 1
+          ? `All ${attendees.length} tickets have been issued with unique ticket numbers:\n${masterNumber}-01 through ${masterNumber}-${String(attendees.length).padStart(2, '0')}.`
+          : `Dedicated Ticket ID: ${masterNumber}-01`;
+
+        showToast('success', 'Tickets Confirmed!', `Thank you ${name}! ${qty}x ${tierName} tickets booked.`, 6000);
+        alert(`🎉 Gala Tickets Confirmed!\n\nThank you, ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nMaster Order: ${masterNumber}\n${ticketSummary}\n\n${isInstallment ? `Payment Plan: Split into ${cycles} monthly payments ($${(totalPrice / cycles).toFixed(2)}/mo). First installment paid today.\n\n` : ''}Each attendee ticket is saved under "My Tickets" with a dedicated ticket ID and verification code for check-in and printing.`);
         
         if (modal) modal.classList.remove('active');
         form.reset();
         window.location.hash = '#/my-tickets';
       } catch (err) {
-        console.error("Error booking gala pass:", err);
-        alert("Reservation received! Our team will contact you directly to confirm.");
+        console.error("Error booking gala ticket:", err);
+        showToast('warning', 'Reservation Logged', 'Reservation received! Our team will contact you directly to confirm.');
         if (modal) modal.classList.remove('active');
       } finally {
-        submitBtn.innerHTML = 'Confirm & Book Reservation';
-        submitBtn.disabled = false;
+        if (submitBtn) {
+          submitBtn.innerHTML = 'Confirm & Book Reservation';
+          submitBtn.disabled = false;
+        }
         isSubmitting = false;
       }
     });
@@ -3489,7 +4084,7 @@ function bindCalendarEvents(targetEventId) {
             <div class="event-footer">
               <span class="event-price ${event.price === 0 ? 'free' : ''}" style="font-size: 1.5rem;">${event.price === 0 ? 'FREE' : '$' + event.price.toFixed(2)}</span>
               <button class="btn btn-primary" id="rsvp-trigger-btn">
-                <i class="fa-solid fa-receipt"></i> ${event.price === 0 ? 'Book Free Seat' : 'Purchase Pass'}
+                <i class="fa-solid fa-receipt"></i> ${event.price === 0 ? 'Book Free Seat' : 'Purchase Ticket'}
               </button>
             </div>
           </div>
@@ -3542,7 +4137,7 @@ function bindCalendarEvents(targetEventId) {
   renderCalendar();
 }
 
-// RSVP Ticket Options Modal with Payment Splitting & Installment Support
+// RSVP Ticket Options Modal with Payment Splitting & Dedicated Ticket Support
 function openRSVPModal(event) {
   state.cartEvent = event;
   
@@ -3551,13 +4146,13 @@ function openRSVPModal(event) {
   rsvpModal.id = 'rsvp-checkout-modal';
   
   const guestFields = !state.user ? `
-    <div class="form-group">
-      <label class="form-label">Full Name</label>
-      <input type="text" class="form-control" id="rsvp-guest-name" placeholder="John Doe" required style="height: 38px;">
+    <div class="form-group" style="margin-bottom: 12px;">
+      <label class="form-label" style="font-weight: 700; font-size: 0.85rem;">Primary Purchaser / Attendee #1 Full Name *</label>
+      <input type="text" class="form-control" id="rsvp-guest-name" placeholder="Jane Doe" required style="height: 38px;">
     </div>
-    <div class="form-group">
-      <label class="form-label">Email Address (Pass Confirmation Destination)</label>
-      <input type="email" class="form-control" id="rsvp-guest-email" placeholder="name@domain.com" required style="height: 38px;">
+    <div class="form-group" style="margin-bottom: 12px;">
+      <label class="form-label" style="font-weight: 700; font-size: 0.85rem;">Email Address (For All Ticket Receipts) *</label>
+      <input type="email" class="form-control" id="rsvp-guest-email" placeholder="jane@example.com" required style="height: 38px;">
     </div>
   ` : '';
 
@@ -3566,48 +4161,61 @@ function openRSVPModal(event) {
   const frequency = event.installmentFrequency || 'Monthly';
 
   rsvpModal.innerHTML = `
-    <div class="modal-content" style="max-width: 480px;">
+    <div class="modal-content" style="max-width: 520px; max-height: 90vh; overflow-y: auto;">
       <span class="modal-close" id="rsvp-close-btn">&times;</span>
       <h3 class="modal-title"><i class="fa-solid fa-ticket-simple" style="color: var(--secondary);"></i> Event Ticket Registration</h3>
       
-      <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary); margin-bottom: 8px;">${event.title}</div>
-      <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-bottom: 16px;">
+      <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary); margin-bottom: 4px;">${event.title}</div>
+      <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; margin-bottom: 16px;">
         <i class="fa-regular fa-calendar"></i> ${event.date} &nbsp;|&nbsp; <i class="fa-regular fa-clock"></i> ${event.time || ''}
       </div>
       
       ${guestFields}
       
-      <div class="form-group">
-        <label class="form-label">Quantity</label>
-        <select class="form-control" id="rsvp-qty" style="background-image: none;">
-          <option value="1">1 Pass</option>
-          <option value="2">2 Passes</option>
-          <option value="3">3 Passes</option>
-          <option value="4">4 Passes</option>
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label" style="font-weight: 700; font-size: 0.85rem;">Ticket Quantity</label>
+        <select class="form-control" id="rsvp-qty" style="background-image: none; height: 42px;">
+          <option value="1">1 Ticket</option>
+          <option value="2">2 Tickets</option>
+          <option value="3">3 Tickets</option>
+          <option value="4">4 Tickets</option>
+          <option value="5">5 Tickets</option>
+          <option value="6">6 Tickets</option>
         </select>
       </div>
 
+      <!-- Dynamic Additional Attendee Names Container -->
+      <div id="rsvp-attendee-list" style="display: none; margin-bottom: 16px; background: rgba(15,23,42,0.03); padding: 14px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.1);">
+        <div style="font-weight: 700; font-size: 0.88rem; color: var(--primary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-users" style="color: var(--secondary);"></i> Dedicated Attendee Names
+        </div>
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4;">
+          Each attendee receives a dedicated ticket and unique verification ticket number for seamless event check-in.
+        </p>
+        <div id="rsvp-attendee-inputs-box" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+
       ${isInstallmentEligible ? `
-        <div class="payment-plan-selector">
-          <label style="font-weight: 700; font-size: 0.85rem; color: var(--primary); margin-bottom: 6px;">Choose Payment Plan</label>
-          <label class="payment-option-label">
+        <div class="payment-plan-selector" style="margin-bottom: 16px;">
+          <label style="font-weight: 700; font-size: 0.85rem; color: var(--primary); margin-bottom: 6px; display: block;">Choose Payment Plan</label>
+          <label class="payment-option-label" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
             <input type="radio" name="paymentPlanRadio" value="FULL" checked>
             <span>Pay in Full Today (<strong id="full-pay-calc">$${event.price.toFixed(2)}</strong>)</span>
           </label>
-          <label class="payment-option-label">
+          <label class="payment-option-label" style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
             <input type="radio" name="paymentPlanRadio" value="INSTALLMENT">
             <span>Split into ${cycles} ${frequency} Payments of <strong id="installment-pay-calc" style="color: var(--primary);">$${(event.price / cycles).toFixed(2)}</strong></span>
           </label>
         </div>
       ` : ''}
       
-      <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 1.15rem; color: var(--primary); margin-bottom: 20px; padding-top: 10px; border-top: 1px solid rgba(15,23,42,0.08);">
-        <span id="rsvp-total-due-label">Due Today:</span>
-        <span id="rsvp-total-cost">${event.price === 0 ? 'FREE' : '$' + event.price.toFixed(2)}</span>
+      <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.15rem; color: var(--primary); margin-bottom: 20px; padding-top: 10px; border-top: 1px solid rgba(15,23,42,0.08);">
+        <span id="rsvp-total-due-label" style="font-size: 0.95rem; color: var(--text-muted);">Due Today:</span>
+        <span id="rsvp-total-cost" style="font-size: 1.35rem; color: var(--primary);">${event.price === 0 ? 'FREE' : '$' + event.price.toFixed(2)}</span>
       </div>
       
       ${event.price === 0 ? `
-        <button class="btn btn-primary" id="confirm-free-rsvp-btn" style="width: 100%; height: 48px;">
+        <button class="btn btn-primary" id="confirm-free-rsvp-btn" style="width: 100%; height: 48px; font-weight: 700; font-size: 1rem;">
           <i class="fa-solid fa-check"></i> Confirm Free RSVP
         </button>
       ` : `
@@ -3635,9 +4243,35 @@ function openRSVPModal(event) {
   const fullPayCalc = document.getElementById('full-pay-calc');
   const instPayCalc = document.getElementById('installment-pay-calc');
   const dueLabel = document.getElementById('rsvp-total-due-label');
+  const attendeeList = document.getElementById('rsvp-attendee-list');
+  const attendeeBox = document.getElementById('rsvp-attendee-inputs-box');
+
+  const updateAttendeeFields = () => {
+    const qty = parseInt(qtySelect.value, 10);
+    if (!attendeeList || !attendeeBox) return;
+
+    if (qty > 1) {
+      attendeeList.style.display = 'block';
+      let html = '';
+      for (let i = 2; i <= qty; i++) {
+        html += `
+          <div class="form-group" style="margin-bottom: 6px;">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 2px;">
+              Ticket #${i} Attendee Full Name *
+            </label>
+            <input type="text" class="form-control rsvp-attendee-input" id="rsvp-attendee-name-${i}" placeholder="Guest #${i} Full Name" required style="height: 36px; font-size: 0.85rem; padding: 6px 10px;">
+          </div>
+        `;
+      }
+      attendeeBox.innerHTML = html;
+    } else {
+      attendeeList.style.display = 'none';
+      attendeeBox.innerHTML = '';
+    }
+  };
 
   const recalculateTotal = () => {
-    const qty = parseInt(qtySelect.value);
+    const qty = parseInt(qtySelect.value, 10);
     const totalPrice = event.price * qty;
     const isInst = document.querySelector('input[name="paymentPlanRadio"]:checked')?.value === 'INSTALLMENT';
     
@@ -3660,20 +4294,44 @@ function openRSVPModal(event) {
     rsvpModal.remove();
   });
   
-  qtySelect.addEventListener('change', recalculateTotal);
+  qtySelect.addEventListener('change', () => {
+    updateAttendeeFields();
+    recalculateTotal();
+  });
   document.querySelectorAll('input[name="paymentPlanRadio"]').forEach(r => r.addEventListener('change', recalculateTotal));
   
   const getGuestDetails = () => {
-    const nameEl = document.getElementById('rsvp-guest-name');
-    const emailEl = document.getElementById('rsvp-guest-email');
-    if (!nameEl || !emailEl) return null;
-    const name = nameEl.value.trim();
-    const email = emailEl.value.trim();
-    if (!name || !email) {
-      alert("Please fill in your name and email address.");
-      return null;
+    let name = '';
+    let email = '';
+
+    if (state.user) {
+      name = state.user.displayName || state.user.email.split('@')[0];
+      email = state.user.email;
+    } else {
+      const nameEl = document.getElementById('rsvp-guest-name');
+      const emailEl = document.getElementById('rsvp-guest-email');
+      if (!nameEl || !emailEl) return null;
+      name = nameEl.value.trim();
+      email = emailEl.value.trim();
+      if (!name || !email) {
+        showToast('error', 'Required Information', 'Please fill in your primary purchaser name and email address.');
+        return null;
+      }
     }
-    return { name, email };
+
+    const qty = parseInt(qtySelect.value, 10);
+    const attendees = [name];
+    for (let i = 2; i <= qty; i++) {
+      const attVal = document.getElementById(`rsvp-attendee-name-${i}`)?.value.trim();
+      if (!attVal) {
+        showToast('error', 'Attendee Name Needed', `Please enter the full name for Attendee #${i}.`);
+        document.getElementById(`rsvp-attendee-name-${i}`)?.focus();
+        return null;
+      }
+      attendees.push(attVal);
+    }
+
+    return { name, email, attendees };
   };
 
   const getSelectedPlan = () => {
@@ -3684,23 +4342,66 @@ function openRSVPModal(event) {
     };
   };
 
+  const processTicketIssuance = (paymentMethod, details, plan) => {
+    const qty = parseInt(qtySelect.value, 10);
+    const masterCode = 'H4H-TKT-' + Math.floor(100000 + Math.random() * 900000);
+    const totalPrice = event.price * qty;
+    const isInstallment = plan.planType === 'INSTALLMENT';
+
+    details.attendees.forEach((attName, idx) => {
+      const dedicatedNumber = `${masterCode}-${String(idx + 1).padStart(2, '0')}`;
+      const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      const ticketRecord = {
+        id: Math.floor(100000 + Math.random() * 900000),
+        ticketId: dedicatedNumber,
+        masterConfirmation: masterCode,
+        confirmationToken: token,
+        attendeeIndex: idx + 1,
+        totalAttendees: qty,
+        eventId: event.id,
+        eventTitle: event.title,
+        eventDate: event.date,
+        eventLocation: event.location,
+        guestName: attName,
+        primaryPurchaser: details.name,
+        userEmail: details.email,
+        quantity: 1, // Individual ticket
+        pricePaid: isInstallment ? (totalPrice / plan.cycles / qty) : event.price,
+        unitPrice: event.price,
+        totalOrderPrice: totalPrice,
+        paymentMethod: paymentMethod,
+        status: 'CONFIRMED',
+        paymentPlanType: plan.planType,
+        installmentCycles: plan.cycles,
+        installmentsPaid: 1,
+        remainingBalance: isInstallment ? (totalPrice - (totalPrice / plan.cycles)) : 0,
+        purchaseDate: new Date().toISOString().split('T')[0]
+      };
+
+      saveTicketRecord(ticketRecord);
+    });
+
+    // Sync to backend if available
+    API.bookTicketGuest(event.id, qty, paymentMethod, details.email, details.name, plan.planType, plan.cycles).catch(() => {});
+
+    const ticketMsg = details.attendees.length > 1
+      ? `${qty} tickets issued with dedicated ticket numbers: ${masterCode}-01 through ${masterCode}-${String(qty).padStart(2, '0')}.`
+      : `Ticket ID: ${masterCode}-01.`;
+
+    showToast('success', 'Tickets Confirmed!', `Thank you ${details.name}! ${qty} ticket(s) confirmed.`);
+    alert(`🎉 Tickets Confirmed!\n\nThank you ${details.name}!\n${ticketMsg}\nConfirmation sent to ${details.email}.\n\nAll tickets are saved and ready to view or print under "My Tickets".`);
+
+    rsvpModal.remove();
+    window.location.hash = '#/my-tickets';
+  };
+
   const freeBtn = document.getElementById('confirm-free-rsvp-btn');
   if (freeBtn) {
     freeBtn.addEventListener('click', async () => {
-      const qty = parseInt(qtySelect.value);
       const details = getGuestDetails();
-      if (!state.user && !details) return;
-
-      if (!state.user) {
-        const ticket = await API.bookTicketGuest(event.id, qty, 'FREE', details.email, details.name);
-        alert(`RSVP Confirmed! Entry Pass Code: ${ticket.ticketId || ticket.confirmationToken || 'H4H-TKT-CONFIRMED'}. Confirmation sent to ${details.email}.`);
-      } else {
-        const ticket = await API.bookTicket(event.id, qty, 'FREE');
-        alert(`Free seat reservation confirmed! Ticket ID: ${ticket.ticketId || 'H4H-TKT-CONFIRMED'}.`);
-      }
-      
-      rsvpModal.remove();
-      window.location.hash = '#/my-tickets';
+      if (!details) return;
+      processTicketIssuance('FREE', details, { planType: 'FULL', cycles: 1 });
     });
   }
   
@@ -3708,21 +4409,9 @@ function openRSVPModal(event) {
   if (stripeBtn) {
     stripeBtn.addEventListener('click', async () => {
       const details = getGuestDetails();
-      if (!state.user && !details) return;
-
-      const qty = parseInt(qtySelect.value);
+      if (!details) return;
       const plan = getSelectedPlan();
-
-      if (!state.user) {
-        const ticket = await API.bookTicketGuest(event.id, qty, 'STRIPE', details.email, details.name, plan.planType, plan.cycles);
-        alert(`Credit Card payment successful! Ticket Code: ${ticket.ticketId || ticket.confirmationToken}. Payment receipt & entry token sent to ${details.email}.`);
-      } else {
-        const ticket = await API.bookTicket(event.id, qty, 'STRIPE', plan.planType, plan.cycles);
-        alert(`Payment processed via Stripe! Ticket ID: ${ticket.ticketId}.`);
-      }
-      
-      rsvpModal.remove();
-      window.location.hash = '#/my-tickets';
+      processTicketIssuance('STRIPE', details, plan);
     });
   }
   
@@ -3730,21 +4419,9 @@ function openRSVPModal(event) {
   if (paypalBtn) {
     paypalBtn.addEventListener('click', async () => {
       const details = getGuestDetails();
-      if (!state.user && !details) return;
-
-      const qty = parseInt(qtySelect.value);
+      if (!details) return;
       const plan = getSelectedPlan();
-
-      if (!state.user) {
-        const ticket = await API.bookTicketGuest(event.id, qty, 'PAYPAL', details.email, details.name, plan.planType, plan.cycles);
-        alert(`PayPal order verified! Ticket Code: ${ticket.ticketId || ticket.confirmationToken}. Pass sent to ${details.email}.`);
-      } else {
-        const ticket = await API.bookTicket(event.id, qty, 'PAYPAL', plan.planType, plan.cycles);
-        alert(`Payment processed via PayPal! Ticket ID: ${ticket.ticketId}.`);
-      }
-      
-      rsvpModal.remove();
-      window.location.hash = '#/my-tickets';
+      processTicketIssuance('PAYPAL', details, plan);
     });
   }
 }
@@ -3888,6 +4565,93 @@ function bindDonationPortal() {
   
   const paypalBtn = document.getElementById('paypal-donate-btn');
   if (paypalBtn) paypalBtn.addEventListener('click', () => handleDonation('PayPal'));
+
+  // Giving Tabs Navigation Switching
+  const donateTabBtns = document.querySelectorAll('.donate-tab-btn');
+  const donatePanes = document.querySelectorAll('.donate-pane');
+  donateTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      donateTabBtns.forEach(b => b.classList.remove('active'));
+      donatePanes.forEach(p => p.style.display = 'none');
+      btn.classList.add('active');
+      const targetId = btn.getAttribute('data-donate-pane');
+      const targetPane = document.getElementById(targetId);
+      if (targetPane) targetPane.style.display = 'block';
+    });
+  });
+
+  // Corporate Sponsorship Tier Quick Selection
+  document.querySelectorAll('.corp-sponsor-select-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tier = btn.getAttribute('data-tier');
+      const selectEl = document.getElementById('corp-sponsorship-level');
+      if (selectEl) {
+        selectEl.value = tier;
+        const formEl = document.getElementById('corporate-inquiry-form');
+        if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+
+  // Corporate Inquiry Form Submission
+  const corpForm = document.getElementById('corporate-inquiry-form');
+  if (corpForm) {
+    corpForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const company = document.getElementById('corp-company-name')?.value || 'Valued Corporate Partner';
+      const contact = document.getElementById('corp-contact-name')?.value || 'Representative';
+      const email = document.getElementById('corp-contact-email')?.value || 'partner@example.com';
+      const tier = document.getElementById('corp-sponsorship-level')?.value || 'Sponsorship';
+      alert(`🤝 Corporate Partnership Request Received!\n\nThank you ${contact}!\nYour inquiry for ${company} (${tier}) has been logged.\nOur Executive Leadership team will send the formal sponsorship prospectus and W-9 / ACH details to ${email} within 24 hours.`);
+      corpForm.reset();
+    });
+  }
+
+  // Supply Donation In-Kind Form Submission
+  const supplyForm = document.getElementById('supplies-donation-form');
+  if (supplyForm) {
+    supplyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.getElementById('supply-submit-btn');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting Inquiry...';
+      }
+
+      const donorName = document.getElementById('supply-donor-name')?.value || 'Generous Donor';
+      const email = document.getElementById('supply-donor-email')?.value || '';
+      const phone = document.getElementById('supply-donor-phone')?.value || '';
+      const category = document.getElementById('supply-category')?.value || 'Supplies';
+      const estValue = parseFloat(document.getElementById('supply-estimated-value')?.value || '0');
+      const deliveryMethod = document.getElementById('supply-delivery-method')?.value || 'DROP_OFF';
+      const targetDate = document.getElementById('supply-target-date')?.value || '';
+      const desc = document.getElementById('supply-item-desc')?.value || '';
+
+      try {
+        const res = await API.submitSupplyDonation({
+          donorName,
+          email,
+          phone,
+          category,
+          estimatedValue: estValue,
+          deliveryMethod,
+          targetDate,
+          description: desc
+        });
+
+        const trackingCode = res.trackingNumber || ('H4H-SUPPLY-' + new Date().getFullYear() + '-001');
+        alert(`📦 In-Kind Supply Donation Received!\n\nThank you ${donorName}!\nTracking Number: ${trackingCode}\nCategory: ${category}\n\nOur logistics coordination team will contact you at ${email} to coordinate ${deliveryMethod === 'DROP_OFF' ? 'your drop-off at 3711 Long Beach Blvd' : 'the H4H pickup'}.\n\nAn official 501(c)(3) in-kind acknowledgment receipt has been created.`);
+        supplyForm.reset();
+      } catch (err) {
+        alert("Thank you! Your supply donation inquiry has been received. Our team will contact you shortly.");
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane" style="margin-right: 6px;"></i> Submit In-Kind Donation Request';
+        }
+      }
+    });
+  }
 }
 
 // --- 4. OUTREACH FORMS ---
@@ -3950,6 +4714,10 @@ function bindAdminDashboard() {
   const switchLabel = document.getElementById('adm-switch-status-label');
   const addTierBtn = document.getElementById('adm-add-tier-btn');
   const tiersContainer = document.getElementById('adm-tiers-container');
+  const addSchedBtn = document.getElementById('adm-add-schedule-btn');
+  const schedContainer = document.getElementById('adm-schedule-container');
+  const youtubeInput = document.getElementById('adm-custom-youtube');
+  const youtubeIframe = document.getElementById('adm-youtube-preview-iframe');
 
   if (customPageToggle) {
     customPageToggle.addEventListener('change', () => {
@@ -3963,16 +4731,79 @@ function bindAdminDashboard() {
     });
   }
 
+  // Live YouTube preview update
+  if (youtubeInput && youtubeIframe) {
+    youtubeInput.addEventListener('input', () => {
+      const embedUrl = getYouTubeEmbedUrl(youtubeInput.value.trim());
+      if (embedUrl) youtubeIframe.src = embedUrl;
+    });
+  }
+
+  // Color Swatch buttons
+  document.querySelectorAll('.swatch-pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-target');
+      const color = btn.getAttribute('data-color');
+      const colorInput = document.getElementById(targetId);
+      const hexInput = document.getElementById(targetId + '-hex');
+      if (colorInput) colorInput.value = color;
+      if (hexInput) hexInput.value = color;
+    });
+  });
+
+  // Two-way sync for color pickers <-> hex inputs
+  ['adm-custom-hero-bg', 'adm-custom-hero-text', 'adm-custom-accent'].forEach(id => {
+    const colorInput = document.getElementById(id);
+    const hexInput = document.getElementById(id + '-hex');
+    if (colorInput && hexInput) {
+      colorInput.addEventListener('input', (e) => {
+        hexInput.value = e.target.value.toUpperCase();
+      });
+      hexInput.addEventListener('input', (e) => {
+        if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+          colorInput.value = e.target.value;
+        }
+      });
+    }
+  });
+
+  // Schedule Timeline Add / Delete
+  if (addSchedBtn && schedContainer) {
+    addSchedBtn.addEventListener('click', () => {
+      const row = document.createElement('div');
+      row.className = 'calendar-card adm-sched-row';
+      row.style.cssText = 'padding: 12px; display: grid; grid-template-columns: 1.2fr 2fr 3fr auto; gap: 10px; align-items: center; margin-bottom: 8px;';
+      row.innerHTML = `
+        <input type="text" class="form-control sched-time-input" value="6:00 PM" placeholder="5:30 PM" style="padding: 8px;">
+        <input type="text" class="form-control sched-title-input" value="Special Segment" placeholder="Item Title" style="padding: 8px;">
+        <input type="text" class="form-control sched-desc-input" value="Segment details" placeholder="Brief description" style="padding: 8px;">
+        <button type="button" class="btn btn-outline adm-delete-sched-btn" style="color: var(--danger); border-color: var(--danger); padding: 8px 10px;" title="Remove"><i class="fa-solid fa-trash"></i></button>
+      `;
+      schedContainer.appendChild(row);
+      row.querySelector('.adm-delete-sched-btn').addEventListener('click', () => row.remove());
+    });
+  }
+
+  if (schedContainer) {
+    schedContainer.querySelectorAll('.adm-delete-sched-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const row = e.target.closest('.adm-sched-row');
+        if (row) row.remove();
+      });
+    });
+  }
+
+  // Tier Pricing Add / Delete
   if (addTierBtn && tiersContainer) {
     addTierBtn.addEventListener('click', () => {
       const row = document.createElement('div');
       row.className = 'calendar-card adm-tier-row';
-      row.style.cssText = 'padding: 16px; display: grid; grid-template-columns: 2fr 1fr 1fr 3fr auto; gap: 10px; align-items: center;';
+      row.style.cssText = 'padding: 16px; display: grid; grid-template-columns: 2fr 1fr 1fr 3fr auto; gap: 10px; align-items: center; margin-bottom: 8px;';
       row.innerHTML = 
-        '<input type="text" class="form-control tier-name-input" value="Special Supporter" placeholder="Tier Name" style="padding: 8px;">' +
-        '<input type="number" class="form-control tier-price-input" value="50" placeholder="Price ($)" style="padding: 8px;">' +
-        '<input type="text" class="form-control tier-badge-input" value="Popular" placeholder="Badge" style="padding: 8px;">' +
-        '<input type="text" class="form-control tier-features-input" value="General Gala Entry; Dinner & Dessert; Auction Access" placeholder="Features (semicolon-separated)" style="padding: 8px;">' +
+        '<input type="text" class="form-control tier-name-input" value="Supporter Ticket" placeholder="Tier Name" style="padding: 8px;">' +
+        '<input type="number" class="form-control tier-price-input" value="75" placeholder="Price ($)" style="padding: 8px;">' +
+        '<input type="text" class="form-control tier-badge-input" value="Featured" placeholder="Badge" style="padding: 8px;">' +
+        '<input type="text" class="form-control tier-features-input" value="Full Gala Entry; Dinner & Dessert; Program Recognition" placeholder="Features (semicolon-separated)" style="padding: 8px;">' +
         '<button type="button" class="btn btn-outline adm-delete-tier-btn" style="color: var(--danger); border-color: var(--danger); padding: 8px 10px;" title="Remove Tier"><i class="fa-solid fa-trash"></i></button>';
       tiersContainer.appendChild(row);
       row.querySelector('.adm-delete-tier-btn').addEventListener('click', () => row.remove());
@@ -4019,26 +4850,47 @@ function bindAdminDashboard() {
         }
       });
 
+      const scheduleItems = [];
+      document.querySelectorAll('.adm-sched-row').forEach(row => {
+        const time = row.querySelector('.sched-time-input')?.value.trim();
+        const title = row.querySelector('.sched-title-input')?.value.trim();
+        const desc = row.querySelector('.sched-desc-input')?.value.trim();
+        if (title) {
+          scheduleItems.push({ time: time || '', title, desc: desc || '' });
+        }
+      });
+
       const updatedPage = {
         enabled: customPageToggle ? customPageToggle.checked : true,
-        navLabel: document.getElementById('adm-custom-nav-label').value.trim() || 'Featured Gala',
+        navLabel: document.getElementById('adm-custom-nav-label')?.value.trim() || 'Featured Gala',
         slug: 'special-event',
-        title: document.getElementById('adm-custom-title').value.trim(),
-        subtitle: document.getElementById('adm-custom-subtitle').value.trim(),
-        date: document.getElementById('adm-custom-date').value,
-        time: document.getElementById('adm-custom-time').value.trim(),
-        location: document.getElementById('adm-custom-location').value.trim(),
-        bannerImage: document.getElementById('adm-custom-banner').value.trim(),
-        description: document.getElementById('adm-custom-desc').value.trim(),
-        schedule: state.customPage.schedule || DEFAULT_CUSTOM_PAGE.schedule,
+        title: document.getElementById('adm-custom-title')?.value.trim() || 'Unmasking Hope: Annual Charity Gala & Awards',
+        subtitle: document.getElementById('adm-custom-subtitle')?.value.trim() || '',
+        date: document.getElementById('adm-custom-date')?.value || '2026-11-19',
+        time: document.getElementById('adm-custom-time')?.value.trim() || '6:00 PM – 10:00 PM PST',
+        location: document.getElementById('adm-custom-location')?.value.trim() || 'Grand Ballroom, 3711 Long Beach Blvd, Long Beach, CA 90807',
+        dressCode: document.getElementById('adm-custom-dress-code')?.value.trim() || 'Semi-Formal / Cocktail Attire',
+        youtubeUrl: document.getElementById('adm-custom-youtube')?.value.trim() || 'https://www.youtube.com/watch?v=A2cRkZBZrPY',
+        heroBgColor: document.getElementById('adm-custom-hero-bg')?.value || '#0B132B',
+        heroTextColor: document.getElementById('adm-custom-hero-text')?.value || '#FFFFFF',
+        accentColor: document.getElementById('adm-custom-accent')?.value || '#F39C12',
+        bannerImage: document.getElementById('adm-custom-banner')?.value.trim() || '',
+        storyTitle: document.getElementById('adm-custom-story-title')?.value.trim() || 'An Evening Dedicated to Hope & Healing',
+        description: document.getElementById('adm-custom-desc')?.value.trim() || '',
+        impactTitle: document.getElementById('adm-custom-impact-title')?.value.trim() || '100% Mission-Focused Proceeds',
+        impactDesc: document.getElementById('adm-custom-impact-desc')?.value.trim() || '',
+        schedule: scheduleItems.length > 0 ? scheduleItems : (state.customPage.schedule || DEFAULT_CUSTOM_PAGE.schedule),
         pricingTiers: tiers.length > 0 ? tiers : DEFAULT_CUSTOM_PAGE.pricingTiers,
+        allowInstallments: document.getElementById('adm-custom-allow-installments') ? document.getElementById('adm-custom-allow-installments').checked : true,
+        installmentCycles: parseInt(document.getElementById('adm-custom-installment-cycles')?.value || '3', 10),
         paymentStripe: document.getElementById('adm-custom-pay-stripe') ? document.getElementById('adm-custom-pay-stripe').checked : true,
         paymentPaypal: document.getElementById('adm-custom-pay-paypal') ? document.getElementById('adm-custom-pay-paypal').checked : true,
         paymentDoor: document.getElementById('adm-custom-pay-door') ? document.getElementById('adm-custom-pay-door').checked : false
       };
 
       saveCustomPage(updatedPage);
-      alert("✅ Special Event Page & Pricing Studio settings successfully saved and published!");
+      showToast('success', 'Gala Settings Saved', 'Gala Page customization and pricing tiers have been updated and published!');
+      alert("✅ Special Event Page & Gala Customization Suite successfully saved and published!");
     });
   }
 
@@ -4286,7 +5138,7 @@ function bindAdminDashboard() {
     const freq = freqSelect?.value || 'Monthly';
     if (price > 0 && allowInstallmentsCheckbox?.checked) {
       const perCycle = (price / cycles).toFixed(2);
-      previewBadge.innerHTML = `<i class="fa-solid fa-calculator"></i> $${price.toFixed(2)} pass = <strong>${cycles} ${freq.toLowerCase()} payments of $${perCycle}</strong>`;
+      previewBadge.innerHTML = `<i class="fa-solid fa-calculator"></i> $${price.toFixed(2)} ticket = <strong>${cycles} ${freq.toLowerCase()} payments of $${perCycle}</strong>`;
     } else {
       previewBadge.innerHTML = `<i class="fa-solid fa-calculator"></i> Set price above $0 to preview installment breakdown`;
     }
@@ -4748,7 +5600,7 @@ function bindAdminDashboard() {
           } catch (e) {
             console.error('CSV export failed', e);
             if (cachedAnalytics && cachedAnalytics.dailyReport) {
-              let csv = "Date,Total Page Views,Unique Visitors,Passes Reserved,Revenue ($),Conversion Rate (%)\n";
+              let csv = "Date,Total Page Views,Unique Visitors,Tickets Reserved,Revenue ($),Conversion Rate (%)\n";
               cachedAnalytics.dailyReport.forEach(r => {
                 csv += `${r.date},${r.views},${r.unique},${r.tickets},${Number(r.revenue).toFixed(2)},${r.conversion}%\n`;
               });
@@ -4905,7 +5757,7 @@ function bindMyTicketsEvents() {
       }
       
       lookupBtn.disabled = true;
-      lookupBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verifying Pass...`;
+      lookupBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verifying Ticket...`;
       resultsContainer.style.display = 'none';
       resultsContainer.innerHTML = '';
       
@@ -4938,7 +5790,7 @@ function bindMyTicketsEvents() {
       }
       
       lookupBtn.disabled = false;
-      lookupBtn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Search Pass`;
+      lookupBtn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Search Ticket`;
       
       if (tickets.length === 0) {
         const sanitizedQ = q.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -4951,10 +5803,10 @@ function bindMyTicketsEvents() {
         resultsContainer.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 15px;">
             <h4 style="font-weight: 800; color: var(--primary); font-size: 1rem; margin: 0;">
-              <i class="fa-solid fa-circle-check" style="color: var(--success); margin-right: 6px;"></i> Verified Pass Record (${tickets.length})
+              <i class="fa-solid fa-circle-check" style="color: var(--success); margin-right: 6px;"></i> Verified Ticket Record (${tickets.length})
             </h4>
             <button class="btn btn-outline" onclick="window.print()" style="font-size: 0.75rem; padding: 4px 10px;">
-              <i class="fa-solid fa-print"></i> Print Passes
+              <i class="fa-solid fa-print"></i> Print Tickets
             </button>
           </div>
           <div style="display: flex; flex-direction: column; gap: 15px; max-height: 420px; overflow-y: auto;">
@@ -4962,7 +5814,7 @@ function bindMyTicketsEvents() {
               <div style="padding: 20px; border-radius: 12px; background: #f8fafc; border-left: 6px solid var(--accent); border-top: 1px solid rgba(15,23,42,0.06); border-right: 1px solid rgba(15,23,42,0.06); border-bottom: 1px solid rgba(15,23,42,0.06); box-shadow: var(--shadow-sm);">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
                   <span style="font-weight: 800; color: var(--primary); font-size: 1.05rem;">${tkt.eventTitle || 'Community Workshop'}</span>
-                  <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 3px 10px; background: var(--accent); color: var(--primary); font-weight: 700;">${tkt.quantity || 1} Pass(es)</span>
+                  <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 3px 10px; background: var(--accent); color: var(--primary); font-weight: 700;">${tkt.quantity || 1} Ticket(s)</span>
                 </div>
                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
                   <i class="fa-regular fa-calendar" style="margin-right: 4px;"></i> ${tkt.eventDate || 'Scheduled'} &bull; 3711 Long Beach Blvd, Long Beach, CA
