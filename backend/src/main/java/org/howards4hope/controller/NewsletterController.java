@@ -92,4 +92,48 @@ public class NewsletterController {
         }
         return sanitized;
     }
+
+    @PostMapping("/admin/newsletter/import")
+    public ResponseEntity<?> importSubscribers(@RequestBody Map<String, Object> request) {
+        Object emailsObj = request.get("emails");
+        boolean sendWelcomeEmail = Boolean.TRUE.equals(request.get("sendWelcomeEmail"));
+
+        if (!(emailsObj instanceof List)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Expected 'emails' as a JSON array of strings"));
+        }
+
+        List<?> rawEmails = (List<?>) emailsObj;
+        int importedCount = 0;
+        int skippedCount = 0;
+
+        for (Object item : rawEmails) {
+            if (item == null) continue;
+            String email = item.toString().trim().toLowerCase();
+            if (email.isEmpty() || !email.contains("@") || !email.contains(".")) {
+                skippedCount++;
+                continue;
+            }
+            if (newsletterRepository.findByEmail(email).isPresent()) {
+                skippedCount++;
+                continue;
+            }
+            NewsletterSubscriber sub = new NewsletterSubscriber(email);
+            newsletterRepository.save(sub);
+            importedCount++;
+
+            if (sendWelcomeEmail) {
+                try {
+                    emailService.sendNewsletterWelcomeEmail(email);
+                } catch (Exception e) {
+                    System.out.println(">>> [NEWSLETTER IMPORT] Welcome email deferred for " + email + ": " + e.getMessage());
+                }
+            }
+        }
+
+        return ResponseEntity.ok().body(Map.of(
+            "imported", importedCount,
+            "skipped", skippedCount,
+            "total", rawEmails.size()
+        ));
+    }
 }

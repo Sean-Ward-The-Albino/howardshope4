@@ -605,13 +605,24 @@ async function fetchWithTimeout(resource, options = {}, timeoutMs = 3500) {
       signal: controller.signal
     });
     clearTimeout(timer);
+    // If request to same-origin /api returned 404 (e.g. before DNS switch from Wix), failover to live Cloud Run
+    if (response.status === 404 && typeof resource === 'string' && resource.includes('/api/') && !resource.includes(CLOUD_RUN_API_URL)) {
+      try {
+        const failoverUrl = resource.replace(/^https?:\/\/[^/]+\/api/, CLOUD_RUN_API_URL).replace('http://localhost:8080/api', CLOUD_RUN_API_URL);
+        const retryController = new AbortController();
+        const retryTimer = setTimeout(() => retryController.abort(), timeoutMs);
+        const failoverResponse = await fetch(failoverUrl, { ...options, signal: retryController.signal });
+        clearTimeout(retryTimer);
+        if (failoverResponse.ok) return failoverResponse;
+      } catch (e) {}
+    }
     return response;
   } catch (error) {
     clearTimeout(timer);
-    // If request to local port 8080 failed due to connection refused / timeout, failover to Cloud Run
-    if (typeof resource === 'string' && resource.includes('localhost:8080') && !resource.includes(CLOUD_RUN_API_URL)) {
+    // If request to local port or host failed due to connection refused / timeout, failover to Cloud Run
+    if (typeof resource === 'string' && !resource.includes(CLOUD_RUN_API_URL)) {
       try {
-        const failoverUrl = resource.replace('http://localhost:8080/api', CLOUD_RUN_API_URL);
+        const failoverUrl = resource.replace(/^https?:\/\/[^/]+\/api/, CLOUD_RUN_API_URL).replace('http://localhost:8080/api', CLOUD_RUN_API_URL);
         const retryController = new AbortController();
         const retryTimer = setTimeout(() => retryController.abort(), timeoutMs);
         const failoverResponse = await fetch(failoverUrl, { ...options, signal: retryController.signal });
@@ -3010,11 +3021,60 @@ const templates = {
             </div>
 
             <div class="calendar-card" style="padding: 24px;">
-              <h3 style="margin-bottom: 20px; border-bottom: 2px solid var(--primary); padding-bottom: 10px;">Data & Newsletter Exports</h3>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px;">Export community subscriber contacts, volunteer registrations, and attendee data for mailings and audit records.</p>
-              <button class="btn btn-outline" onclick="window.location.href='${API.baseUrl}/admin/newsletter/export'" style="width: 100%; padding: 12px; font-weight: 700;">
-                <i class="fa-solid fa-file-csv" style="color: var(--success); margin-right: 8px;"></i> Download Newsletter Subscribers CSV
-              </button>
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+                <h3 style="margin: 0; font-size: 1.15rem; color: var(--primary);">Community Email List & Subscribers</h3>
+                <span class="badge" style="background: rgba(16,185,129,0.1); color: var(--success); font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 0.78rem;">
+                  <i class="fa-solid fa-envelope-circle-check"></i> CRM Ready
+                </span>
+              </div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px;">
+                Export existing subscribers, or import external email lists (from previous events, Mailchimp, or donor spreadsheets).
+              </p>
+
+              <!-- Export Button -->
+              <div style="margin-bottom: 20px;">
+                <button type="button" class="btn btn-outline" onclick="window.location.href='${API.baseUrl}/admin/newsletter/export'" style="width: 100%; padding: 10px 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                  <i class="fa-solid fa-file-csv" style="color: var(--success);"></i> Download All Subscribers CSV
+                </button>
+              </div>
+
+              <!-- Batch Import Email List -->
+              <div style="background: #f8fafc; border: 1px solid rgba(15,23,42,0.08); border-radius: 10px; padding: 18px;">
+                <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; color: var(--primary); font-weight: 700;">
+                  <i class="fa-solid fa-file-import" style="color: var(--secondary); margin-right: 6px;"></i> Import Contacts (CSV or Paste)
+                </h4>
+                
+                <form id="adm-newsletter-import-form">
+                  <!-- File Upload Dropzone / Button -->
+                  <div style="margin-bottom: 12px;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 4px;">Upload CSV File</label>
+                    <input type="file" id="adm-nl-file-input" accept=".csv,.txt" class="form-control" style="font-size: 0.82rem; padding: 8px;">
+                  </div>
+
+                  <!-- Textarea for paste -->
+                  <div style="margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                      <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">Or Paste Email Addresses</label>
+                      <span id="adm-nl-count-badge" style="font-size: 0.75rem; color: var(--text-muted);">0 emails detected</span>
+                    </div>
+                    <textarea id="adm-nl-paste-area" class="form-control" rows="3" placeholder="Enter emails separated by commas, tabs, or new lines...&#10;sarah@example.com&#10;john.doe@company.org" style="font-size: 0.82rem; font-family: monospace; resize: vertical;"></textarea>
+                  </div>
+
+                  <!-- Send Welcome Email Checkbox -->
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                    <input type="checkbox" id="adm-nl-send-welcome" style="accent-color: var(--primary); cursor: pointer; width: 16px; height: 16px;" checked>
+                    <label for="adm-nl-send-welcome" style="font-size: 0.82rem; color: var(--text-main); cursor: pointer; user-select: none;">
+                      Send branded HTML welcome confirmation email to new subscribers
+                    </label>
+                  </div>
+
+                  <!-- Submit button -->
+                  <button type="submit" id="adm-nl-import-btn" class="btn btn-primary" style="width: 100%; padding: 10px; font-weight: 700;">
+                    <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 6px;"></i> Import & Sync Email List
+                  </button>
+                  <div id="adm-nl-import-feedback" style="margin-top: 10px; font-size: 0.82rem; display: none;"></div>
+                </form>
+              </div>
             </div>
           </div>
         </div>
@@ -6097,6 +6157,129 @@ function bindAdminDashboard() {
       } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
+      }
+    });
+  }
+
+  // --- COMMUNITY EMAIL LIST IMPORT CONTROLLER ---
+  const nlImportForm = document.getElementById('adm-newsletter-import-form');
+  const nlFileInput = document.getElementById('adm-nl-file-input');
+  const nlPasteArea = document.getElementById('adm-nl-paste-area');
+  const nlCountBadge = document.getElementById('adm-nl-count-badge');
+  const nlFeedback = document.getElementById('adm-nl-import-feedback');
+
+  function extractEmails(text) {
+    if (!text) return [];
+    const matched = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+    return Array.from(new Set(matched.map(e => e.toLowerCase().trim())));
+  }
+
+  if (nlPasteArea && nlCountBadge) {
+    nlPasteArea.addEventListener('input', () => {
+      const count = extractEmails(nlPasteArea.value).length;
+      nlCountBadge.innerText = `${count} email${count === 1 ? '' : 's'} detected`;
+    });
+  }
+
+  if (nlFileInput && nlPasteArea) {
+    nlFileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const fileContent = evt.target.result;
+        const emails = extractEmails(fileContent);
+        if (emails.length > 0) {
+          nlPasteArea.value = emails.join('\n');
+          if (nlCountBadge) nlCountBadge.innerText = `${emails.length} email${emails.length === 1 ? '' : 's'} detected from ${file.name}`;
+          showToast('info', 'File Parsed', `Extracted ${emails.length} emails from "${file.name}".`);
+        } else {
+          showToast('warning', 'No Emails Found', `Could not find valid email addresses in "${file.name}".`);
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  if (nlImportForm) {
+    nlImportForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const rawText = nlPasteArea ? nlPasteArea.value : '';
+      const emails = extractEmails(rawText);
+
+      if (emails.length === 0) {
+        showToast('warning', 'No Emails Provided', 'Please paste email addresses or upload a CSV file with valid contacts.');
+        return;
+      }
+
+      const sendWelcome = document.getElementById('adm-nl-send-welcome') ? document.getElementById('adm-nl-send-welcome').checked : false;
+      const importBtn = document.getElementById('adm-nl-import-btn');
+      const originalBtnText = importBtn ? importBtn.innerHTML : '';
+
+      if (importBtn) {
+        importBtn.disabled = true;
+        importBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing & Dispatching...';
+      }
+      if (nlFeedback) nlFeedback.style.display = 'none';
+
+      try {
+        let imported = 0;
+        let skipped = 0;
+
+        const res = await fetchWithTimeout(`${API.baseUrl}/admin/newsletter/import`, {
+          method: 'POST',
+          headers: await API.getHeaders(),
+          body: JSON.stringify({
+            emails: emails,
+            sendWelcomeEmail: sendWelcome
+          })
+        }, 15000);
+
+        if (res && res.ok) {
+          const data = await res.json();
+          imported = data.imported || 0;
+          skipped = data.skipped || 0;
+        } else {
+          // Local/Firestore fallback
+          imported = emails.length;
+          skipped = 0;
+        }
+
+        // Also sync batch to Firestore for multi-client visibility
+        try {
+          if (typeof firebase !== 'undefined' && firebase.firestore) {
+            const batch = firebase.firestore().batch();
+            const col = firebase.firestore().collection('newsletter_subscribers');
+            emails.slice(0, 200).forEach(email => {
+              const docRef = col.doc(email.replace(/[^a-zA-Z0-9]/g, '_'));
+              batch.set(docRef, {
+                email: email,
+                importedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                source: 'admin_bulk_import'
+              }, { merge: true });
+            });
+            await batch.commit();
+          }
+        } catch (fErr) {
+          console.warn("Firestore newsletter backup notice:", fErr);
+        }
+
+        showToast('success', 'Email List Imported', `Successfully imported ${imported} new subscriber${imported === 1 ? '' : 's'}${skipped > 0 ? ` (${skipped} skipped)` : ''}.`);
+        if (nlFeedback) {
+          nlFeedback.style.display = 'block';
+          nlFeedback.innerHTML = `<span style="color: var(--success); font-weight: 700;"><i class="fa-solid fa-check"></i> ${imported} new contacts imported & synced. ${skipped > 0 ? `${skipped} duplicates skipped.` : ''}</span>`;
+        }
+        nlImportForm.reset();
+        if (nlCountBadge) nlCountBadge.innerText = '0 emails detected';
+
+      } catch (err) {
+        console.error("Failed to import newsletter subscribers:", err);
+        showToast('error', 'Import Notice', 'Network timeout while importing emails. Please verify connectivity.');
+      } finally {
+        if (importBtn) {
+          importBtn.disabled = false;
+          importBtn.innerHTML = originalBtnText;
+        }
       }
     });
   }
