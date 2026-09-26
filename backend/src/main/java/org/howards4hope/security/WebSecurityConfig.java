@@ -21,7 +21,7 @@ import java.util.List;
 @EnableWebSecurity
 public class WebSecurityConfig {
 
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5500,http://127.0.0.1:5500,https://howards4hope-b06f6.web.app,https://howards4hope-b06f6.firebaseapp.com,https://howards4hope.org}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5000,http://localhost:5500,http://127.0.0.1:5000,http://127.0.0.1:5500,https://howards4hope-b06f6.web.app,https://howards4hope-b06f6.firebaseapp.com,https://howards4hope.org}")
     private String allowedOrigins;
 
     @Bean
