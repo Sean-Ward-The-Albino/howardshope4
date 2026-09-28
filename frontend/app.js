@@ -228,12 +228,13 @@ const DEFAULT_CUSTOM_PAGE = {
   pageBgColor: "#FFFFFF",
   savedColors: ["#0B132B", "#1E2761", "#F39C12", "#2563EB", "#10B981", "#3B0712", "#FFFFFF", "#18181B"],
   storyTitle: "An Evening Dedicated to Hope & Healing",
-  description: "The Unmasking Hope Annual Charity Gala is our signature event of the year, bringing together corporate partners, advocates, and families to celebrate our resilient community and secure vital funding for youth empowerment and caregiver respite services.",
+  description: "The Unmasking Hope Annual Charity Gala & Awards is our signature gathering of the year, bringing together corporate partners, community leaders, and devoted advocates to celebrate our resilient community and secure vital funding for families across Long Beach.\n\nThroughout this inspiring evening, we honor extraordinary caregivers who champion individuals with disabilities, spotlight youth scholarship recipients, and reflect on the milestones achieved through our community wellness, mentorship, and single-parent relief programs.\n\nTogether, our collective presence and generosity ensure that no caregiver walks alone, no child is denied life-changing educational opportunities, and every family in need is met with dignity, nourishment, and unwavering hope.",
   impactTitle: "100% Mission-Focused Proceeds",
   impactDesc: "Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency single-parent food security toolkits.",
   allowInstallments: true,
-  installmentCycles: 3,
-  installmentFrequency: "Monthly",
+  installmentCycles: 4,
+  splitInterval: "ALL",
+  installmentFrequency: "Bi-Weekly, Twice a Month, or Monthly",
   paymentStripe: true,
   paymentPaypal: true,
   paymentDoor: false,
@@ -315,6 +316,17 @@ function sanitizeHexColor(val, fallback = '#0B132B') {
     return clean.toUpperCase();
   }
   return fallback;
+}
+
+function formatStoryParagraphs(text, fallback = '') {
+  const content = (text && String(text).trim()) ? String(text).trim() : (fallback || '');
+  if (!content) return '';
+  if (content.includes('<p>') && content.includes('</p>')) {
+    return content;
+  }
+  const paras = content.split(/\r?\n+/).map(p => p.trim()).filter(Boolean);
+  if (paras.length === 0) return '';
+  return paras.map(p => `<p class="gala-story-paragraph" style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.85; margin: 0 0 16px 0;">${p}</p>`).join('');
 }
 
 function loadCustomPage() {
@@ -746,7 +758,15 @@ function renderGalaAttendeesTable(filterQuery = '', dietaryFilter = 'ALL') {
         </td>
         <td style="font-weight: 700; color: var(--success); font-size: 0.88rem;">
           $${price}
-          ${att.paymentPlanType === 'INSTALLMENT' ? `<div style="font-size: 0.7rem; color: var(--secondary); font-weight: 600;">(Installment)</div>` : ''}
+          ${att.paymentPlanLabel ? `
+            <div style="font-size: 0.72rem; color: var(--secondary); font-weight: 700; margin-top: 2px;">
+              <i class="fa-solid fa-clock-rotate-left"></i> ${att.paymentPlanLabel}
+            </div>
+          ` : (att.paymentPlanType && att.paymentPlanType !== 'FULL' ? `
+            <div style="font-size: 0.72rem; color: var(--secondary); font-weight: 700; margin-top: 2px;">
+              <i class="fa-solid fa-clock-rotate-left"></i> ${att.paymentPlanType}
+            </div>
+          ` : '')}
         </td>
         <td>
           ${hasAllergy ? `
@@ -792,10 +812,14 @@ function downloadGalaAttendeesCsv() {
     "Email Address",
     "Phone Number",
     "Ticket Tier / Type",
-    "Amount Paid ($)",
-    "Total Order ($)",
+    "Amount Paid Today ($)",
+    "Total Order Value ($)",
     "Payment Method",
-    "Payment Plan",
+    "Payment Plan Schedule",
+    "Payment Frequency",
+    "Per-Installment Amount ($)",
+    "Installment Cycles",
+    "Remaining Balance ($)",
     "Dietary Preference",
     "Food Allergy Details",
     "Has Dietary Alert",
@@ -809,6 +833,11 @@ function downloadGalaAttendeesCsv() {
     const hasAllergy = Boolean(item.hasAllergy) || (item.dietaryPreference && item.dietaryPreference !== 'Standard / No Restrictions') || Boolean(item.allergyNotes && item.allergyNotes !== 'None');
     const price = typeof item.pricePaid === 'number' ? item.pricePaid.toFixed(2) : (item.pricePaid || '0.00');
     const orderTotal = typeof item.totalOrderPrice === 'number' ? item.totalOrderPrice.toFixed(2) : price;
+    const planSchedule = item.paymentPlanLabel || item.paymentPlanType || 'Paid in Full';
+    const planFreq = item.installmentFrequency || (item.paymentPlanType === 'FULL' ? 'None (Full Today)' : 'Installment');
+    const installmentAmt = item.installmentAmount ? Number(item.installmentAmount).toFixed(2) : price;
+    const cycles = item.installmentCycles || 1;
+    const remBal = typeof item.remainingBalance === 'number' ? item.remainingBalance.toFixed(2) : (item.remainingBalance || '0.00');
 
     return [
       `"${(item.ticketId || '').replace(/"/g, '""')}"`,
@@ -820,7 +849,11 @@ function downloadGalaAttendeesCsv() {
       price,
       orderTotal,
       `"${(item.paymentMethod || 'STRIPE').replace(/"/g, '""')}"`,
-      `"${(item.paymentPlanType || 'FULL').replace(/"/g, '""')}"`,
+      `"${String(planSchedule).replace(/"/g, '""')}"`,
+      `"${String(planFreq).replace(/"/g, '""')}"`,
+      installmentAmt,
+      cycles,
+      remBal,
       `"${(item.dietaryPreference || 'Standard / No Restrictions').replace(/"/g, '""')}"`,
       `"${(item.allergyNotes || 'None').replace(/"/g, '""')}"`,
       hasAllergy ? 'YES' : 'NO',
@@ -2750,25 +2783,41 @@ const templates = {
           <div>
             <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">About The Gala</span>
             <h2 class="section-title" style="text-align: left; margin-bottom: 20px; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${page.storyTitle || 'An Evening Dedicated to Hope & Healing'}</h2>
-            <p style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.8; margin-bottom: 25px;">
-              ${page.description}
-            </p>
+            <div class="gala-story-paragraphs" style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 25px;">
+              ${formatStoryParagraphs(page.description, DEFAULT_CUSTOM_PAGE.description)}
+            </div>
             <div style="background: var(--bg-card); border-left: 4px solid ${page.accentColor || 'var(--accent)'}; padding: 20px; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); margin-bottom: 25px;">
               <h4 style="color: var(--primary); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-hand-holding-heart" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 6px;"></i> ${page.impactTitle || '100% Mission-Focused Proceeds'}</h4>
               <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">${page.impactDesc || 'Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency single-parent food security toolkits.'}</p>
             </div>
             
             <!-- Program Schedule Timeline -->
-            <h3 style="font-size: 1.4rem; color: var(--primary); margin: 35px 0 15px 0; font-weight: 800; font-family: '${page.headlineFont || 'Playfair Display'}', serif;"><i class="fa-solid fa-list-check" style="color: var(--secondary); margin-right: 8px;"></i> Program Itinerary</h3>
-            <div class="timeline-list">
-              ${(page.schedule || []).map(item => `
-                <div class="timeline-item">
-                  <div class="timeline-dot" style="border-color: ${page.accentColor || 'var(--accent)'};"></div>
-                  <div class="timeline-time">${item.time}</div>
-                  <div class="timeline-title">${item.title}</div>
-                  <div class="timeline-desc">${item.desc}</div>
+            <div style="margin-top: 35px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <h3 style="font-size: 1.4rem; color: var(--primary); margin: 0; font-weight: 800; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">
+                  <i class="fa-solid fa-list-check" style="color: var(--secondary); margin-right: 8px;"></i> Program Itinerary & Schedule
+                </h3>
+                <span style="font-size: 0.8rem; background: rgba(30,39,97,0.08); color: var(--primary); padding: 4px 10px; border-radius: 50px; font-weight: 700;">
+                  ${(page.schedule || []).length} Scheduled Segments
+                </span>
+              </div>
+              ${(page.schedule && page.schedule.length > 0) ? `
+                <div class="timeline-list">
+                  ${page.schedule.map(item => `
+                    <div class="timeline-item">
+                      <div class="timeline-dot" style="border-color: ${page.accentColor || 'var(--accent)'};"></div>
+                      <div class="timeline-time">${item.time || 'TBA'}</div>
+                      <div class="timeline-title">${item.title}</div>
+                      ${item.desc ? `<div class="timeline-desc">${item.desc}</div>` : ''}
+                    </div>
+                  `).join('')}
                 </div>
-              `).join('')}
+              ` : `
+                <div style="padding: 24px; background: var(--bg-card); border-radius: var(--radius-md); text-align: center; color: var(--text-muted); border: 1px dashed rgba(15,23,42,0.15);">
+                  <i class="fa-regular fa-clock" style="font-size: 1.6rem; color: var(--secondary); margin-bottom: 8px; display: block;"></i>
+                  Detailed program itinerary will be announced closer to the event!
+                </div>
+              `}
             </div>
           </div>
 
@@ -2940,22 +2989,70 @@ const templates = {
               <!-- Payment Splitting / Installments Option -->
               ${page.allowInstallments !== false ? `
                 <div class="split-pay-callout" id="gala-split-pay-callout" style="margin-bottom: 20px;">
-                  <div style="font-weight: 800; color: var(--primary); font-size: 0.95rem; margin-bottom: 8px;">
-                    <i class="fa-solid fa-receipt" style="color: var(--secondary); margin-right: 6px;"></i> Payment Schedule Option
+                  <div style="font-weight: 800; color: var(--primary); font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                    <span><i class="fa-solid fa-receipt" style="color: var(--secondary); margin-right: 6px;"></i> Payment Schedule Option</span>
+                    <span class="badge" style="background: rgba(30, 130, 76, 0.12); color: var(--success); font-size: 0.72rem; font-weight: 700;">0% Interest &bull; Flexible Options</span>
                   </div>
+
                   <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem;">
-                      <input type="radio" name="gala_split_plan" value="FULL" checked style="transform: scale(1.15);">
-                      <span>Pay in Full Today (<strong id="gala-full-price-val">$0.00</strong>)</span>
+                    <!-- Option 1: Full -->
+                    <label class="split-plan-option-label" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 2px solid rgba(15,23,42,0.1); background: white; cursor: pointer;">
+                      <input type="radio" name="gala_split_plan" value="FULL" checked style="margin-top: 3px; transform: scale(1.15);">
+                      <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
+                          <span>Pay in Full Today</span>
+                          <span id="gala-full-price-val">$0.00</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">One-time single payment. Full 501(c)(3) tax receipt issued immediately.</div>
+                      </div>
                     </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem;">
-                      <input type="radio" name="gala_split_plan" value="INSTALLMENT" style="transform: scale(1.15);">
-                      <span>Split into <strong>${page.installmentCycles || 3} Monthly Payments</strong> (<strong id="gala-split-price-val" style="color: var(--primary);">$0.00</strong> / mo)</span>
+
+                    <!-- Option 2: Bi-Weekly -->
+                    <label class="split-plan-option-label" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 2px solid rgba(15,23,42,0.1); background: white; cursor: pointer;">
+                      <input type="radio" name="gala_split_plan" value="BIWEEKLY" style="margin-top: 3px; transform: scale(1.15);">
+                      <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
+                          <span>Bi-Weekly Plan (Every 2 Weeks)</span>
+                          <span id="gala-biweekly-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 / bi-weekly</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;" id="gala-biweekly-details">
+                          Split into 4 payments every 14 days. 1st installment charged today.
+                        </div>
+                      </div>
+                    </label>
+
+                    <!-- Option 3: Twice a Month -->
+                    <label class="split-plan-option-label" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 2px solid rgba(15,23,42,0.1); background: white; cursor: pointer;">
+                      <input type="radio" name="gala_split_plan" value="TWICE_MONTHLY" style="margin-top: 3px; transform: scale(1.15);">
+                      <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
+                          <span>Twice a Month (1st &amp; 15th)</span>
+                          <span id="gala-twicemonth-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 twice/mo</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;" id="gala-twicemonth-details">
+                          Split into semi-monthly payments on 1st & 15th. 1st installment charged today.
+                        </div>
+                      </div>
+                    </label>
+
+                    <!-- Option 4: Monthly -->
+                    <label class="split-plan-option-label" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 2px solid rgba(15,23,42,0.1); background: white; cursor: pointer;">
+                      <input type="radio" name="gala_split_plan" value="MONTHLY" style="margin-top: 3px; transform: scale(1.15);">
+                      <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
+                          <span>Monthly Plan (${page.installmentCycles || 3} Months)</span>
+                          <span id="gala-split-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 / mo</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                          Billed once per month across ${page.installmentCycles || 3} months. 1st installment charged today.
+                        </div>
+                      </div>
                     </label>
                   </div>
+
                   <div style="margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; border-top: 1px dashed rgba(15,23,42,0.15); padding-top: 8px;">
-                    <i class="fa-solid fa-bolt" style="color: ${page.accentColor || 'var(--accent)'};"></i> <strong>Buy Now Pay Later:</strong> 
-                    Split into 4 interest-free payments via <strong>Stripe (Klarna / Affirm / Afterpay)</strong> or <strong>PayPal (Pay in 4)</strong>. Your tickets and tax receipt are confirmed immediately.
+                    <i class="fa-solid fa-bolt" style="color: ${page.accentColor || 'var(--accent)'};"></i> <strong>Integrated BNPL:</strong> 
+                    Split into 4 interest-free payments via <strong>Stripe (Klarna / Affirm / Afterpay)</strong> or <strong>PayPal (Pay in 4)</strong>. All tickets confirmed immediately.
                   </div>
                 </div>
               ` : ''}
@@ -3865,13 +3962,14 @@ const templates = {
 
               <!-- MISSION STORY & NARRATIVE DETAILS -->
               <div class="form-group" style="margin-bottom: 18px;">
-                <label style="font-size: 0.85rem; font-weight: 700;">Story Section Title</label>
-                <input type="text" id="adm-custom-story-title" class="form-control" value="${state.customPage.storyTitle || 'An Evening Dedicated to Hope & Healing'}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
-              </div>
-
-              <div class="form-group" style="margin-bottom: 18px;">
-                <label style="font-size: 0.85rem; font-weight: 700;">Event Mission Story & Overview</label>
-                <textarea id="adm-custom-desc" class="form-control" rows="3" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">${state.customPage.description || ''}</textarea>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label style="font-size: 0.85rem; font-weight: 700; margin: 0;">Event Mission Story & Overview (Multi-Paragraph Form)</label>
+                  <span style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;"><i class="fa-solid fa-align-left"></i> Press Enter twice for new paragraphs</span>
+                </div>
+                <textarea id="adm-custom-desc" class="form-control" rows="6" placeholder="Enter paragraph 1...&#10;&#10;Enter paragraph 2...&#10;&#10;Enter paragraph 3..." style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); line-height: 1.6; font-size: 0.95rem;">${state.customPage.description || ''}</textarea>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                  <i class="fa-solid fa-circle-info" style="color: var(--accent);"></i> Formatted as distinct, readable paragraphs on the public Gala page and in the live preview.
+                </div>
               </div>
 
               <div class="admin-form-row-2" style="margin-bottom: 24px;">
@@ -3886,23 +3984,40 @@ const templates = {
               </div>
 
               <!-- PROGRAM ITINERARY / SCHEDULE MANAGER -->
-              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px;">
+              <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px; border: 1px solid rgba(15,23,42,0.08);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-                  <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0; font-weight: 800;">
-                    <i class="fa-solid fa-clock" style="color: var(--secondary); margin-right: 6px;"></i> Program Schedule & Itinerary Timeline
-                  </h4>
-                  <button type="button" class="btn btn-outline" id="adm-add-schedule-btn" style="font-size: 0.8rem; padding: 6px 12px;">
-                    <i class="fa-solid fa-plus"></i> Add Itinerary Event
+                  <div>
+                    <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0; font-weight: 800;">
+                      <i class="fa-solid fa-clock" style="color: var(--secondary); margin-right: 6px;"></i> Program Schedule & Itinerary Timeline
+                    </h4>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0 0;">Add, remove, re-order, and edit times and activities for the Gala program.</p>
+                  </div>
+                  <button type="button" class="btn btn-outline" id="adm-add-schedule-btn" style="font-size: 0.85rem; padding: 7px 14px; background: white; font-weight: 700;">
+                    <i class="fa-solid fa-plus" style="margin-right: 4px; color: var(--success);"></i> Add Itinerary Event
                   </button>
                 </div>
 
                 <div id="adm-schedule-container" style="display: flex; flex-direction: column; gap: 10px;">
                   ${(state.customPage.schedule || []).map((s, idx) => `
-                    <div class="calendar-card adm-sched-row" style="padding: 12px; display: grid; grid-template-columns: 1.2fr 2fr 3fr auto; gap: 10px; align-items: center;">
-                      <input type="text" class="form-control sched-time-input" value="${s.time}" placeholder="5:30 PM" style="padding: 8px;">
-                      <input type="text" class="form-control sched-title-input" value="${s.title}" placeholder="Item Title" style="padding: 8px;">
-                      <input type="text" class="form-control sched-desc-input" value="${s.desc}" placeholder="Brief description" style="padding: 8px;">
-                      <button type="button" class="btn btn-outline adm-delete-sched-btn" style="color: var(--danger); border-color: var(--danger); padding: 8px 10px;" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                    <div class="calendar-card adm-sched-row" style="padding: 14px; display: grid; grid-template-columns: auto 1.2fr 2fr 3fr auto; gap: 10px; align-items: center; background: white; border: 1px solid rgba(15,23,42,0.08); border-radius: 8px;">
+                      <div class="sched-index-badge" style="font-size: 0.78rem; font-weight: 800; color: var(--secondary); background: rgba(0,124,146,0.1); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">#${idx + 1}</div>
+                      <div>
+                        <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px;">Time</label>
+                        <input type="text" class="form-control sched-time-input" value="${s.time}" placeholder="5:30 PM" style="padding: 8px 10px; font-size: 0.88rem; width: 100%;">
+                      </div>
+                      <div>
+                        <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px;">Activity / Title</label>
+                        <input type="text" class="form-control sched-title-input" value="${s.title}" placeholder="Item Title" style="padding: 8px 10px; font-size: 0.88rem; width: 100%;">
+                      </div>
+                      <div>
+                        <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px;">Description</label>
+                        <input type="text" class="form-control sched-desc-input" value="${s.desc}" placeholder="Brief description of segment" style="padding: 8px 10px; font-size: 0.88rem; width: 100%;">
+                      </div>
+                      <div style="display: flex; gap: 4px; align-items: flex-end; padding-top: 14px;">
+                        <button type="button" class="btn btn-outline adm-move-up-sched-btn" style="padding: 6px 8px; font-size: 0.75rem;" title="Move Up"><i class="fa-solid fa-arrow-up"></i></button>
+                        <button type="button" class="btn btn-outline adm-move-down-sched-btn" style="padding: 6px 8px; font-size: 0.75rem;" title="Move Down"><i class="fa-solid fa-arrow-down"></i></button>
+                        <button type="button" class="btn btn-outline adm-delete-sched-btn" style="color: var(--danger); border-color: var(--danger); padding: 6px 8px; font-size: 0.75rem;" title="Remove"><i class="fa-solid fa-trash"></i></button>
+                      </div>
                     </div>
                   `).join('')}
                 </div>
@@ -3939,24 +4054,36 @@ const templates = {
                 </h4>
                 
                 <!-- Payment Splitting Controls -->
-                <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.08); margin-bottom: 18px;">
-                  <label style="display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 0.95rem; cursor: pointer; margin-bottom: 10px;">
+                <div style="background: white; padding: 18px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.08); margin-bottom: 18px;">
+                  <label style="display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 0.95rem; cursor: pointer; margin-bottom: 12px;">
                     <input type="checkbox" id="adm-custom-allow-installments" ${state.customPage.allowInstallments !== false ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--primary);">
                     Enable Payment Splitting & Installment Schedules for Tickets
                   </label>
                   
-                  <div style="display: flex; align-items: center; gap: 12px; font-size: 0.88rem; color: var(--text-muted); margin-left: 28px;">
-                    <span>Number of Monthly Installments:</span>
-                    <select id="adm-custom-installment-cycles" class="form-control" style="width: auto; padding: 6px 12px;">
-                      <option value="2" ${state.customPage.installmentCycles === 2 ? 'selected' : ''}>2 Monthly Payments</option>
-                      <option value="3" ${state.customPage.installmentCycles === 3 || !state.customPage.installmentCycles ? 'selected' : ''}>3 Monthly Payments</option>
-                      <option value="4" ${state.customPage.installmentCycles === 4 ? 'selected' : ''}>4 Monthly Payments</option>
-                    </select>
+                  <div class="admin-form-row-2" style="margin-left: 28px; margin-bottom: 12px;">
+                    <div>
+                      <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 4px;">Available Schedule Options</label>
+                      <select id="adm-custom-split-interval" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 0.88rem;">
+                        <option value="ALL" ${(!state.customPage.splitInterval || state.customPage.splitInterval === 'ALL') ? 'selected' : ''}>All Options (Bi-Weekly, Twice a Month, Monthly, & Full)</option>
+                        <option value="BIWEEKLY" ${state.customPage.splitInterval === 'BIWEEKLY' ? 'selected' : ''}>Bi-Weekly Only (Every 2 Weeks)</option>
+                        <option value="TWICE_MONTHLY" ${state.customPage.splitInterval === 'TWICE_MONTHLY' ? 'selected' : ''}>Twice a Month Only (1st & 15th)</option>
+                        <option value="MONTHLY" ${state.customPage.splitInterval === 'MONTHLY' ? 'selected' : ''}>Monthly Only</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 4px;">Default Number of Installments</label>
+                      <select id="adm-custom-installment-cycles" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 0.88rem;">
+                        <option value="2" ${state.customPage.installmentCycles === 2 ? 'selected' : ''}>2 Installments</option>
+                        <option value="3" ${state.customPage.installmentCycles === 3 || !state.customPage.installmentCycles ? 'selected' : ''}>3 Installments</option>
+                        <option value="4" ${state.customPage.installmentCycles === 4 ? 'selected' : ''}>4 Installments (Recommended for Bi-Weekly)</option>
+                        <option value="6" ${state.customPage.installmentCycles === 6 ? 'selected' : ''}>6 Installments</option>
+                      </select>
+                    </div>
                   </div>
                   
-                  <div style="margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 8px;">
-                    <i class="fa-solid fa-circle-info" style="color: var(--secondary);"></i> <strong>How Stripe & PayPal Splitting Works:</strong> 
-                    When enabled, attendees can split payments over time. In addition, <strong>Stripe Payment Elements automatically enables Klarna & Affirm</strong>, and <strong>PayPal enables "Pay in 4"</strong> at checkout with 0% interest for the buyer, while <strong>Howards 4 Hope receives 100% of the funds upfront immediately</strong>.
+                  <div style="margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 8px; margin-left: 28px;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--secondary);"></i> <strong>Bi-Weekly &amp; Twice a Month Schedules:</strong> 
+                    Attendees can choose to split payments bi-weekly (every 14 days) or twice a month (1st & 15th). Integrated <strong>Stripe (Klarna/Affirm)</strong> and <strong>PayPal (Pay in 4)</strong> handle recurring billing seamlessly while Howards 4 Hope receives funds upfront.
                   </div>
                 </div>
 
@@ -4176,9 +4303,10 @@ const templates = {
                       </div>
                     ` : ''}
 
-                    ${tkt.paymentPlanType === 'INSTALLMENT' ? `
-                      <div class="installment-badge" style="margin-bottom: 12px; font-size: 0.75rem;">
-                        <i class="fa-solid fa-clock-rotate-left"></i> Installment Plan: ${tkt.installmentsPaid || 1} of ${tkt.installmentCycles || 3} Paid ($${tkt.remainingBalance ? tkt.remainingBalance.toFixed(2) : '0.00'} remaining)
+                    ${tkt.paymentPlanType && tkt.paymentPlanType !== 'FULL' ? `
+                      <div class="installment-badge" style="margin-bottom: 12px; font-size: 0.78rem; background: rgba(0, 124, 146, 0.1); color: var(--primary); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(0, 124, 146, 0.2);">
+                        <i class="fa-solid fa-clock-rotate-left" style="color: var(--secondary); margin-right: 4px;"></i> 
+                        <strong>${tkt.paymentPlanLabel || (tkt.installmentFrequency ? `${tkt.installmentFrequency} Plan` : 'Installment Plan')}:</strong> ${tkt.installmentsPaid || 1} of ${tkt.installmentCycles || 2} Paid ($${tkt.remainingBalance ? Number(tkt.remainingBalance).toFixed(2) : '0.00'} remaining)
                       </div>
                     ` : ''}
 
@@ -4737,10 +4865,35 @@ function bindCustomEventPage() {
     if (fullPriceVal) {
       fullPriceVal.textContent = total === 0 ? 'FREE' : '$' + total.toFixed(2);
     }
+    // Bi-Weekly calculation (4 cycles)
+    const biweeklyVal = document.getElementById('gala-biweekly-price-val');
+    const biweeklyDetails = document.getElementById('gala-biweekly-details');
+    if (biweeklyVal) {
+      const perBiweekly = total === 0 ? 0 : (total / 4);
+      biweeklyVal.textContent = total === 0 ? '$0.00' : '$' + perBiweekly.toFixed(2) + ' / 2 wks';
+      if (biweeklyDetails) {
+        biweeklyDetails.textContent = total === 0 
+          ? 'Split into 4 bi-weekly payments. 0% interest.'
+          : `4 payments of $${perBiweekly.toFixed(2)} every 14 days. 1st installment ($${perBiweekly.toFixed(2)}) charged today.`;
+      }
+    }
+    // Twice a Month calculation (2 cycles on 1st & 15th)
+    const twicemonthVal = document.getElementById('gala-twicemonth-price-val');
+    const twicemonthDetails = document.getElementById('gala-twicemonth-details');
+    if (twicemonthVal) {
+      const perTwice = total === 0 ? 0 : (total / 2);
+      twicemonthVal.textContent = total === 0 ? '$0.00' : '$' + perTwice.toFixed(2) + ' twice/mo';
+      if (twicemonthDetails) {
+        twicemonthDetails.textContent = total === 0
+          ? 'Split into 2 semi-monthly payments. 0% interest.'
+          : `2 payments of $${perTwice.toFixed(2)} billed on 1st & 15th. 1st installment ($${perTwice.toFixed(2)}) charged today.`;
+      }
+    }
+    // Monthly calculation
     const splitPriceVal = document.getElementById('gala-split-price-val');
     const cycles = (state.customPage && state.customPage.installmentCycles) || 3;
     if (splitPriceVal) {
-      splitPriceVal.textContent = total === 0 ? '$0.00' : '$' + (total / cycles).toFixed(2);
+      splitPriceVal.textContent = total === 0 ? '$0.00' : '$' + (total / cycles).toFixed(2) + ' / mo';
     }
   }
 
@@ -4841,8 +4994,8 @@ function bindCustomEventPage() {
 
       // Check payment split option
       const splitPlanRadio = document.querySelector('input[name="gala_split_plan"]:checked');
-      const isInstallment = splitPlanRadio && splitPlanRadio.value === 'INSTALLMENT';
-      const cycles = (state.customPage && state.customPage.installmentCycles) || 3;
+      const planType = splitPlanRadio ? splitPlanRadio.value : 'FULL';
+      const isSplit = planType !== 'FULL';
 
       // Collect all attendee names and food allergy profiles
       const att1Dietary = document.getElementById('custom-tier-dietary-1')?.value || 'Standard / No Restrictions';
@@ -4886,6 +5039,28 @@ function bindCustomEventPage() {
         const masterNumber = 'H4H-GALA-' + Math.floor(100000 + Math.random() * 900000);
         const selectedPaymentMethod = totalPrice === 0 ? 'FREE' : (document.querySelector('input[name="gala_payment"]:checked')?.value.toUpperCase() || 'STRIPE');
 
+        let cycles = 1;
+        let planLabel = 'Paid in Full Today';
+        let installmentFreq = 'None';
+        let perPaymentAmount = totalPrice;
+
+        if (planType === 'BIWEEKLY') {
+          cycles = 4;
+          installmentFreq = 'Bi-Weekly (Every 2 Weeks)';
+          perPaymentAmount = totalPrice / 4;
+          planLabel = `Bi-Weekly ($${perPaymentAmount.toFixed(2)} / 2 wks)`;
+        } else if (planType === 'TWICE_MONTHLY') {
+          cycles = 2;
+          installmentFreq = 'Twice a Month (1st & 15th)';
+          perPaymentAmount = totalPrice / 2;
+          planLabel = `Twice a Month ($${perPaymentAmount.toFixed(2)} twice/mo)`;
+        } else if (planType === 'MONTHLY') {
+          cycles = (state.customPage && state.customPage.installmentCycles) || 3;
+          installmentFreq = 'Monthly';
+          perPaymentAmount = totalPrice / cycles;
+          planLabel = `Monthly ($${perPaymentAmount.toFixed(2)} / mo)`;
+        }
+
         const createdTickets = [];
 
         attendees.forEach((attObj, idx) => {
@@ -4909,15 +5084,18 @@ function bindCustomEventPage() {
             userEmail: attObj.email,
             phone: phone,
             quantity: 1, // Individual ticket per attendee
-            pricePaid: isInstallment ? (totalPrice / cycles / qty) : unitPrice,
+            pricePaid: isSplit ? (perPaymentAmount / qty) : unitPrice,
             unitPrice: unitPrice,
             totalOrderPrice: totalPrice,
             paymentMethod: selectedPaymentMethod,
             status: 'CONFIRMED',
-            paymentPlanType: isInstallment ? 'INSTALLMENT' : 'FULL',
-            installmentCycles: isInstallment ? cycles : 1,
+            paymentPlanType: planType,
+            paymentPlanLabel: planLabel,
+            installmentFrequency: installmentFreq,
+            installmentCycles: cycles,
+            installmentAmount: perPaymentAmount,
             installmentsPaid: 1,
-            remainingBalance: isInstallment ? (totalPrice - (totalPrice / cycles)) : 0,
+            remainingBalance: isSplit ? (totalPrice - perPaymentAmount) : 0,
             dietaryPreference: attObj.dietaryPreference,
             allergyNotes: attObj.allergyNotes,
             hasAllergy: attObj.hasAllergy,
@@ -4929,14 +5107,18 @@ function bindCustomEventPage() {
         });
 
         // Backend sync if available
-        API.bookTicketGuest(9999, qty, selectedPaymentMethod, email, name, isInstallment ? 'INSTALLMENT' : 'FULL', cycles).catch(() => {});
+        API.bookTicketGuest(9999, qty, selectedPaymentMethod, email, name, planType, cycles).catch(() => {});
 
         const ticketSummary = attendees.length > 1
           ? `All ${attendees.length} tickets have been issued with unique ticket numbers:\n${masterNumber}-01 through ${masterNumber}-${String(attendees.length).padStart(2, '0')}.`
           : `Dedicated Ticket ID: ${masterNumber}-01`;
 
+        const planNotice = isSplit
+          ? `\n\nPayment Schedule: ${planLabel} (${cycles} installments). First installment of $${perPaymentAmount.toFixed(2)} paid today.`
+          : '';
+
         showToast('success', 'Tickets Confirmed!', `Thank you ${name}! ${qty}x ${tierName} tickets booked.`, 6000);
-        alert(`🎉 Gala Tickets Confirmed!\n\nThank you, ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nMaster Order: ${masterNumber}\n${ticketSummary}\n\n${isInstallment ? `Payment Plan: Split into ${cycles} monthly payments ($${(totalPrice / cycles).toFixed(2)}/mo). First installment paid today.\n\n` : ''}Each attendee ticket has been saved with food allergy notes and individual verification code for check-in and printing.`);
+        alert(`🎉 Gala Tickets Confirmed!\n\nThank you, ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nMaster Order: ${masterNumber}\n${ticketSummary}${planNotice}\n\nEach attendee ticket has been saved with food allergy notes and individual verification code for check-in and printing.`);
         
         if (modal) modal.classList.remove('active');
         form.reset();
@@ -5948,29 +6130,93 @@ function bindAdminDashboard() {
     }
   });
 
-  // Schedule Timeline Add / Delete
-  if (addSchedBtn && schedContainer) {
-    addSchedBtn.addEventListener('click', () => {
-      const row = document.createElement('div');
-      row.className = 'calendar-card adm-sched-row';
-      row.style.cssText = 'padding: 12px; display: grid; grid-template-columns: 1.2fr 2fr 3fr auto; gap: 10px; align-items: center; margin-bottom: 8px;';
-      row.innerHTML = `
-        <input type="text" class="form-control sched-time-input" value="6:00 PM" placeholder="5:30 PM" style="padding: 8px;">
-        <input type="text" class="form-control sched-title-input" value="Special Segment" placeholder="Item Title" style="padding: 8px;">
-        <input type="text" class="form-control sched-desc-input" value="Segment details" placeholder="Brief description" style="padding: 8px;">
-        <button type="button" class="btn btn-outline adm-delete-sched-btn" style="color: var(--danger); border-color: var(--danger); padding: 8px 10px;" title="Remove"><i class="fa-solid fa-trash"></i></button>
-      `;
-      schedContainer.appendChild(row);
-      row.querySelector('.adm-delete-sched-btn').addEventListener('click', () => row.remove());
+  // Schedule Timeline Add / Delete / Reorder Management
+  function renumberSchedRows() {
+    if (!schedContainer) return;
+    const rows = schedContainer.querySelectorAll('.adm-sched-row');
+    rows.forEach((r, idx) => {
+      const badge = r.querySelector('.sched-index-badge');
+      if (badge) badge.textContent = `#${idx + 1}`;
+    });
+  }
+
+  function bindScheduleRow(row) {
+    if (!row) return;
+    const delBtn = row.querySelector('.adm-delete-sched-btn');
+    const moveUpBtn = row.querySelector('.adm-move-up-sched-btn');
+    const moveDownBtn = row.querySelector('.adm-move-down-sched-btn');
+
+    if (delBtn) {
+      delBtn.addEventListener('click', () => {
+        row.remove();
+        renumberSchedRows();
+        updateGalaStudioLivePreview();
+        showToast('info', 'Segment Removed', 'Itinerary segment removed from schedule.');
+      });
+    }
+
+    if (moveUpBtn) {
+      moveUpBtn.addEventListener('click', () => {
+        const prev = row.previousElementSibling;
+        if (prev && prev.classList.contains('adm-sched-row')) {
+          schedContainer.insertBefore(row, prev);
+          renumberSchedRows();
+          updateGalaStudioLivePreview();
+        }
+      });
+    }
+
+    if (moveDownBtn) {
+      moveDownBtn.addEventListener('click', () => {
+        const next = row.nextElementSibling;
+        if (next && next.classList.contains('adm-sched-row')) {
+          schedContainer.insertBefore(next, row);
+          renumberSchedRows();
+          updateGalaStudioLivePreview();
+        }
+      });
+    }
+
+    row.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', updateGalaStudioLivePreview);
     });
   }
 
   if (schedContainer) {
-    schedContainer.querySelectorAll('.adm-delete-sched-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const row = e.target.closest('.adm-sched-row');
-        if (row) row.remove();
-      });
+    schedContainer.querySelectorAll('.adm-sched-row').forEach(row => bindScheduleRow(row));
+  }
+
+  if (addSchedBtn && schedContainer) {
+    addSchedBtn.addEventListener('click', () => {
+      const currentCount = schedContainer.querySelectorAll('.adm-sched-row').length + 1;
+      const row = document.createElement('div');
+      row.className = 'calendar-card adm-sched-row';
+      row.style.cssText = 'padding: 14px; display: grid; grid-template-columns: auto 1.2fr 2fr 3fr auto; gap: 10px; align-items: center; background: white; border: 1px solid rgba(15,23,42,0.08); border-radius: 8px; margin-bottom: 8px;';
+      row.innerHTML = `
+        <div class="sched-index-badge" style="font-size: 0.78rem; font-weight: 800; color: var(--secondary); background: rgba(0,124,146,0.1); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">#${currentCount}</div>
+        <div>
+          <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px;">Time</label>
+          <input type="text" class="form-control sched-time-input" value="7:00 PM" placeholder="5:30 PM" style="padding: 8px 10px; font-size: 0.88rem; width: 100%;">
+        </div>
+        <div>
+          <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px;">Activity / Title</label>
+          <input type="text" class="form-control sched-title-input" value="Special Segment" placeholder="Item Title" style="padding: 8px 10px; font-size: 0.88rem; width: 100%;">
+        </div>
+        <div>
+          <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 2px;">Description</label>
+          <input type="text" class="form-control sched-desc-input" value="Keynote address and honoring of special guests" placeholder="Brief description of segment" style="padding: 8px 10px; font-size: 0.88rem; width: 100%;">
+        </div>
+        <div style="display: flex; gap: 4px; align-items: flex-end; padding-top: 14px;">
+          <button type="button" class="btn btn-outline adm-move-up-sched-btn" style="padding: 6px 8px; font-size: 0.75rem;" title="Move Up"><i class="fa-solid fa-arrow-up"></i></button>
+          <button type="button" class="btn btn-outline adm-move-down-sched-btn" style="padding: 6px 8px; font-size: 0.75rem;" title="Move Down"><i class="fa-solid fa-arrow-down"></i></button>
+          <button type="button" class="btn btn-outline adm-delete-sched-btn" style="color: var(--danger); border-color: var(--danger); padding: 6px 8px; font-size: 0.75rem;" title="Remove"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      `;
+      schedContainer.appendChild(row);
+      bindScheduleRow(row);
+      renumberSchedRows();
+      updateGalaStudioLivePreview();
+      row.querySelector('.sched-title-input')?.focus();
     });
   }
 
@@ -6036,8 +6282,8 @@ function bindAdminDashboard() {
         const time = row.querySelector('.sched-time-input')?.value.trim();
         const title = row.querySelector('.sched-title-input')?.value.trim();
         const desc = row.querySelector('.sched-desc-input')?.value.trim();
-        if (title) {
-          scheduleItems.push({ time: time || '', title, desc: desc || '' });
+        if (title || time) {
+          scheduleItems.push({ time: time || 'TBA', title: title || 'Scheduled Activity', desc: desc || '' });
         }
       });
 
@@ -6067,10 +6313,12 @@ function bindAdminDashboard() {
         description: document.getElementById('adm-custom-desc')?.value.trim() || '',
         impactTitle: document.getElementById('adm-custom-impact-title')?.value.trim() || '100% Mission-Focused Proceeds',
         impactDesc: document.getElementById('adm-custom-impact-desc')?.value.trim() || '',
-        schedule: scheduleItems.length > 0 ? scheduleItems : (state.customPage.schedule || DEFAULT_CUSTOM_PAGE.schedule),
+        schedule: scheduleItems,
         pricingTiers: tiers.length > 0 ? tiers : DEFAULT_CUSTOM_PAGE.pricingTiers,
         allowInstallments: document.getElementById('adm-custom-allow-installments') ? document.getElementById('adm-custom-allow-installments').checked : true,
-        installmentCycles: parseInt(document.getElementById('adm-custom-installment-cycles')?.value || '3', 10),
+        splitInterval: document.getElementById('adm-custom-split-interval')?.value || 'ALL',
+        installmentCycles: parseInt(document.getElementById('adm-custom-installment-cycles')?.value || '4', 10),
+        installmentFrequency: document.getElementById('adm-custom-split-interval')?.value === 'BIWEEKLY' ? 'Bi-Weekly (Every 2 Weeks)' : (document.getElementById('adm-custom-split-interval')?.value === 'TWICE_MONTHLY' ? 'Twice a Month (1st & 15th)' : 'Bi-Weekly, Twice a Month, or Monthly'),
         paymentStripe: document.getElementById('adm-custom-pay-stripe') ? document.getElementById('adm-custom-pay-stripe').checked : true,
         paymentPaypal: document.getElementById('adm-custom-pay-paypal') ? document.getElementById('adm-custom-pay-paypal').checked : true,
         paymentDoor: document.getElementById('adm-custom-pay-door') ? document.getElementById('adm-custom-pay-door').checked : false
@@ -6078,7 +6326,7 @@ function bindAdminDashboard() {
 
       await saveCustomPage(updatedPage);
       updateGalaStudioLivePreview();
-      showToast('success', 'Gala Settings Saved', 'Gala Page customization and pricing tiers have been updated and synced to cloud!');
+      showToast('success', 'Gala Settings Saved', 'Gala Page customization, itinerary, and payment options have been updated and synced to cloud!');
     });
   }
 

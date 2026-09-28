@@ -6236,3 +6236,53 @@ input:checked+.admin-slider:before {
     animation: none !important;
   }
 }
+
+/* Gala Story Narrative Multi-Paragraphs */
+.gala-story-paragraphs {
+  margin-bottom: 25px;
+}
+
+.gala-story-paragraph {
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  line-height: 1.85;
+  margin: 0 0 16px 0;
+  letter-spacing: 0.1px;
+}
+
+.gala-story-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+/* Payment Splitting Option Cards */
+.split-plan-option-label {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1.5px solid rgba(15, 23, 42, 0.12) !important;
+}
+
+.split-plan-option-label:hover {
+  border-color: var(--secondary) !important;
+  background: rgba(0, 124, 146, 0.03) !important;
+  transform: translateY(-1px);
+}
+
+.split-plan-option-label:has(input:checked) {
+  border-color: var(--primary) !important;
+  background: rgba(30, 39, 97, 0.04) !important;
+  box-shadow: 0 2px 8px rgba(30, 39, 97, 0.08);
+}
+
+/* Admin Itinerary Row & Index Badges */
+.adm-sched-row {
+  transition: all 0.15s ease-in-out;
+}
+
+.adm-sched-row:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: rgba(0, 124, 146, 0.3) !important;
+}
+
+.sched-index-badge {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
