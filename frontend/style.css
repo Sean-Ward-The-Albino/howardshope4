@@ -5406,6 +5406,7 @@ input:checked+.admin-slider:before {
     line-height: 1.35 !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 2 !important;
+    line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     margin-bottom: 8px !important;

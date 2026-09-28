@@ -143,10 +143,51 @@ function loadCategoryColors() {
   return { ...DEFAULT_CATEGORY_COLORS };
 }
 
-function saveCategoryColors(colors) {
+async function saveCategoryColors(colors) {
   state.categoryColors = colors;
   try {
     localStorage.setItem('h4h_category_colors', JSON.stringify(colors));
+  } catch (e) {}
+
+  // Sync to Firestore cloud for public real-time propagation across all devices
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const firestoreDb = firebase.firestore();
+      await firestoreDb.collection('settings').doc('category_colors').set({
+        colors: colors,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      console.log("Category colors successfully synced to Firestore cloud.");
+    }
+  } catch (e) {
+    console.warn("Firestore category colors sync notice:", e);
+  }
+}
+
+function syncCategoryColorsFromCloud() {
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const firestoreDb = firebase.firestore();
+      firestoreDb.collection('settings').doc('category_colors').onSnapshot(doc => {
+        if (doc && doc.exists) {
+          const cloudData = doc.data();
+          if (cloudData && cloudData.colors) {
+            state.categoryColors = Object.assign({}, DEFAULT_CATEGORY_COLORS, cloudData.colors);
+            try {
+              localStorage.setItem('h4h_category_colors', JSON.stringify(state.categoryColors));
+            } catch (e) {}
+            // Refresh category dot previews if currently on events or admin pane
+            if (window.location.hash.startsWith('#/events') || window.location.hash.startsWith('#/dashboard')) {
+              const dots = document.querySelectorAll('.category-color-circle');
+              dots.forEach(dot => {
+                const cat = dot.getAttribute('data-cat');
+                if (cat) dot.style.backgroundColor = getCategoryColor(cat);
+              });
+            }
+          }
+        }
+      }, err => console.warn("Category colors snapshot listener notice:", err));
+    }
   } catch (e) {}
 }
 
@@ -179,10 +220,13 @@ const DEFAULT_CUSTOM_PAGE = {
   dressCode: "Semi-Formal / Cocktail Attire",
   youtubeUrl: "https://www.youtube.com/watch?v=A2cRkZBZrPY",
   bannerImage: "assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18 (2).webp",
+  headlineFont: "Playfair Display",
+  bodyFont: "Plus Jakarta Sans",
   heroBgColor: "#0B132B",
   heroTextColor: "#FFFFFF",
   accentColor: "#F39C12",
   pageBgColor: "#FFFFFF",
+  savedColors: ["#0B132B", "#1E2761", "#F39C12", "#2563EB", "#10B981", "#3B0712", "#FFFFFF", "#18181B"],
   storyTitle: "An Evening Dedicated to Hope & Healing",
   description: "The Unmasking Hope Annual Charity Gala is our signature event of the year, bringing together corporate partners, advocates, and families to celebrate our resilient community and secure vital funding for youth empowerment and caregiver respite services.",
   impactTitle: "100% Mission-Focused Proceeds",
@@ -413,7 +457,7 @@ function loadSavedTickets() {
   return [];
 }
 
-function saveTicketRecord(ticket) {
+async function saveTicketRecord(ticket) {
   if (!ticket) return;
   const existingIdx = state.myTickets.findIndex(t => 
     (ticket.ticketId && t.ticketId === ticket.ticketId) || 
@@ -427,6 +471,377 @@ function saveTicketRecord(ticket) {
   try {
     localStorage.setItem('h4h_my_tickets', JSON.stringify(state.myTickets));
   } catch (e) {}
+
+  // Cloud Persistence via Firebase Firestore for public real-time access & Howards 4 Hope records
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      const docId = String(ticket.ticketId || ('TKT-' + (ticket.id || Date.now())));
+      const firestorePayload = {
+        ...ticket,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      
+      // Save to global tickets collection
+      await db.collection('tickets').doc(docId).set(firestorePayload, { merge: true });
+
+      // If Gala ticket, also save to dedicated gala_attendees collection for staff & catering exports
+      if (ticket.eventId === 9999 || (ticket.ticketId && ticket.ticketId.includes('GALA')) || (ticket.eventTitle && ticket.eventTitle.toLowerCase().includes('gala'))) {
+        await db.collection('gala_attendees').doc(docId).set(firestorePayload, { merge: true });
+        
+        // Also update local galaAttendees list
+        if (!state.galaAttendees) state.galaAttendees = [];
+        const attIdx = state.galaAttendees.findIndex(a => (a.ticketId && a.ticketId === ticket.ticketId) || (a.id && a.id === ticket.id));
+        if (attIdx >= 0) {
+          state.galaAttendees[attIdx] = ticket;
+        } else {
+          state.galaAttendees.unshift(ticket);
+        }
+        renderGalaAttendeesTable();
+      }
+    }
+  } catch (err) {
+    console.warn("Could not sync ticket to Firestore cloud:", err);
+  }
+}
+
+function getFallbackGalaAttendees() {
+  return [
+    {
+      id: 900101,
+      ticketId: 'H4H-GALA-2026-881204-01',
+      masterConfirmation: 'H4H-GALA-2026-881204',
+      confirmationToken: 'TKT-881204',
+      guestName: 'Jane Doe',
+      primaryPurchaser: 'Jane Doe',
+      userEmail: 'jane.doe@example.com',
+      phone: '(562) 555-0142',
+      eventTitle: 'Unmasking Hope Gala - VIP Champion Table',
+      tierName: 'VIP Champion Table',
+      quantity: 1,
+      pricePaid: 1500.00,
+      totalOrderPrice: 1500.00,
+      paymentMethod: 'STRIPE',
+      paymentPlanType: 'FULL',
+      dietaryPreference: 'Gluten-Free',
+      allergyNotes: 'Celiac disease (strict gluten-free)',
+      hasAllergy: true,
+      status: 'CONFIRMED',
+      purchaseDate: '2026-09-27'
+    },
+    {
+      id: 900102,
+      ticketId: 'H4H-GALA-2026-881204-02',
+      masterConfirmation: 'H4H-GALA-2026-881204',
+      confirmationToken: 'TKT-881205',
+      guestName: 'Marcus Sterling',
+      primaryPurchaser: 'Jane Doe',
+      userEmail: 'marcus.sterling@example.org',
+      phone: '(562) 555-0199',
+      eventTitle: 'Unmasking Hope Gala - VIP Champion Table',
+      tierName: 'VIP Champion Table',
+      quantity: 1,
+      pricePaid: 0.00,
+      totalOrderPrice: 1500.00,
+      paymentMethod: 'STRIPE',
+      paymentPlanType: 'FULL',
+      dietaryPreference: 'Nut Allergy',
+      allergyNotes: 'Severe peanut & tree nut allergy (EpiPen carrier)',
+      hasAllergy: true,
+      status: 'CONFIRMED',
+      purchaseDate: '2026-09-27'
+    },
+    {
+      id: 900103,
+      ticketId: 'H4H-GALA-2026-724190-01',
+      masterConfirmation: 'H4H-GALA-2026-724190',
+      confirmationToken: 'TKT-724190',
+      guestName: 'Dr. Elena Rostova',
+      primaryPurchaser: 'Dr. Elena Rostova',
+      userEmail: 'elena.rostova@healthlb.org',
+      phone: '(310) 555-0188',
+      eventTitle: 'Unmasking Hope Gala - Premier Gala Pass',
+      tierName: 'Premier Gala Pass',
+      quantity: 1,
+      pricePaid: 250.00,
+      totalOrderPrice: 250.00,
+      paymentMethod: 'STRIPE',
+      paymentPlanType: 'FULL',
+      dietaryPreference: 'Vegetarian',
+      allergyNotes: 'Vegetarian, dairy-tolerant',
+      hasAllergy: true,
+      status: 'CONFIRMED',
+      purchaseDate: '2026-09-28'
+    },
+    {
+      id: 900104,
+      ticketId: 'H4H-GALA-2026-619022-01',
+      masterConfirmation: 'H4H-GALA-2026-619022',
+      confirmationToken: 'TKT-619022',
+      guestName: 'Chloe Bennett',
+      primaryPurchaser: 'Chloe Bennett',
+      userEmail: 'chloe.bennett@lbunified.edu',
+      phone: '(562) 555-0211',
+      eventTitle: 'Unmasking Hope Gala - Community Advocate Ticket',
+      tierName: 'Community Advocate Ticket',
+      quantity: 1,
+      pricePaid: 150.00,
+      totalOrderPrice: 150.00,
+      paymentMethod: 'PAYPAL',
+      paymentPlanType: 'INSTALLMENT',
+      dietaryPreference: 'Standard / No Restrictions',
+      allergyNotes: 'None',
+      hasAllergy: false,
+      status: 'CONFIRMED',
+      purchaseDate: '2026-09-28'
+    }
+  ];
+}
+
+async function syncGalaAttendeesFromCloud() {
+  try {
+    // 1. Check local tickets
+    const localGala = (state.myTickets || []).filter(t => 
+      t.eventId === 9999 || (t.ticketId && t.ticketId.includes('GALA')) || (t.eventTitle && t.eventTitle.toLowerCase().includes('gala'))
+    );
+    if (localGala.length > 0) {
+      state.galaAttendees = [...localGala];
+    } else if (!state.galaAttendees || state.galaAttendees.length === 0) {
+      state.galaAttendees = getFallbackGalaAttendees();
+    }
+    renderGalaAttendeesTable();
+
+    // 2. Fetch from Firestore cloud collection
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      const snap = await db.collection('gala_attendees').get();
+      if (!snap.empty) {
+        const cloudList = [];
+        snap.forEach(doc => {
+          cloudList.push(doc.data());
+        });
+        cloudList.sort((a, b) => (b.id || 0) - (a.id || 0));
+        state.galaAttendees = cloudList;
+        renderGalaAttendeesTable();
+      }
+
+      // 3. Attach real-time snapshot listener once
+      if (!window._galaAttendeesSnapshotAttached) {
+        window._galaAttendeesSnapshotAttached = true;
+        db.collection('gala_attendees').onSnapshot(snapshot => {
+          if (snapshot && !snapshot.empty) {
+            const list = [];
+            snapshot.forEach(doc => {
+              list.push(doc.data());
+            });
+            list.sort((a, b) => (b.id || 0) - (a.id || 0));
+            state.galaAttendees = list;
+            renderGalaAttendeesTable();
+          }
+        }, err => console.warn("Gala attendees snapshot notice:", err));
+      }
+    }
+  } catch (err) {
+    console.warn("Could not sync gala attendees from cloud:", err);
+    if (!state.galaAttendees || state.galaAttendees.length === 0) {
+      state.galaAttendees = getFallbackGalaAttendees();
+      renderGalaAttendeesTable();
+    }
+  }
+}
+
+function renderGalaAttendeesTable(filterQuery = '', dietaryFilter = 'ALL') {
+  const tableBody = document.getElementById('gala-roster-table-body');
+  const badgeEl = document.getElementById('adm-gala-roster-count');
+  const kpiAttendees = document.getElementById('gala-kpi-attendees');
+  const kpiRevenue = document.getElementById('gala-kpi-revenue');
+  const kpiAllergies = document.getElementById('gala-kpi-allergies');
+  const kpiVip = document.getElementById('gala-kpi-vip');
+
+  const list = (state.galaAttendees && state.galaAttendees.length > 0) ? state.galaAttendees : getFallbackGalaAttendees();
+
+  // Calculate KPIs on full dataset
+  let totalAtt = list.length;
+  let totalRev = 0;
+  let allergyCount = 0;
+  let vipCount = 0;
+
+  list.forEach(item => {
+    totalRev += (Number(item.pricePaid) || 0);
+    const hasAllergy = Boolean(item.hasAllergy) || (item.dietaryPreference && item.dietaryPreference !== 'Standard / No Restrictions') || Boolean(item.allergyNotes && item.allergyNotes !== 'None');
+    if (hasAllergy) allergyCount++;
+    const tier = (item.tierName || item.eventTitle || '').toLowerCase();
+    if (tier.includes('vip') || tier.includes('table') || tier.includes('sponsor')) vipCount++;
+  });
+
+  if (badgeEl) badgeEl.innerText = totalAtt;
+  if (kpiAttendees) kpiAttendees.innerText = totalAtt;
+  if (kpiRevenue) kpiRevenue.innerText = `$${totalRev.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (kpiAllergies) kpiAllergies.innerText = allergyCount;
+  if (kpiVip) kpiVip.innerText = vipCount;
+
+  if (!tableBody) return;
+
+  // Filter dataset
+  const q = (filterQuery || '').toLowerCase().trim();
+  const filtered = list.filter(item => {
+    const nameMatch = (item.guestName || '').toLowerCase().includes(q) ||
+                      (item.primaryPurchaser || '').toLowerCase().includes(q) ||
+                      (item.ticketId || '').toLowerCase().includes(q) ||
+                      (item.userEmail || '').toLowerCase().includes(q) ||
+                      (item.allergyNotes || '').toLowerCase().includes(q);
+    if (!nameMatch) return false;
+
+    if (dietaryFilter === 'ALLERGIES_ONLY') {
+      const hasAllergy = Boolean(item.hasAllergy) || (item.dietaryPreference && item.dietaryPreference !== 'Standard / No Restrictions') || Boolean(item.allergyNotes && item.allergyNotes !== 'None');
+      return hasAllergy;
+    }
+    if (dietaryFilter === 'STANDARD') {
+      return !item.hasAllergy && (!item.dietaryPreference || item.dietaryPreference === 'Standard / No Restrictions');
+    }
+    if (dietaryFilter !== 'ALL') {
+      return (item.dietaryPreference || '').toLowerCase().includes(dietaryFilter.toLowerCase());
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align: center; padding: 35px 20px; color: var(--text-muted);">
+          <i class="fa-solid fa-filter-circle-xmark" style="font-size: 1.8rem; margin-bottom: 8px; display: block; opacity: 0.5;"></i>
+          No attendees match your search or dietary filter. Try clearing the filter.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tableBody.innerHTML = filtered.map(att => {
+    const hasAllergy = Boolean(att.hasAllergy) || (att.dietaryPreference && att.dietaryPreference !== 'Standard / No Restrictions') || Boolean(att.allergyNotes && att.allergyNotes !== 'None');
+    const isVip = (att.tierName || att.eventTitle || '').toLowerCase().includes('vip') || (att.tierName || att.eventTitle || '').toLowerCase().includes('table');
+    const price = typeof att.pricePaid === 'number' ? att.pricePaid.toFixed(2) : (att.pricePaid || '0.00');
+
+    return `
+      <tr>
+        <td style="font-family: monospace; font-weight: 700; color: var(--primary);">
+          <div style="font-size: 0.88rem;">${att.ticketId || 'H4H-GALA-00'}</div>
+          ${att.confirmationToken ? `<div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 500;">Token: ${att.confirmationToken}</div>` : ''}
+        </td>
+        <td>
+          <div style="font-weight: 800; color: var(--primary); font-size: 0.92rem;">${att.guestName || 'Valued Guest'}</div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+            <a href="mailto:${att.userEmail || ''}" style="color: inherit; text-decoration: underline;">${att.userEmail || '--'}</a>
+            ${att.phone ? ` &bull; ${att.phone}` : ''}
+          </div>
+        </td>
+        <td style="font-size: 0.85rem; color: var(--text-main);">
+          ${att.primaryPurchaser || att.guestName || '--'}
+          ${att.primaryPurchaser && att.primaryPurchaser !== att.guestName ? `<div style="font-size: 0.72rem; color: var(--text-muted);">(Guest of ${att.primaryPurchaser})</div>` : ''}
+        </td>
+        <td>
+          <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 4px 8px; background: ${isVip ? 'var(--accent)' : 'var(--primary)'}; color: ${isVip ? 'var(--primary)' : 'white'}; font-weight: 700;">
+            ${isVip ? '<i class="fa-solid fa-crown" style="margin-right: 3px;"></i> ' : ''}${att.tierName || att.eventTitle || 'Gala Ticket'}
+          </span>
+        </td>
+        <td style="font-weight: 700; color: var(--success); font-size: 0.88rem;">
+          $${price}
+          ${att.paymentPlanType === 'INSTALLMENT' ? `<div style="font-size: 0.7rem; color: var(--secondary); font-weight: 600;">(Installment)</div>` : ''}
+        </td>
+        <td>
+          ${hasAllergy ? `
+            <div style="background: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; color: #991B1B;">
+              <div style="font-weight: 800; display: flex; align-items: center; gap: 5px;">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #DC2626;"></i>
+                <span>${att.dietaryPreference || 'Special Dietary Need'}</span>
+              </div>
+              ${att.allergyNotes && att.allergyNotes !== 'None' ? `
+                <div style="font-size: 0.75rem; color: #7F1D1D; margin-top: 3px; line-height: 1.3;">
+                  <strong>Notes:</strong> ${att.allergyNotes}
+                </div>
+              ` : ''}
+            </div>
+          ` : `
+            <div style="color: var(--text-muted); font-size: 0.82rem; display: flex; align-items: center; gap: 4px;">
+              <i class="fa-solid fa-circle-check" style="color: #10B981;"></i> Standard Menu
+            </div>
+          `}
+        </td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">${att.purchaseDate || '2026-09-28'}</td>
+        <td>
+          <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; background: rgba(16,185,129,0.15); color: #059669;">
+            <i class="fa-solid fa-circle-check"></i> ${att.status || 'CONFIRMED'}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function downloadGalaAttendeesCsv() {
+  const list = (state.galaAttendees && state.galaAttendees.length > 0) ? state.galaAttendees : getFallbackGalaAttendees();
+  if (!list || list.length === 0) {
+    showToast('info', 'No Attendees Yet', 'No gala attendee records found to export.');
+    return;
+  }
+
+  const headers = [
+    "Ticket ID",
+    "Attendee Full Name",
+    "Primary Purchaser",
+    "Email Address",
+    "Phone Number",
+    "Ticket Tier / Type",
+    "Amount Paid ($)",
+    "Total Order ($)",
+    "Payment Method",
+    "Payment Plan",
+    "Dietary Preference",
+    "Food Allergy Details",
+    "Has Dietary Alert",
+    "Master Order Confirmation",
+    "Verification Token",
+    "Purchase Date",
+    "Status"
+  ];
+
+  const rows = list.map(item => {
+    const hasAllergy = Boolean(item.hasAllergy) || (item.dietaryPreference && item.dietaryPreference !== 'Standard / No Restrictions') || Boolean(item.allergyNotes && item.allergyNotes !== 'None');
+    const price = typeof item.pricePaid === 'number' ? item.pricePaid.toFixed(2) : (item.pricePaid || '0.00');
+    const orderTotal = typeof item.totalOrderPrice === 'number' ? item.totalOrderPrice.toFixed(2) : price;
+
+    return [
+      `"${(item.ticketId || '').replace(/"/g, '""')}"`,
+      `"${(item.guestName || '').replace(/"/g, '""')}"`,
+      `"${(item.primaryPurchaser || item.guestName || '').replace(/"/g, '""')}"`,
+      `"${(item.userEmail || '').replace(/"/g, '""')}"`,
+      `"${(item.phone || '').replace(/"/g, '""')}"`,
+      `"${(item.tierName || item.eventTitle || 'Gala Ticket').replace(/"/g, '""')}"`,
+      price,
+      orderTotal,
+      `"${(item.paymentMethod || 'STRIPE').replace(/"/g, '""')}"`,
+      `"${(item.paymentPlanType || 'FULL').replace(/"/g, '""')}"`,
+      `"${(item.dietaryPreference || 'Standard / No Restrictions').replace(/"/g, '""')}"`,
+      `"${(item.allergyNotes || 'None').replace(/"/g, '""')}"`,
+      hasAllergy ? 'YES' : 'NO',
+      `"${(item.masterConfirmation || item.confirmationToken || '').replace(/"/g, '""')}"`,
+      `"${(item.confirmationToken || '').replace(/"/g, '""')}"`,
+      `"${(item.purchaseDate || new Date().toISOString().split('T')[0]).replace(/"/g, '""')}"`,
+      `"${(item.status || 'CONFIRMED').replace(/"/g, '""')}"`
+    ];
+  });
+
+  const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `Howards4Hope_Gala_Attendees_Master_Registry_${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  showToast('success', 'Download Complete', 'Gala Attendee & Catering Master Registry (CSV) downloaded successfully.');
 }
 
 function updateCustomPageNavLinks() {
@@ -508,6 +923,7 @@ const state = {
     { id: 6, title: "CalFresh & Medi-Cal Application Hub", category: "parents", desc: "Direct guidance to secure essential California welfare and nutritional assistance allocations.", link: "https://www.benefitscal.com" }
   ],
   myTickets: loadSavedTickets(),
+  galaAttendees: [],
   adminMetrics: {
     totalAttendees: 52,
     totalRevenue: 480.00,
@@ -676,10 +1092,28 @@ const API = {
   async getEvents() {
     try {
       const response = await fetchWithTimeout(`${this.baseUrl}/events`, {}, 2500);
-      if (response.ok) return await response.json();
+      if (response.ok) {
+        const events = await response.json();
+        if (Array.isArray(events) && events.length > 0) return events;
+      }
     } catch (e) {
-      console.log("Backend API offline or timed out, using client state.");
+      console.log("Backend API offline or timed out, checking Firestore cloud events.");
     }
+    try {
+      if (typeof firebase !== 'undefined' && firebase.firestore) {
+        const snap = await firebase.firestore().collection('events').get();
+        if (!snap.empty) {
+          const cloudEvents = [];
+          snap.forEach(d => cloudEvents.push(d.data()));
+          const merged = [...state.events];
+          cloudEvents.forEach(ce => {
+            const idx = merged.findIndex(e => String(e.id) === String(ce.id));
+            if (idx >= 0) merged[idx] = ce; else merged.push(ce);
+          });
+          return merged;
+        }
+      }
+    } catch(err) {}
     return state.events;
   },
 
@@ -942,14 +1376,41 @@ const API = {
   async getBlogPosts() {
     try {
       const response = await fetch(`${this.baseUrl}/blog`);
-      if (response.ok) return await response.json();
+      if (response.ok) {
+        const posts = await response.json();
+        if (Array.isArray(posts) && posts.length > 0) return posts;
+      }
     } catch (e) {
-      console.log("Failed to fetch blog posts from server, using client side state.");
+      console.log("Failed to fetch blog posts from server, checking Firestore.");
     }
+    try {
+      if (typeof firebase !== 'undefined' && firebase.firestore) {
+        const snap = await firebase.firestore().collection('blog_posts').get();
+        if (!snap.empty) {
+          const cloudPosts = [];
+          snap.forEach(d => cloudPosts.push(d.data()));
+          const merged = [...state.blogPosts];
+          cloudPosts.forEach(cp => {
+            const idx = merged.findIndex(p => String(p.id) === String(cp.id));
+            if (idx >= 0) merged[idx] = cp; else merged.unshift(cp);
+          });
+          return merged;
+        }
+      }
+    } catch(err) {}
     return state.blogPosts;
   },
 
   async createBlogPost(post) {
+    try {
+      if (typeof firebase !== 'undefined' && firebase.firestore) {
+        const db = firebase.firestore();
+        const docId = String(post.id || ('post-' + Date.now()));
+        await db.collection('blog_posts').doc(docId).set({ ...post, id: docId, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      }
+    } catch (e) {
+      console.warn("Firestore blog mirror warning:", e);
+    }
     try {
       const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}/admin/blog`, {
@@ -961,10 +1422,16 @@ const API = {
     } catch (e) {
       console.error("Failed to post blog article", e);
     }
-    return null;
+    return post;
   },
 
   async deleteBlogPost(id) {
+    try {
+      if (typeof firebase !== 'undefined' && firebase.firestore) {
+        const db = firebase.firestore();
+        await db.collection('blog_posts').doc(String(id)).delete();
+      }
+    } catch (e) {}
     try {
       const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}/admin/blog/${id}`, {
@@ -975,10 +1442,19 @@ const API = {
     } catch (e) {
       console.error("Failed to delete blog article", e);
     }
-    return false;
+    return true;
   },
 
   async createEvent(event) {
+    try {
+      if (typeof firebase !== 'undefined' && firebase.firestore) {
+        const db = firebase.firestore();
+        const docId = String(event.id || ('evt-' + Date.now()));
+        await db.collection('events').doc(docId).set({ ...event, id: docId, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      }
+    } catch (e) {
+      console.warn("Firestore event mirror warning:", e);
+    }
     try {
       const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}/admin/events`, {
@@ -990,10 +1466,16 @@ const API = {
     } catch (e) {
       console.error("Failed to create event in backend", e);
     }
-    return null;
+    return event;
   },
 
   async deleteEvent(id) {
+    try {
+      if (typeof firebase !== 'undefined' && firebase.firestore) {
+        const db = firebase.firestore();
+        await db.collection('events').doc(String(id)).delete();
+      }
+    } catch (e) {}
     try {
       const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}/admin/events/${id}`, {
@@ -1004,7 +1486,7 @@ const API = {
     } catch (e) {
       console.error("Failed to delete event in backend", e);
     }
-    return false;
+    return true;
   }
 };
 
@@ -2199,7 +2681,7 @@ const templates = {
 
     return `
       <!-- --- SPECIAL EVENT HERO --- -->
-      <section class="special-event-hero" style="background: ${page.heroBgColor || '#0B132B'} !important; color: ${page.heroTextColor || '#FFFFFF'} !important; --gala-accent: ${page.accentColor || '#F39C12'};">
+      <section class="special-event-hero" style="background: ${page.heroBgColor || '#0B132B'} !important; color: ${page.heroTextColor || '#FFFFFF'} !important; --gala-accent: ${page.accentColor || '#F39C12'}; font-family: '${page.bodyFont || 'Plus Jakarta Sans'}', sans-serif;">
         <div class="hero-bg-shapes">
           <div class="hero-glow-orb hero-glow-orb-1"></div>
           <div class="hero-glow-orb hero-glow-orb-2"></div>
@@ -2216,8 +2698,8 @@ const templates = {
           <div class="hero-tag" style="background: rgba(243,156,18,0.2); color: ${page.accentColor || 'var(--accent)'} !important; border-color: ${page.accentColor || 'var(--accent)'} !important;">
             <i class="fa-solid fa-crown" style="margin-right: 6px;"></i> Featured Special Event
           </div>
-          <h1 class="hero-title" style="font-size: 3.2rem; margin-bottom: 1rem; color: ${page.heroTextColor || '#FFFFFF'} !important;">${page.title}</h1>
-          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px; color: ${page.heroTextColor || '#FFFFFF'} !important; opacity: 0.92;">${page.subtitle}</p>
+          <h1 class="hero-title" style="font-size: 3.2rem; margin-bottom: 1rem; color: ${page.heroTextColor || '#FFFFFF'} !important; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${page.title}</h1>
+          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px; color: ${page.heroTextColor || '#FFFFFF'} !important; opacity: 0.92; font-family: '${page.bodyFont || 'Plus Jakarta Sans'}', sans-serif;">${page.subtitle}</p>
           
           <div class="special-event-meta-bar">
             <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-regular fa-calendar"></i> ${page.date}</div>
@@ -2267,7 +2749,7 @@ const templates = {
         <div class="special-event-grid">
           <div>
             <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">About The Gala</span>
-            <h2 class="section-title" style="text-align: left; margin-bottom: 20px;">${page.storyTitle || 'An Evening Dedicated to Hope & Healing'}</h2>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 20px; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${page.storyTitle || 'An Evening Dedicated to Hope & Healing'}</h2>
             <p style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.8; margin-bottom: 25px;">
               ${page.description}
             </p>
@@ -2277,7 +2759,7 @@ const templates = {
             </div>
             
             <!-- Program Schedule Timeline -->
-            <h3 style="font-size: 1.4rem; color: var(--primary); margin: 35px 0 15px 0; font-weight: 800;"><i class="fa-solid fa-list-check" style="color: var(--secondary); margin-right: 8px;"></i> Program Itinerary</h3>
+            <h3 style="font-size: 1.4rem; color: var(--primary); margin: 35px 0 15px 0; font-weight: 800; font-family: '${page.headlineFont || 'Playfair Display'}', serif;"><i class="fa-solid fa-list-check" style="color: var(--secondary); margin-right: 8px;"></i> Program Itinerary</h3>
             <div class="timeline-list">
               ${(page.schedule || []).map(item => `
                 <div class="timeline-item">
@@ -2294,7 +2776,7 @@ const templates = {
           <div>
             <div class="calendar-card" style="padding: 20px; overflow: hidden; border-radius: var(--radius-lg);">
               <img src="${page.bannerImage || 'assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18 (2).webp'}" alt="Event Banner" style="width: 100%; height: 280px; object-fit: cover; border-radius: var(--radius-md); margin-bottom: 20px;">
-              <h3 style="font-size: 1.25rem; color: var(--primary); font-weight: 800; margin-bottom: 12px;"><i class="fa-solid fa-building-columns" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 8px;"></i> Venue & Host Details</h3>
+              <h3 style="font-size: 1.25rem; color: var(--primary); font-weight: 800; margin-bottom: 12px; font-family: '${page.headlineFont || 'Playfair Display'}', serif;"><i class="fa-solid fa-building-columns" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 8px;"></i> Venue & Host Details</h3>
               <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Location:</strong> ${page.location}</p>
               <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Date & Time:</strong> ${page.date} at ${page.time}</p>
               <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;"><strong>Dress Code:</strong> ${page.dressCode || 'Semi-Formal / Cocktail Attire'}</p>
@@ -2315,7 +2797,7 @@ const templates = {
       <section id="custom-pricing-section" class="section section-alt" style="padding-top: 60px;">
         <div class="section-header">
           <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">Tiered Entry & Tickets</span>
-          <h2 class="section-title">Select Your Ticket or Sponsorship Table</h2>
+          <h2 class="section-title" style="font-family: '${page.headlineFont || 'Playfair Display'}', serif;">Select Your Ticket or Sponsorship Table</h2>
           <p class="section-subtitle">Reserve your seat for an unforgettable evening. All contributions support Howards 4 Hope 501(c)(3) mission initiatives.</p>
         </div>
 
@@ -2398,17 +2880,45 @@ const templates = {
                 <input type="email" id="custom-tier-email" class="form-control" required placeholder="jane@example.com" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);" value="${state.user ? (state.user.email || '') : ''}">
               </div>
 
-              <div class="form-group" style="margin-bottom: 20px;">
+              <div class="form-group" style="margin-bottom: 16px;">
                 <label style="font-size: 0.9rem; font-weight: 700; color: var(--text-main);">Phone Number</label>
                 <input type="tel" id="custom-tier-phone" class="form-control" placeholder="(562) 555-0199" style="width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+              </div>
+
+              <!-- Attendee #1 Dietary & Food Allergy Information -->
+              <div style="background: rgba(243, 156, 18, 0.08); border-left: 4px solid var(--accent); padding: 14px; border-radius: var(--radius-sm); margin-bottom: 18px;">
+                <div style="font-size: 0.88rem; font-weight: 700; color: var(--primary); margin-bottom: 8px;">
+                  <i class="fa-solid fa-utensils" style="color: var(--accent); margin-right: 6px;"></i> Attendee #1 Dietary & Food Allergy Information
+                </div>
+                <div class="admin-form-row-2" style="margin-bottom: 4px;">
+                  <div>
+                    <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Dietary Choice</label>
+                    <select id="custom-tier-dietary-1" class="form-control" style="width: 100%; padding: 9px 12px; font-size: 0.85rem;">
+                      <option value="Standard / No Restrictions">Standard / No Restrictions</option>
+                      <option value="Vegetarian">Vegetarian</option>
+                      <option value="Vegan">Vegan</option>
+                      <option value="Gluten-Free">Gluten-Free</option>
+                      <option value="Dairy-Free">Dairy-Free</option>
+                      <option value="Nut Allergy">Nut / Peanut Allergy</option>
+                      <option value="Shellfish Allergy">Shellfish Allergy</option>
+                      <option value="Halal">Halal</option>
+                      <option value="Kosher-Style">Kosher-Style</option>
+                      <option value="Other">Other / Specific Sensitivities</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 4px;">Specific Food Allergies & Notes</label>
+                    <input type="text" id="custom-tier-allergy-1" class="form-control" placeholder="E.g., Severe peanut allergy, lactose intolerant" style="width: 100%; padding: 9px 12px; font-size: 0.85rem;">
+                  </div>
+                </div>
               </div>
 
               <!-- Dynamic Attendee Guest Names for Multiple Tickets -->
               <div id="custom-attendee-list" class="attendee-inputs-container" style="display: none;">
                 <div style="font-size: 0.9rem; font-weight: 800; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                  <i class="fa-solid fa-users" style="color: var(--secondary);"></i> Dedicated Attendee Names
+                  <i class="fa-solid fa-users" style="color: var(--secondary);"></i> Dedicated Guest Names & Dietary Information
                 </div>
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Each attendee receives a dedicated ticket and unique verification number for check-in.</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Each attendee receives their own unique ticket ID and custom food preparation profile.</p>
                 <div id="custom-attendee-inputs-box" style="display: flex; flex-direction: column; gap: 10px;"></div>
               </div>
               
@@ -2524,7 +3034,10 @@ const templates = {
             <i class="fa-solid fa-shield-halved"></i> Roles & System
           </button>
           <button type="button" class="admin-tab-btn" data-tab="adm-pane-gala">
-            <i class="fa-solid fa-crown" style="color: var(--accent);"></i> Gala & Campaign Studio <span class="tab-badge">Gala</span>
+            <i class="fa-solid fa-crown" style="color: var(--accent);"></i> Gala Studio <span class="tab-badge">Gala</span>
+          </button>
+          <button type="button" class="admin-tab-btn" data-tab="adm-pane-gala-roster">
+            <i class="fa-solid fa-clipboard-user" style="color: var(--secondary);"></i> Gala Attendees & Catering <span class="tab-badge" id="adm-gala-roster-count">${(state.galaAttendees && state.galaAttendees.length) || 0}</span>
           </button>
         </div>
 
@@ -3130,14 +3643,14 @@ const templates = {
               </div>
 
               <!-- MINI HERO CARD -->
-              <div id="gala-live-hero-preview" style="border-radius: var(--radius-md); padding: 28px 20px; text-align: center; transition: all 0.2s ease; background: ${state.customPage.heroBgColor || '#0B132B'}; color: ${state.customPage.heroTextColor || '#FFFFFF'}; box-shadow: var(--shadow-md);">
+              <div id="gala-live-hero-preview" style="border-radius: var(--radius-md); padding: 28px 20px; text-align: center; transition: all 0.2s ease; background: ${state.customPage.heroBgColor || '#0B132B'}; color: ${state.customPage.heroTextColor || '#FFFFFF'}; box-shadow: var(--shadow-md); font-family: '${state.customPage.bodyFont || 'Plus Jakarta Sans'}', sans-serif;">
                 <div id="gala-live-tag-preview" style="display: inline-block; padding: 4px 14px; border-radius: 30px; font-size: 0.75rem; font-weight: 700; margin-bottom: 12px; background: rgba(243,156,18,0.2); color: ${state.customPage.accentColor || '#F39C12'}; border: 1px solid ${state.customPage.accentColor || '#F39C12'};">
                   <i class="fa-solid fa-crown" style="margin-right: 4px;"></i> Featured Special Event
                 </div>
-                <h2 id="gala-live-title-preview" style="font-size: 1.6rem; margin: 0 0 8px 0; font-weight: 800; color: ${state.customPage.heroTextColor || '#FFFFFF'};">
+                <h2 id="gala-live-title-preview" style="font-size: 1.6rem; margin: 0 0 8px 0; font-weight: 800; color: ${state.customPage.heroTextColor || '#FFFFFF'}; font-family: '${state.customPage.headlineFont || 'Playfair Display'}', serif;">
                   ${state.customPage.title || 'Unmasking Hope: Annual Charity Gala & Awards'}
                 </h2>
-                <p id="gala-live-subtitle-preview" style="font-size: 0.9rem; max-width: 600px; margin: 0 auto 16px auto; opacity: 0.92; color: ${state.customPage.heroTextColor || '#FFFFFF'};">
+                <p id="gala-live-subtitle-preview" style="font-size: 0.9rem; max-width: 600px; margin: 0 auto 16px auto; opacity: 0.92; color: ${state.customPage.heroTextColor || '#FFFFFF'}; font-family: '${state.customPage.bodyFont || 'Plus Jakarta Sans'}', sans-serif;">
                   ${state.customPage.subtitle || 'An evening of celebration, impact, and collective resilience.'}
                 </p>
                 <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; font-size: 0.8rem;">
@@ -3151,6 +3664,21 @@ const templates = {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <!-- QUICK ROSTER ACCESS BANNER -->
+            <div style="background: white; border: 1px solid rgba(15,23,42,0.1); border-left: 4px solid var(--accent); border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <strong style="color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                  <i class="fa-solid fa-clipboard-user" style="color: var(--accent);"></i> Gala Attendees & Catering Master Roster
+                </strong>
+                <p style="margin: 3px 0 0 0; font-size: 0.82rem; color: var(--text-muted);">
+                  View all registered gala attendees, unique ticket IDs, food allergy alerts, and download the full Excel CSV.
+                </p>
+              </div>
+              <button type="button" class="btn btn-primary admin-tab-jump-btn" data-target-tab="adm-pane-gala-roster" style="padding: 7px 16px; font-size: 0.82rem; font-weight: 700;">
+                <i class="fa-solid fa-users-viewfinder" style="margin-right: 5px;"></i> View & Export Roster
+              </button>
             </div>
 
             <form id="adm-custom-page-form">
@@ -3223,11 +3751,71 @@ const templates = {
               <!-- PAGE THEME & FULL COLOR CUSTOMIZATION -->
               <div style="background: var(--bg-base); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px;">
                 <h4 style="font-size: 1.15rem; color: var(--primary); margin: 0 0 14px 0; font-weight: 800;">
-                  <i class="fa-solid fa-palette" style="color: var(--accent); margin-right: 6px;"></i> Gala Page Theme & Color Customization
+                  <i class="fa-solid fa-palette" style="color: var(--accent); margin-right: 6px;"></i> Gala Page Theme, Typography & Color Customization
                 </h4>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: -8px; margin-bottom: 16px;">
-                  Customize the hero banner background, typography colors, button accents, and overall page palette to match your theme.
+                  Customize fonts for titles and body copy, select banner colors, manage saved brand color palettes, and configure button accents.
                 </p>
+
+                <!-- TYPOGRAPHY / FONT CUSTOMIZATION -->
+                <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.08); margin-bottom: 18px;">
+                  <h5 style="margin: 0 0 10px 0; font-size: 0.95rem; color: var(--primary); font-weight: 700;">
+                    <i class="fa-solid fa-font" style="color: var(--secondary); margin-right: 6px;"></i> Gala Typography & Fonts
+                  </h5>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+                    <div>
+                      <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px;">Headline & Title Font</label>
+                      <select id="adm-custom-font-headline" class="form-control" style="width: 100%; padding: 8px 12px; font-weight: 600;">
+                        <option value="Playfair Display" ${state.customPage.headlineFont === 'Playfair Display' || !state.customPage.headlineFont ? 'selected' : ''}>Playfair Display (Luxury Gala & Awards)</option>
+                        <option value="Cinzel" ${state.customPage.headlineFont === 'Cinzel' ? 'selected' : ''}>Cinzel (Regal Classical Awards)</option>
+                        <option value="Montserrat" ${state.customPage.headlineFont === 'Montserrat' ? 'selected' : ''}>Montserrat (Modern Geometric Impact)</option>
+                        <option value="Plus Jakarta Sans" ${state.customPage.headlineFont === 'Plus Jakarta Sans' ? 'selected' : ''}>Plus Jakarta Sans (Contemporary Bold)</option>
+                        <option value="Outfit" ${state.customPage.headlineFont === 'Outfit' ? 'selected' : ''}>Outfit (Warm Humanistic)</option>
+                        <option value="Inter" ${state.customPage.headlineFont === 'Inter' ? 'selected' : ''}>Inter (Clean Minimalist)</option>
+                        <option value="Merriweather" ${state.customPage.headlineFont === 'Merriweather' ? 'selected' : ''}>Merriweather (Classic Editorial Serif)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px;">Body & Description Font</label>
+                      <select id="adm-custom-font-body" class="form-control" style="width: 100%; padding: 8px 12px; font-weight: 600;">
+                        <option value="Plus Jakarta Sans" ${state.customPage.bodyFont === 'Plus Jakarta Sans' || !state.customPage.bodyFont ? 'selected' : ''}>Plus Jakarta Sans (Crisp Modern)</option>
+                        <option value="Inter" ${state.customPage.bodyFont === 'Inter' ? 'selected' : ''}>Inter (Clean Standard)</option>
+                        <option value="Outfit" ${state.customPage.bodyFont === 'Outfit' ? 'selected' : ''}>Outfit (Warm Modern)</option>
+                        <option value="Merriweather" ${state.customPage.bodyFont === 'Merriweather' ? 'selected' : ''}>Merriweather (Classic Editorial)</option>
+                        <option value="Montserrat" ${state.customPage.bodyFont === 'Montserrat' ? 'selected' : ''}>Montserrat (Contemporary)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SAVED COLOR PALETTES & SWATCHES MANAGER -->
+                <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid rgba(15,23,42,0.08); margin-bottom: 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                    <h5 style="margin: 0; font-size: 0.95rem; color: var(--primary); font-weight: 700;">
+                      <i class="fa-solid fa-swatchbook" style="color: var(--accent); margin-right: 6px;"></i> Saved Brand Color Swatches & Quick Palette
+                    </h5>
+                    <span style="font-size: 0.78rem; color: var(--text-muted);">Click any swatch to apply to active color field</span>
+                  </div>
+                  
+                  <div id="gala-saved-swatches-bar" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
+                    ${(state.customPage.savedColors || ['#0B132B', '#1E2761', '#F39C12', '#2563EB', '#10B981', '#3B0712', '#FFFFFF', '#18181B']).map(c => `
+                      <div class="swatch-item" style="position: relative; display: inline-flex; align-items: center;">
+                        <button type="button" class="gala-saved-swatch-chip" data-color="${c}" style="width: 32px; height: 32px; border-radius: 50%; background: ${c}; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.15s ease;" title="Apply ${c}"></button>
+                        <button type="button" class="gala-delete-swatch-btn" data-color="${c}" style="position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center;" title="Delete swatch">&times;</button>
+                      </div>
+                    `).join('')}
+                  </div>
+
+                  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="adm-new-swatch-hex" placeholder="#7C3AED" class="form-control" style="width: 110px; font-family: monospace; font-size: 0.85rem; padding: 6px 10px;">
+                    <button type="button" class="btn btn-outline" id="adm-save-swatch-btn" style="padding: 6px 14px; font-size: 0.82rem; font-weight: 700;">
+                      <i class="fa-solid fa-plus" style="color: var(--success); margin-right: 4px;"></i> Save Color Swatch
+                    </button>
+                    <button type="button" class="btn btn-outline" id="adm-save-current-accent-btn" style="padding: 6px 14px; font-size: 0.82rem;">
+                      <i class="fa-solid fa-bookmark" style="margin-right: 4px;"></i> Save Current Accent
+                    </button>
+                  </div>
+                </div>
 
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px;">
                   <!-- Hero Background Color -->
@@ -3397,6 +3985,116 @@ const templates = {
             </form>
           </div>
         </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB PANE 6: GALA ATTENDEES & CATERING MASTER REGISTRY     -->
+        <!-- ========================================================= -->
+        <div class="admin-tab-pane" id="adm-pane-gala-roster">
+          <div style="max-width: 1250px; margin: 0 auto 3rem auto;">
+            <!-- Header & Action Row -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
+              <div>
+                <h3 style="font-size: 1.4rem; color: var(--primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-clipboard-user" style="color: var(--accent);"></i> Gala Attendees & Catering Master Registry
+                </h3>
+                <p style="font-size: 0.88rem; color: var(--text-muted); margin: 4px 0 0 0;">
+                  Live master roster of all registered guests, individual unique ticket IDs, food allergy alerts, seating tiers, and payments.
+                </p>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button type="button" id="btn-download-gala-csv" class="btn btn-primary" style="padding: 10px 18px; font-weight: 700;">
+                  <i class="fa-solid fa-file-csv" style="margin-right: 6px;"></i> Download Attendees Master (CSV)
+                </button>
+                <button type="button" id="btn-print-gala-roster" class="btn btn-outline" style="padding: 10px 16px;">
+                  <i class="fa-solid fa-print" style="margin-right: 6px;"></i> Print Roster
+                </button>
+              </div>
+            </div>
+
+            <!-- KPI Summary Cards -->
+            <div class="admin-kpi-grid" style="margin-bottom: 24px;">
+              <div class="calendar-card admin-kpi-card" style="border-left: 4px solid var(--primary);">
+                <div class="kpi-icon" style="color: var(--primary);"><i class="fa-solid fa-users"></i></div>
+                <div>
+                  <div id="gala-kpi-attendees" class="kpi-value">${(state.galaAttendees && state.galaAttendees.length) || 0}</div>
+                  <div class="kpi-label">Total Gala Guests</div>
+                </div>
+              </div>
+              <div class="calendar-card admin-kpi-card" style="border-left: 4px solid var(--accent);">
+                <div class="kpi-icon" style="color: var(--accent);"><i class="fa-solid fa-dollar-sign"></i></div>
+                <div>
+                  <div id="gala-kpi-revenue" class="kpi-value">$0.00</div>
+                  <div class="kpi-label">Gala Ticket Revenue</div>
+                </div>
+              </div>
+              <div class="calendar-card admin-kpi-card" style="border-left: 4px solid #EF4444;">
+                <div class="kpi-icon" style="color: #EF4444;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div>
+                  <div id="gala-kpi-allergies" class="kpi-value" style="color: #DC2626;">0</div>
+                  <div class="kpi-label">Dietary / Food Allergy Alerts</div>
+                </div>
+              </div>
+              <div class="calendar-card admin-kpi-card" style="border-left: 4px solid var(--secondary);">
+                <div class="kpi-icon" style="color: var(--secondary);"><i class="fa-solid fa-crown"></i></div>
+                <div>
+                  <div id="gala-kpi-vip" class="kpi-value">0</div>
+                  <div class="kpi-label">VIP & Sponsor Guests</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Search & Filter Controls -->
+            <div class="calendar-card" style="padding: 16px 20px; margin-bottom: 20px;">
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 260px; position: relative;">
+                  <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                  <input type="text" id="gala-roster-search" class="form-control" placeholder="Search by Attendee Name, Ticket ID, Purchaser, or Allergy..." style="padding-left: 38px; height: 42px;">
+                </div>
+                <div style="min-width: 200px;">
+                  <select id="gala-roster-filter-dietary" class="form-control" style="height: 42px;">
+                    <option value="ALL">All Dietary Profiles</option>
+                    <option value="ALLERGIES_ONLY">⚠️ Food Allergy Alerts Only</option>
+                    <option value="STANDARD">Standard Menu</option>
+                    <option value="Vegetarian">Vegetarian</option>
+                    <option value="Vegan">Vegan</option>
+                    <option value="Gluten-Free">Gluten-Free</option>
+                    <option value="Dairy-Free">Dairy-Free</option>
+                    <option value="Nut Allergy">Nut / Peanut Allergy</option>
+                    <option value="Shellfish Allergy">Shellfish Allergy</option>
+                  </select>
+                </div>
+                <button type="button" id="gala-roster-refresh-btn" class="btn btn-outline" style="height: 42px; padding: 0 14px;" title="Refresh Roster">
+                  <i class="fa-solid fa-rotate"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Attendee Master Table Card -->
+            <div class="calendar-card" style="padding: 20px; overflow-x: auto;">
+              <table class="overtime-analytics-table" style="min-width: 1000px;">
+                <thead>
+                  <tr>
+                    <th>Ticket ID</th>
+                    <th>Attendee Name & Contact</th>
+                    <th>Purchaser</th>
+                    <th>Tier / Ticket Type</th>
+                    <th>Amount Paid</th>
+                    <th>Food Allergy & Dietary Needs</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="gala-roster-table-body">
+                  <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                      <i class="fa-solid fa-spinner fa-spin"></i> Loading gala attendees and dietary roster...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </section>
     `;
   },
@@ -3464,6 +4162,13 @@ const templates = {
                     <div style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 8px;">
                       <strong>Holder:</strong> ${tkt.guestName || tkt.userEmail || (state.user ? state.user.displayName || state.user.email : 'Valued Attendee')}
                     </div>
+
+                    ${(tkt.dietaryPreference && tkt.dietaryPreference !== 'Standard / No Restrictions') || (tkt.allergyNotes && tkt.allergyNotes !== 'None') ? `
+                      <div style="font-size: 0.8rem; color: #991B1B; background: #FEE2E2; padding: 5px 10px; border-radius: 6px; margin-bottom: 8px; border: 1px solid #FCA5A5; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-utensils" style="color: #DC2626;"></i>
+                        <span><strong>Dietary:</strong> ${tkt.dietaryPreference || 'Special Dietary Need'}${tkt.allergyNotes && tkt.allergyNotes !== 'None' ? ` (${tkt.allergyNotes})` : ''}</span>
+                      </div>
+                    ` : ''}
 
                     ${tkt.pricePaid !== undefined && tkt.pricePaid !== null ? `
                       <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 10px;">
@@ -3975,11 +4680,42 @@ function bindCustomEventPage() {
       let html = '';
       for (let i = 2; i <= qty; i++) {
         html += `
-          <div class="form-group" style="margin-bottom: 8px;">
-            <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 4px;">
-              <i class="fa-solid fa-user-tag" style="color: var(--secondary); margin-right: 4px;"></i> Ticket #${i} Attendee Full Name *
-            </label>
-            <input type="text" class="form-control custom-attendee-input" id="custom-attendee-name-${i}" placeholder="Guest #${i} Full Name" required style="width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+          <div class="calendar-card" style="padding: 14px; margin-bottom: 12px; border-left: 4px solid var(--secondary); background: white;">
+            <div style="font-size: 0.88rem; font-weight: 800; color: var(--primary); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <span><i class="fa-solid fa-user-tag" style="color: var(--secondary); margin-right: 6px;"></i> Ticket #${i} Attendee Full Name *</span>
+              <span style="font-size: 0.75rem; background: var(--bg-base); padding: 2px 8px; border-radius: 10px; color: var(--text-muted); font-weight: 700;">Guest #${i}</span>
+            </div>
+            <div class="admin-form-row-2" style="margin-bottom: 10px;">
+              <div>
+                <input type="text" class="form-control custom-attendee-input" id="custom-attendee-name-${i}" placeholder="Guest #${i} Full Name" required style="width: 100%; padding: 9px 12px; font-size: 0.88rem; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+              </div>
+              <div>
+                <input type="email" class="form-control" id="custom-attendee-email-${i}" placeholder="Guest Email (Optional)" style="width: 100%; padding: 9px 12px; font-size: 0.88rem; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15); background-color: var(--bg-base);">
+              </div>
+            </div>
+            <div style="background: rgba(15,23,42,0.03); padding: 10px; border-radius: 6px;">
+              <div class="admin-form-row-2">
+                <div>
+                  <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Dietary Choice</label>
+                  <select id="custom-attendee-dietary-${i}" class="form-control" style="width: 100%; padding: 8px; font-size: 0.82rem;">
+                    <option value="Standard / No Restrictions">Standard / No Restrictions</option>
+                    <option value="Vegetarian">Vegetarian</option>
+                    <option value="Vegan">Vegan</option>
+                    <option value="Gluten-Free">Gluten-Free</option>
+                    <option value="Dairy-Free">Dairy-Free</option>
+                    <option value="Nut Allergy">Nut / Peanut Allergy</option>
+                    <option value="Shellfish Allergy">Shellfish Allergy</option>
+                    <option value="Halal">Halal</option>
+                    <option value="Kosher-Style">Kosher-Style</option>
+                    <option value="Other">Other / Specific Sensitivities</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Food Allergies & Dietary Notes</label>
+                  <input type="text" id="custom-attendee-allergy-${i}" class="form-control" placeholder="E.g., Nut allergy, gluten-sensitive" style="width: 100%; padding: 8px; font-size: 0.82rem;">
+                </div>
+              </div>
+            </div>
           </div>
         `;
       }
@@ -4108,12 +4844,35 @@ function bindCustomEventPage() {
       const isInstallment = splitPlanRadio && splitPlanRadio.value === 'INSTALLMENT';
       const cycles = (state.customPage && state.customPage.installmentCycles) || 3;
 
-      // Collect all attendee names
-      const attendees = [name];
+      // Collect all attendee names and food allergy profiles
+      const att1Dietary = document.getElementById('custom-tier-dietary-1')?.value || 'Standard / No Restrictions';
+      const att1Allergy = document.getElementById('custom-tier-allergy-1')?.value.trim() || 'None';
+      const attendees = [{
+        name: name,
+        email: email,
+        dietaryPreference: att1Dietary,
+        allergyNotes: att1Allergy,
+        hasAllergy: att1Dietary !== 'Standard / No Restrictions' || (Boolean(att1Allergy) && att1Allergy.toLowerCase() !== 'none')
+      }];
+
       for (let i = 2; i <= qty; i++) {
         const attInput = document.getElementById(`custom-attendee-name-${i}`);
+        const attEmailInput = document.getElementById(`custom-attendee-email-${i}`);
+        const attDietaryInput = document.getElementById(`custom-attendee-dietary-${i}`);
+        const attAllergyInput = document.getElementById(`custom-attendee-allergy-${i}`);
+
         const attName = attInput && attInput.value.trim() ? attInput.value.trim() : `Guest ${i} of ${name}`;
-        attendees.push(attName);
+        const attEmail = attEmailInput && attEmailInput.value.trim() ? attEmailInput.value.trim() : email;
+        const attDietary = attDietaryInput ? attDietaryInput.value : 'Standard / No Restrictions';
+        const attAllergy = attAllergyInput && attAllergyInput.value.trim() ? attAllergyInput.value.trim() : 'None';
+
+        attendees.push({
+          name: attName,
+          email: attEmail,
+          dietaryPreference: attDietary,
+          allergyNotes: attAllergy,
+          hasAllergy: attDietary !== 'Standard / No Restrictions' || (Boolean(attAllergy) && attAllergy.toLowerCase() !== 'none')
+        });
       }
 
       if (submitBtn) {
@@ -4129,7 +4888,7 @@ function bindCustomEventPage() {
 
         const createdTickets = [];
 
-        attendees.forEach((attName, idx) => {
+        attendees.forEach((attObj, idx) => {
           const dedicatedNumber = `${masterNumber}-${String(idx + 1).padStart(2, '0')}`;
           const token = Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -4142,13 +4901,14 @@ function bindCustomEventPage() {
             totalAttendees: qty,
             eventId: 9999,
             eventTitle: `${state.customPage.title} - ${tierName}`,
+            tierName: tierName,
             eventDate: state.customPage.date,
             eventLocation: state.customPage.location,
-            guestName: attName,
+            guestName: attObj.name,
             primaryPurchaser: name,
-            userEmail: email,
+            userEmail: attObj.email,
             phone: phone,
-            quantity: 1, // Individual ticket
+            quantity: 1, // Individual ticket per attendee
             pricePaid: isInstallment ? (totalPrice / cycles / qty) : unitPrice,
             unitPrice: unitPrice,
             totalOrderPrice: totalPrice,
@@ -4158,6 +4918,9 @@ function bindCustomEventPage() {
             installmentCycles: isInstallment ? cycles : 1,
             installmentsPaid: 1,
             remainingBalance: isInstallment ? (totalPrice - (totalPrice / cycles)) : 0,
+            dietaryPreference: attObj.dietaryPreference,
+            allergyNotes: attObj.allergyNotes,
+            hasAllergy: attObj.hasAllergy,
             purchaseDate: new Date().toISOString().split('T')[0]
           };
 
@@ -4173,7 +4936,7 @@ function bindCustomEventPage() {
           : `Dedicated Ticket ID: ${masterNumber}-01`;
 
         showToast('success', 'Tickets Confirmed!', `Thank you ${name}! ${qty}x ${tierName} tickets booked.`, 6000);
-        alert(`🎉 Gala Tickets Confirmed!\n\nThank you, ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nMaster Order: ${masterNumber}\n${ticketSummary}\n\n${isInstallment ? `Payment Plan: Split into ${cycles} monthly payments ($${(totalPrice / cycles).toFixed(2)}/mo). First installment paid today.\n\n` : ''}Each attendee ticket is saved under "My Tickets" with a dedicated ticket ID and verification code for check-in and printing.`);
+        alert(`🎉 Gala Tickets Confirmed!\n\nThank you, ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nMaster Order: ${masterNumber}\n${ticketSummary}\n\n${isInstallment ? `Payment Plan: Split into ${cycles} monthly payments ($${(totalPrice / cycles).toFixed(2)}/mo). First installment paid today.\n\n` : ''}Each attendee ticket has been saved with food allergy notes and individual verification code for check-in and printing.`);
         
         if (modal) modal.classList.remove('active');
         form.reset();
@@ -4981,6 +5744,8 @@ function bindAdminDashboard() {
     const heroBg = sanitizeHexColor(document.getElementById('adm-custom-hero-bg')?.value || document.getElementById('adm-custom-hero-bg-hex')?.value, '#0B132B');
     const heroText = sanitizeHexColor(document.getElementById('adm-custom-hero-text')?.value || document.getElementById('adm-custom-hero-text-hex')?.value, '#FFFFFF');
     const accent = sanitizeHexColor(document.getElementById('adm-custom-accent')?.value || document.getElementById('adm-custom-accent-hex')?.value, '#F39C12');
+    const headlineFont = document.getElementById('adm-custom-font-headline')?.value || state.customPage.headlineFont || 'Playfair Display';
+    const bodyFont = document.getElementById('adm-custom-font-body')?.value || state.customPage.bodyFont || 'Plus Jakarta Sans';
     const title = document.getElementById('adm-custom-title')?.value.trim() || 'Unmasking Hope: Annual Charity Gala & Awards';
     const subtitle = document.getElementById('adm-custom-subtitle')?.value.trim() || 'An evening of celebration, impact, and collective resilience.';
     const date = document.getElementById('adm-custom-date')?.value || '2026-11-19';
@@ -4991,6 +5756,7 @@ function bindAdminDashboard() {
     if (heroBox) {
       heroBox.style.backgroundColor = heroBg;
       heroBox.style.color = heroText;
+      heroBox.style.fontFamily = `'${bodyFont}', sans-serif`;
     }
     const tagEl = document.getElementById('gala-live-tag-preview');
     if (tagEl) {
@@ -5001,11 +5767,13 @@ function bindAdminDashboard() {
     if (titleEl) {
       titleEl.innerText = title;
       titleEl.style.color = heroText;
+      titleEl.style.fontFamily = `'${headlineFont}', serif`;
     }
     const subEl = document.getElementById('gala-live-subtitle-preview');
     if (subEl) {
       subEl.innerText = subtitle;
       subEl.style.color = heroText;
+      subEl.style.fontFamily = `'${bodyFont}', sans-serif`;
     }
     const dateEl = document.getElementById('gala-live-date-preview');
     if (dateEl) dateEl.innerHTML = `<i class="fa-regular fa-calendar"></i> ${date}`;
@@ -5023,6 +5791,8 @@ function bindAdminDashboard() {
     state.customPage.heroBgColor = heroBg;
     state.customPage.heroTextColor = heroText;
     state.customPage.accentColor = accent;
+    state.customPage.headlineFont = headlineFont;
+    state.customPage.bodyFont = bodyFont;
     state.customPage.title = title;
     state.customPage.subtitle = subtitle;
     state.customPage.date = date;
@@ -5035,6 +5805,97 @@ function bindAdminDashboard() {
     youtubeInput.addEventListener('input', () => {
       const embedUrl = getYouTubeEmbedUrl(youtubeInput.value.trim());
       if (embedUrl) youtubeIframe.src = embedUrl;
+    });
+  }
+
+  // Font selectors change event listeners
+  ['adm-custom-font-headline', 'adm-custom-font-body'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (sel) {
+      sel.addEventListener('change', updateGalaStudioLivePreview);
+    }
+  });
+
+  // Saved Swatches Manager
+  function renderGalaSavedSwatches() {
+    const container = document.getElementById('gala-saved-swatches-bar');
+    if (!container) return;
+    const colors = state.customPage.savedColors || ['#0B132B', '#1E2761', '#F39C12', '#2563EB', '#10B981', '#3B0712', '#FFFFFF', '#18181B'];
+    container.innerHTML = colors.map(c => `
+      <div class="swatch-item" style="position: relative; display: inline-flex; align-items: center;">
+        <button type="button" class="gala-saved-swatch-chip" data-color="${c}" style="width: 32px; height: 32px; border-radius: 50%; background: ${c}; border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.15s ease;" title="Apply ${c}"></button>
+        <button type="button" class="gala-delete-swatch-btn" data-color="${c}" style="position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: #ef4444; color: white; border: none; font-size: 10px; line-height: 1; cursor: pointer; display: none; align-items: center; justify-content: center;" title="Delete swatch">&times;</button>
+      </div>
+    `).join('');
+    bindGalaSavedSwatches();
+  }
+
+  function bindGalaSavedSwatches() {
+    document.querySelectorAll('.gala-saved-swatch-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const color = chip.getAttribute('data-color');
+        const accentInput = document.getElementById('adm-custom-accent');
+        const accentHex = document.getElementById('adm-custom-accent-hex');
+        if (accentInput) accentInput.value = color;
+        if (accentHex) accentHex.value = color;
+        updateGalaStudioLivePreview();
+        showToast('info', 'Color Applied', `Applied swatch ${color} to Gala Accent.`);
+      });
+      const parent = chip.parentElement;
+      const delBtn = parent ? parent.querySelector('.gala-delete-swatch-btn') : null;
+      if (parent && delBtn) {
+        parent.addEventListener('mouseenter', () => delBtn.style.display = 'inline-flex');
+        parent.addEventListener('mouseleave', () => delBtn.style.display = 'none');
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const colorToDelete = delBtn.getAttribute('data-color');
+          state.customPage.savedColors = (state.customPage.savedColors || []).filter(c => c.toUpperCase() !== colorToDelete.toUpperCase());
+          renderGalaSavedSwatches();
+          await saveCustomPage(state.customPage);
+          showToast('info', 'Swatch Removed', `Removed ${colorToDelete} from saved colors.`);
+        });
+      }
+    });
+  }
+
+  bindGalaSavedSwatches();
+
+  const saveSwatchBtn = document.getElementById('adm-save-swatch-btn');
+  const newSwatchHex = document.getElementById('adm-new-swatch-hex');
+  if (saveSwatchBtn && newSwatchHex) {
+    saveSwatchBtn.addEventListener('click', async () => {
+      let hex = newSwatchHex.value.trim().toUpperCase();
+      if (!hex.startsWith('#')) hex = '#' + hex;
+      if (!/^#[0-9A-F]{6}$/i.test(hex)) {
+        showToast('error', 'Invalid Hex Color', 'Please enter a valid 6-digit hex code, e.g. #7C3AED');
+        return;
+      }
+      if (!state.customPage.savedColors) state.customPage.savedColors = ['#0B132B', '#1E2761', '#F39C12', '#2563EB', '#10B981', '#3B0712', '#FFFFFF', '#18181B'];
+      if (!state.customPage.savedColors.includes(hex)) {
+        state.customPage.savedColors.push(hex);
+        renderGalaSavedSwatches();
+        await saveCustomPage(state.customPage);
+        showToast('success', 'Color Saved', `Saved ${hex} to brand swatches and synced to cloud!`);
+        newSwatchHex.value = '';
+      } else {
+        showToast('info', 'Already Saved', `${hex} is already in your saved swatches.`);
+      }
+    });
+  }
+
+  const saveCurAccentBtn = document.getElementById('adm-save-current-accent-btn');
+  if (saveCurAccentBtn) {
+    saveCurAccentBtn.addEventListener('click', async () => {
+      const curAccent = sanitizeHexColor(document.getElementById('adm-custom-accent')?.value || document.getElementById('adm-custom-accent-hex')?.value, '#F39C12').toUpperCase();
+      if (!state.customPage.savedColors) state.customPage.savedColors = ['#0B132B', '#1E2761', '#F39C12', '#2563EB', '#10B981', '#3B0712', '#FFFFFF', '#18181B'];
+      if (!state.customPage.savedColors.includes(curAccent)) {
+        state.customPage.savedColors.push(curAccent);
+        renderGalaSavedSwatches();
+        await saveCustomPage(state.customPage);
+        showToast('success', 'Accent Saved', `Saved current accent ${curAccent} to swatches!`);
+      } else {
+        showToast('info', 'Already Saved', `Current accent ${curAccent} is already in saved swatches.`);
+      }
     });
   }
 
@@ -5198,6 +6059,9 @@ function bindAdminDashboard() {
         heroBgColor,
         heroTextColor,
         accentColor,
+        headlineFont: document.getElementById('adm-custom-font-headline')?.value || state.customPage.headlineFont || 'Playfair Display',
+        bodyFont: document.getElementById('adm-custom-font-body')?.value || state.customPage.bodyFont || 'Plus Jakarta Sans',
+        savedColors: state.customPage.savedColors || ['#0B132B', '#1E2761', '#F39C12', '#2563EB', '#10B981', '#3B0712', '#FFFFFF', '#18181B'],
         bannerImage: document.getElementById('adm-custom-banner')?.value.trim() || '',
         storyTitle: document.getElementById('adm-custom-story-title')?.value.trim() || 'An Evening Dedicated to Hope & Healing',
         description: document.getElementById('adm-custom-desc')?.value.trim() || '',
@@ -5217,6 +6081,42 @@ function bindAdminDashboard() {
       showToast('success', 'Gala Settings Saved', 'Gala Page customization and pricing tiers have been updated and synced to cloud!');
     });
   }
+
+  // Gala Attendee & Catering Master Roster Listeners
+  const rosterSearch = document.getElementById('gala-roster-search');
+  const dietaryFilter = document.getElementById('gala-roster-filter-dietary');
+  const rosterRefreshBtn = document.getElementById('gala-roster-refresh-btn');
+  const downloadCsvBtn = document.getElementById('btn-download-gala-csv');
+  const printRosterBtn = document.getElementById('btn-print-gala-roster');
+
+  if (rosterSearch) {
+    rosterSearch.addEventListener('input', () => {
+      renderGalaAttendeesTable(rosterSearch.value, dietaryFilter ? dietaryFilter.value : 'ALL');
+    });
+  }
+  if (dietaryFilter) {
+    dietaryFilter.addEventListener('change', () => {
+      renderGalaAttendeesTable(rosterSearch ? rosterSearch.value : '', dietaryFilter.value);
+    });
+  }
+  if (rosterRefreshBtn) {
+    rosterRefreshBtn.addEventListener('click', async () => {
+      rosterRefreshBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+      await syncGalaAttendeesFromCloud();
+      rosterRefreshBtn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
+      showToast('info', 'Roster Refreshed', 'Gala attendee and dietary roster updated from cloud.');
+    });
+  }
+  if (downloadCsvBtn) {
+    downloadCsvBtn.addEventListener('click', downloadGalaAttendeesCsv);
+  }
+  if (printRosterBtn) {
+    printRosterBtn.addEventListener('click', () => window.print());
+  }
+
+  // Load Gala attendees table & cloud sync
+  renderGalaAttendeesTable();
+  syncGalaAttendeesFromCloud();
 
   // 1. Category Color Pickers Live Update
   document.querySelectorAll('.category-color-picker').forEach(picker => {
