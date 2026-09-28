@@ -20,7 +20,9 @@ const ADMIN_WHITELIST = [
   'howards4hope@gmail.com',
   'staff@howards4hope.org',
   'lacreashia@howards4hope.org',
-  'lamar@howards4hope.org'
+  'lamar@howards4hope.org',
+  'swardhero@gmail.com',
+  'sean.ward.7777@gmail.com'
 ];
 
 function isUserAdmin(user, tokenResult = null) {
@@ -332,13 +334,21 @@ function formatStoryParagraphs(text, fallback = '') {
 function loadCustomPage() {
   try {
     const saved = localStorage.getItem('h4h_custom_page');
-    if (saved) return Object.assign({}, DEFAULT_CUSTOM_PAGE, JSON.parse(saved));
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') {
+        if (!parsed.schedule || !Array.isArray(parsed.schedule) || parsed.schedule.length === 0) {
+          parsed.schedule = DEFAULT_CUSTOM_PAGE.schedule;
+        }
+        return Object.assign({}, DEFAULT_CUSTOM_PAGE, parsed);
+      }
+    }
   } catch (e) {}
   return { ...DEFAULT_CUSTOM_PAGE };
 }
 
 async function saveCustomPage(pageConfig) {
-  state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, pageConfig);
+  state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, state.customPage, pageConfig);
   try {
     localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
   } catch (e) {}
@@ -348,15 +358,28 @@ async function saveCustomPage(pageConfig) {
   try {
     if (typeof firebase !== 'undefined' && firebase.firestore) {
       const firestoreDb = firebase.firestore();
-      await firestoreDb.collection('settings').doc('gala_page').set({
+      const cleanSchedule = (state.customPage.schedule || []).map(s => ({
+        time: String(s.time || 'TBA'),
+        title: String(s.title || 'Scheduled Activity'),
+        desc: String(s.desc || '')
+      }));
+
+      const payload = {
         ...state.customPage,
+        schedule: cleanSchedule,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-      console.log("Gala page configuration successfully synced to Firestore cloud.");
+      };
+
+      await firestoreDb.collection('settings').doc('gala_page').set(payload, { merge: true });
+      console.log("Gala page configuration successfully synced globally to Firestore cloud.", payload);
+      return true;
     }
   } catch (err) {
-    console.warn("Firestore save warning (cached locally):", err);
+    console.error("Firestore gala_page save error:", err);
+    showToast('warning', 'Cloud Sync Notice', 'Saved to local device cache. Cloud sync error: ' + (err.message || 'Permission denied'));
+    return false;
   }
+  return true;
 }
 
 async function syncCustomPageFromCloud() {
@@ -367,6 +390,11 @@ async function syncCustomPageFromCloud() {
       if (doc.exists) {
         const cloudData = doc.data();
         if (cloudData && typeof cloudData === 'object') {
+          if (!cloudData.schedule || !Array.isArray(cloudData.schedule) || cloudData.schedule.length === 0) {
+            cloudData.schedule = (state.customPage && state.customPage.schedule && state.customPage.schedule.length > 0)
+              ? state.customPage.schedule
+              : DEFAULT_CUSTOM_PAGE.schedule;
+          }
           state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, cloudData);
           try {
             localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
@@ -388,7 +416,12 @@ async function syncCustomPageFromCloud() {
         firestoreDb.collection('settings').doc('gala_page').onSnapshot(snapshot => {
           if (snapshot && snapshot.exists) {
             const cloudData = snapshot.data();
-            if (cloudData) {
+            if (cloudData && typeof cloudData === 'object') {
+              if (!cloudData.schedule || !Array.isArray(cloudData.schedule) || cloudData.schedule.length === 0) {
+                cloudData.schedule = (state.customPage && state.customPage.schedule && state.customPage.schedule.length > 0)
+                  ? state.customPage.schedule
+                  : DEFAULT_CUSTOM_PAGE.schedule;
+              }
               state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, cloudData);
               try {
                 localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
@@ -4025,9 +4058,14 @@ const templates = {
                     </h4>
                     <p style="font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0 0;">Add, remove, re-order, and edit times and activities for the Gala program.</p>
                   </div>
-                  <button type="button" class="btn btn-outline" id="adm-add-schedule-btn" style="font-size: 0.85rem; padding: 7px 14px; background: white; font-weight: 700;">
-                    <i class="fa-solid fa-plus" style="margin-right: 4px; color: var(--success);"></i> Add Itinerary Event
-                  </button>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-outline" id="adm-add-schedule-btn" style="font-size: 0.85rem; padding: 7px 14px; background: white; font-weight: 700;">
+                      <i class="fa-solid fa-plus" style="margin-right: 4px; color: var(--success);"></i> Add Itinerary Event
+                    </button>
+                    <button type="button" class="btn btn-primary" id="adm-save-schedule-now-btn" style="font-size: 0.85rem; padding: 7px 16px; font-weight: 700; background: var(--secondary); border-color: var(--secondary); color: white;">
+                      <i class="fa-solid fa-cloud-arrow-up" style="margin-right: 4px;"></i> Save Schedule to Cloud
+                    </button>
+                  </div>
                 </div>
 
                 <div id="adm-schedule-container" style="display: flex; flex-direction: column; gap: 10px;">
@@ -4662,6 +4700,7 @@ async function router() {
   } else if (hash === '#/blog') {
     contentDiv.innerHTML = templates.blog();
   } else if (hash === '#/special-event') {
+    syncCustomPageFromCloud().catch(() => {});
     contentDiv.innerHTML = templates.customEventPage();
     bindCustomEventPage();
   } else if (hash === '#/terms') {
@@ -4688,6 +4727,7 @@ window.addEventListener('hashchange', router);
 // Instant application bootstrap on DOM ready
 function initApp() {
   updateCustomPageNavLinks();
+  syncCustomPageFromCloud().catch(() => {});
   router();
   
   // Newsletter Form binding
@@ -6215,6 +6255,29 @@ function bindAdminDashboard() {
   });
 
   // Schedule Timeline Add / Delete / Reorder Management
+  function collectScheduleFromDOM() {
+    if (!schedContainer) return [];
+    const items = [];
+    schedContainer.querySelectorAll('.adm-sched-row').forEach(row => {
+      const time = row.querySelector('.sched-time-input')?.value.trim();
+      const title = row.querySelector('.sched-title-input')?.value.trim();
+      const desc = row.querySelector('.sched-desc-input')?.value.trim();
+      if (title || time) {
+        items.push({ time: time || 'TBA', title: title || 'Scheduled Activity', desc: desc || '' });
+      }
+    });
+    return items;
+  }
+
+  function syncScheduleStateFromDOM() {
+    const items = collectScheduleFromDOM();
+    state.customPage.schedule = items;
+    try {
+      localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
+    } catch (e) {}
+    updateGalaStudioLivePreview();
+  }
+
   function renumberSchedRows() {
     if (!schedContainer) return;
     const rows = schedContainer.querySelectorAll('.adm-sched-row');
@@ -6234,8 +6297,8 @@ function bindAdminDashboard() {
       delBtn.addEventListener('click', () => {
         row.remove();
         renumberSchedRows();
-        updateGalaStudioLivePreview();
-        showToast('info', 'Segment Removed', 'Itinerary segment removed from schedule.');
+        syncScheduleStateFromDOM();
+        showToast('info', 'Segment Removed', 'Itinerary segment removed. Remember to save changes.');
       });
     }
 
@@ -6245,7 +6308,7 @@ function bindAdminDashboard() {
         if (prev && prev.classList.contains('adm-sched-row')) {
           schedContainer.insertBefore(row, prev);
           renumberSchedRows();
-          updateGalaStudioLivePreview();
+          syncScheduleStateFromDOM();
         }
       });
     }
@@ -6256,18 +6319,35 @@ function bindAdminDashboard() {
         if (next && next.classList.contains('adm-sched-row')) {
           schedContainer.insertBefore(next, row);
           renumberSchedRows();
-          updateGalaStudioLivePreview();
+          syncScheduleStateFromDOM();
         }
       });
     }
 
     row.querySelectorAll('input').forEach(inp => {
-      inp.addEventListener('input', updateGalaStudioLivePreview);
+      inp.addEventListener('input', () => {
+        syncScheduleStateFromDOM();
+      });
     });
   }
 
   if (schedContainer) {
     schedContainer.querySelectorAll('.adm-sched-row').forEach(row => bindScheduleRow(row));
+  }
+
+  const saveSchedNowBtn = document.getElementById('adm-save-schedule-now-btn');
+  if (saveSchedNowBtn) {
+    saveSchedNowBtn.addEventListener('click', async () => {
+      saveSchedNowBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 4px;"></i> Saving Schedule...';
+      saveSchedNowBtn.disabled = true;
+      syncScheduleStateFromDOM();
+      const success = await saveCustomPage(state.customPage);
+      saveSchedNowBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up" style="margin-right: 4px;"></i> Save Schedule to Cloud';
+      saveSchedNowBtn.disabled = false;
+      if (success) {
+        showToast('success', 'Itinerary Synced Globally', 'Program itinerary has been saved to the cloud and is now live across the site!');
+      }
+    });
   }
 
   if (addSchedBtn && schedContainer) {
@@ -6299,7 +6379,7 @@ function bindAdminDashboard() {
       schedContainer.appendChild(row);
       bindScheduleRow(row);
       renumberSchedRows();
-      updateGalaStudioLivePreview();
+      syncScheduleStateFromDOM();
       row.querySelector('.sched-title-input')?.focus();
     });
   }
@@ -6361,15 +6441,7 @@ function bindAdminDashboard() {
         }
       });
 
-      const scheduleItems = [];
-      document.querySelectorAll('.adm-sched-row').forEach(row => {
-        const time = row.querySelector('.sched-time-input')?.value.trim();
-        const title = row.querySelector('.sched-title-input')?.value.trim();
-        const desc = row.querySelector('.sched-desc-input')?.value.trim();
-        if (title || time) {
-          scheduleItems.push({ time: time || 'TBA', title: title || 'Scheduled Activity', desc: desc || '' });
-        }
-      });
+      const scheduleItems = collectScheduleFromDOM();
 
       const heroBgColor = sanitizeHexColor(document.getElementById('adm-custom-hero-bg-hex')?.value || document.getElementById('adm-custom-hero-bg')?.value, '#0B132B');
       const heroTextColor = sanitizeHexColor(document.getElementById('adm-custom-hero-text-hex')?.value || document.getElementById('adm-custom-hero-text')?.value, '#FFFFFF');
@@ -6408,9 +6480,11 @@ function bindAdminDashboard() {
         paymentDoor: document.getElementById('adm-custom-pay-door') ? document.getElementById('adm-custom-pay-door').checked : false
       };
 
-      await saveCustomPage(updatedPage);
+      const saveOk = await saveCustomPage(updatedPage);
       updateGalaStudioLivePreview();
-      showToast('success', 'Gala Settings Saved', 'Gala Page customization, itinerary, and payment options have been updated and synced to cloud!');
+      if (saveOk) {
+        showToast('success', 'Gala Settings Saved', 'Gala Page customization, itinerary, and payment options have been updated and synced globally to cloud!');
+      }
     });
   }
 

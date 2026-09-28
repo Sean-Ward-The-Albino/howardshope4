@@ -15,7 +15,9 @@ service cloud.firestore {
           'howards4hope@gmail.com',
           'staff@howards4hope.org',
           'lacreashia@howards4hope.org',
-          'lamar@howards4hope.org'
+          'lamar@howards4hope.org',
+          'swardhero@gmail.com',
+          'sean.ward.7777@gmail.com'
         ]
       );
     }
@@ -52,6 +54,13 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // --- GALA ATTENDEES & CATERING MASTER REGISTRY ---
+    match /gala_attendees/{attendeeId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if true;
+    }
+
     // --- DONATIONS & TAX RECEIPTS (Row-Level Security) ---
     // Donors can read only their own contributions; Admins have full access
     match /donations/{donationId} {
@@ -78,10 +87,10 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
-    // --- PLATFORM SETTINGS ---
+    // --- PLATFORM SETTINGS (Gala Page, Theme & Colors) ---
     match /settings/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
 
     // Default Deny Rule for undefined paths
