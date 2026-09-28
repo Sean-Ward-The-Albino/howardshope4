@@ -3773,9 +3773,14 @@ const templates = {
                   View all registered gala attendees, unique ticket IDs, food allergy alerts, and download the full Excel CSV.
                 </p>
               </div>
-              <button type="button" class="btn btn-primary admin-tab-jump-btn" data-target-tab="adm-pane-gala-roster" style="padding: 7px 16px; font-size: 0.82rem; font-weight: 700;">
-                <i class="fa-solid fa-users-viewfinder" style="margin-right: 5px;"></i> View & Export Roster
-              </button>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button type="button" class="btn btn-outline" id="btn-quick-download-gala-csv" style="padding: 7px 14px; font-size: 0.82rem; font-weight: 700; background: white;">
+                  <i class="fa-solid fa-file-csv" style="margin-right: 5px; color: var(--success);"></i> Export CSV
+                </button>
+                <button type="button" class="btn btn-primary admin-tab-jump-btn" data-target-tab="adm-pane-gala-roster" style="padding: 7px 16px; font-size: 0.82rem; font-weight: 700;">
+                  <i class="fa-solid fa-users-viewfinder" style="margin-right: 5px;"></i> View Full Table
+                </button>
+              </div>
             </div>
 
             <form id="adm-custom-page-form">
@@ -6357,6 +6362,10 @@ function bindAdminDashboard() {
   }
   if (downloadCsvBtn) {
     downloadCsvBtn.addEventListener('click', downloadGalaAttendeesCsv);
+  }
+  const quickDownloadCsvBtn = document.getElementById('btn-quick-download-gala-csv');
+  if (quickDownloadCsvBtn) {
+    quickDownloadCsvBtn.addEventListener('click', downloadGalaAttendeesCsv);
   }
   if (printRosterBtn) {
     printRosterBtn.addEventListener('click', () => window.print());
