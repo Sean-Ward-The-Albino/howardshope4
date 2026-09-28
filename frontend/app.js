@@ -1207,7 +1207,7 @@ const API = {
     );
     const unitPrice = event ? (event.price || 0) : 0;
     const totalPrice = unitPrice * quantity;
-    const isInstallment = paymentPlanType === 'INSTALLMENT' && installmentCycles > 1;
+    const isInstallment = paymentPlanType !== 'FULL' && installmentCycles > 1;
     const cycles = isInstallment ? installmentCycles : 1;
     const firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
     
@@ -1225,7 +1225,7 @@ const API = {
       pricePaid: firstPayment,
       paymentMethod: paymentMethod,
       status: 'CONFIRMED',
-      paymentPlanType: isInstallment ? 'INSTALLMENT' : 'FULL',
+      paymentPlanType: isInstallment ? (paymentPlanType || 'INSTALLMENT') : 'FULL',
       installmentCycles: cycles,
       installmentsPaid: 1,
       remainingBalance: isInstallment ? (totalPrice - firstPayment) : 0,
@@ -1265,7 +1265,7 @@ const API = {
     );
     const unitPrice = event ? (event.price || 0) : 0;
     const totalPrice = unitPrice * quantity;
-    const isInstallment = paymentPlanType === 'INSTALLMENT' && installmentCycles > 1;
+    const isInstallment = paymentPlanType !== 'FULL' && installmentCycles > 1;
     const cycles = isInstallment ? installmentCycles : 1;
     const firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
 
@@ -1283,7 +1283,7 @@ const API = {
       pricePaid: firstPayment,
       paymentMethod: paymentMethod,
       status: 'CONFIRMED',
-      paymentPlanType: isInstallment ? 'INSTALLMENT' : 'FULL',
+      paymentPlanType: isInstallment ? (paymentPlanType || 'INSTALLMENT') : 'FULL',
       installmentCycles: cycles,
       installmentsPaid: 1,
       remainingBalance: isInstallment ? (totalPrice - firstPayment) : 0,
@@ -2995,12 +2995,12 @@ const templates = {
                   </div>
 
                   <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <!-- Option 1: Full -->
+                    <!-- Option 1: Full / Pay Now -->
                     <label class="split-plan-option-label" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 2px solid rgba(15,23,42,0.1); background: white; cursor: pointer;">
                       <input type="radio" name="gala_split_plan" value="FULL" checked style="margin-top: 3px; transform: scale(1.15);">
                       <div style="flex: 1;">
                         <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
-                          <span>Pay in Full Today</span>
+                          <span>Pay in Full Today (Pay Now)</span>
                           <span id="gala-full-price-val">$0.00</span>
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">One-time single payment. Full 501(c)(3) tax receipt issued immediately.</div>
@@ -3013,7 +3013,7 @@ const templates = {
                       <div style="flex: 1;">
                         <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
                           <span>Bi-Weekly Plan (Every 2 Weeks)</span>
-                          <span id="gala-biweekly-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 / bi-weekly</span>
+                          <span id="gala-biweekly-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 / 2 wks</span>
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;" id="gala-biweekly-details">
                           Split into 4 payments every 14 days. 1st installment charged today.
@@ -3035,16 +3035,44 @@ const templates = {
                       </div>
                     </label>
 
-                    <!-- Option 4: Monthly -->
+                    <!-- Option 4: 2 Months Plan -->
                     <label class="split-plan-option-label" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 2px solid rgba(15,23,42,0.1); background: white; cursor: pointer;">
-                      <input type="radio" name="gala_split_plan" value="MONTHLY" style="margin-top: 3px; transform: scale(1.15);">
+                      <input type="radio" name="gala_split_plan" value="MONTHLY_2" style="margin-top: 3px; transform: scale(1.15);">
                       <div style="flex: 1;">
                         <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
-                          <span>Monthly Plan (${page.installmentCycles || 3} Months)</span>
-                          <span id="gala-split-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 / mo</span>
+                          <span>Monthly Plan (2 Months)</span>
+                          <span id="gala-monthly2-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 / mo</span>
                         </div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
-                          Billed once per month across ${page.installmentCycles || 3} months. 1st installment charged today.
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;" id="gala-monthly2-details">
+                          Split into 2 equal monthly payments across 2 months. 1st installment charged today.
+                        </div>
+                      </div>
+                    </label>
+
+                    <!-- Option 5: 3 Months Plan -->
+                    <label class="split-plan-option-label" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 2px solid rgba(15,23,42,0.1); background: white; cursor: pointer;">
+                      <input type="radio" name="gala_split_plan" value="MONTHLY_3" style="margin-top: 3px; transform: scale(1.15);">
+                      <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
+                          <span>Monthly Plan (3 Months)</span>
+                          <span id="gala-monthly3-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 / mo</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;" id="gala-monthly3-details">
+                          Split into 3 equal monthly payments across 3 months. 1st installment charged today.
+                        </div>
+                      </div>
+                    </label>
+
+                    <!-- Option 6: 4 Months Plan -->
+                    <label class="split-plan-option-label" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 2px solid rgba(15,23,42,0.1); background: white; cursor: pointer;">
+                      <input type="radio" name="gala_split_plan" value="MONTHLY_4" style="margin-top: 3px; transform: scale(1.15);">
+                      <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; color: var(--primary);">
+                          <span>Monthly Plan (4 Months)</span>
+                          <span id="gala-monthly4-price-val" style="color: var(--secondary); font-weight: 800;">$0.00 / mo</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;" id="gala-monthly4-details">
+                          Split into 4 equal monthly payments across 4 months. 1st installment charged today.
                         </div>
                       </div>
                     </label>
@@ -4894,7 +4922,43 @@ function bindCustomEventPage() {
           : `2 payments of $${perTwice.toFixed(2)} billed on 1st & 15th. 1st installment ($${perTwice.toFixed(2)}) charged today.`;
       }
     }
-    // Monthly calculation
+    // 2 Monthly Payments calculation (2 cycles)
+    const monthly2Val = document.getElementById('gala-monthly2-price-val');
+    const monthly2Details = document.getElementById('gala-monthly2-details');
+    if (monthly2Val) {
+      const perMonthly2 = total === 0 ? 0 : (total / 2);
+      monthly2Val.textContent = total === 0 ? '$0.00' : '$' + perMonthly2.toFixed(2) + ' / mo';
+      if (monthly2Details) {
+        monthly2Details.textContent = total === 0
+          ? 'Split into 2 equal monthly payments across 2 months. 0% interest.'
+          : `2 payments of $${perMonthly2.toFixed(2)} billed monthly. 1st installment ($${perMonthly2.toFixed(2)}) charged today.`;
+      }
+    }
+    // 3 Monthly Payments calculation (3 cycles)
+    const monthly3Val = document.getElementById('gala-monthly3-price-val');
+    const monthly3Details = document.getElementById('gala-monthly3-details');
+    if (monthly3Val) {
+      const perMonthly3 = total === 0 ? 0 : (total / 3);
+      monthly3Val.textContent = total === 0 ? '$0.00' : '$' + perMonthly3.toFixed(2) + ' / mo';
+      if (monthly3Details) {
+        monthly3Details.textContent = total === 0
+          ? 'Split into 3 equal monthly payments across 3 months. 0% interest.'
+          : `3 payments of $${perMonthly3.toFixed(2)} billed monthly. 1st installment ($${perMonthly3.toFixed(2)}) charged today.`;
+      }
+    }
+    // 4 Monthly Payments calculation (4 cycles)
+    const monthly4Val = document.getElementById('gala-monthly4-price-val');
+    const monthly4Details = document.getElementById('gala-monthly4-details');
+    if (monthly4Val) {
+      const perMonthly4 = total === 0 ? 0 : (total / 4);
+      monthly4Val.textContent = total === 0 ? '$0.00' : '$' + perMonthly4.toFixed(2) + ' / mo';
+      if (monthly4Details) {
+        monthly4Details.textContent = total === 0
+          ? 'Split into 4 equal monthly payments across 4 months. 0% interest.'
+          : `4 payments of $${perMonthly4.toFixed(2)} billed monthly. 1st installment ($${perMonthly4.toFixed(2)}) charged today.`;
+      }
+    }
+    // Backward compatibility for generic splitPriceVal
     const splitPriceVal = document.getElementById('gala-split-price-val');
     const cycles = (state.customPage && state.customPage.installmentCycles) || 3;
     if (splitPriceVal) {
@@ -5059,11 +5123,26 @@ function bindCustomEventPage() {
           installmentFreq = 'Twice a Month (1st & 15th)';
           perPaymentAmount = totalPrice / 2;
           planLabel = `Twice a Month ($${perPaymentAmount.toFixed(2)} twice/mo)`;
+        } else if (planType === 'MONTHLY_2') {
+          cycles = 2;
+          installmentFreq = 'Monthly (2 Months)';
+          perPaymentAmount = totalPrice / 2;
+          planLabel = `Monthly 2 Mos ($${perPaymentAmount.toFixed(2)} / mo)`;
+        } else if (planType === 'MONTHLY_3') {
+          cycles = 3;
+          installmentFreq = 'Monthly (3 Months)';
+          perPaymentAmount = totalPrice / 3;
+          planLabel = `Monthly 3 Mos ($${perPaymentAmount.toFixed(2)} / mo)`;
+        } else if (planType === 'MONTHLY_4') {
+          cycles = 4;
+          installmentFreq = 'Monthly (4 Months)';
+          perPaymentAmount = totalPrice / 4;
+          planLabel = `Monthly 4 Mos ($${perPaymentAmount.toFixed(2)} / mo)`;
         } else if (planType === 'MONTHLY') {
           cycles = (state.customPage && state.customPage.installmentCycles) || 3;
-          installmentFreq = 'Monthly';
+          installmentFreq = `Monthly (${cycles} Months)`;
           perPaymentAmount = totalPrice / cycles;
-          planLabel = `Monthly ($${perPaymentAmount.toFixed(2)} / mo)`;
+          planLabel = `Monthly (${cycles} Mos) ($${perPaymentAmount.toFixed(2)} / mo)`;
         }
 
         const createdTickets = [];
