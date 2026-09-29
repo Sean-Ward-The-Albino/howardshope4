@@ -55,6 +55,40 @@ public class OutreachController {
     }
 
     /**
+     * Public endpoint to submit a general inquiry or volunteer outreach form from site footer.
+     */
+    @PostMapping(value = {"/contact/submit", "/outreach/contact"})
+    public ResponseEntity<?> submitContactInquiry(@RequestBody Map<String, Object> payload) {
+        String name = String.valueOf(payload.getOrDefault("name", payload.getOrDefault("fullName", "Friend"))).trim();
+        String email = String.valueOf(payload.getOrDefault("email", "")).trim();
+        String role = String.valueOf(payload.getOrDefault("role", "General Inquiry")).trim();
+        String message = String.valueOf(payload.getOrDefault("message", "")).trim();
+
+        if (email.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email address is required."));
+        }
+
+        VolunteerApplication app = new VolunteerApplication();
+        app.setFullName(name);
+        app.setEmail(email);
+        app.setRoleInterest(role);
+        app.setStatementOfIntent(message);
+        VolunteerApplication saved = volunteerRepository.save(app);
+
+        new Thread(() -> {
+            try {
+                emailService.sendVolunteerApplicationNotification(saved);
+            } catch (Exception ignored) {}
+        }).start();
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "Your inquiry has been received. Our team will contact you shortly.",
+            "inquiryId", saved.getId()
+        ));
+    }
+
+    /**
      * Admin endpoint: retrieve all volunteer & partner applications.
      */
     @GetMapping("/admin/outreach/applications")

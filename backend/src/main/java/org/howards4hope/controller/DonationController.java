@@ -58,20 +58,10 @@ public class DonationController {
                 request.amount,
                 request.frequency,
                 request.paymentMethod,
-                "COMPLETED"
+                "PENDING"
         );
 
         Donation savedDonation = donationRepository.save(donation);
-
-        // Send Official 501(c)(3) Tax Receipt Email
-        emailService.sendTaxDeductibleDonationReceipt(
-                savedDonation.getDonorEmail(),
-                savedDonation.getDonorName(),
-                savedDonation.getAmount(),
-                savedDonation.getFrequency(),
-                savedDonation.getTaxReceiptNumber(),
-                savedDonation.getDonationDate()
-        );
 
         try {
             if (stripeApiKey != null && !stripeApiKey.startsWith("sk_test_mock")) {
@@ -128,15 +118,66 @@ public class DonationController {
                 return ResponseEntity.ok(response);
             }
         } catch (Exception e) {
-            System.out.println(">>> DonationController: Stripe fallback mode. Error: " + e.getMessage());
+            System.out.println(">>> DonationController: Stripe session creation deferred. " + e.getMessage());
         }
 
         Map<String, Object> response = new HashMap<>();
-        response.put("checkoutUrl", "#/donate?status=success&receipt=" + savedDonation.getTaxReceiptNumber());
+        response.put("checkoutUrl", "#/donate?status=pending&receipt=" + savedDonation.getTaxReceiptNumber());
         response.put("taxReceiptNumber", savedDonation.getTaxReceiptNumber());
         response.put("donation", savedDonation);
-        response.put("message", "Donation recorded and 501(c)(3) tax receipt dispatched!");
+        response.put("status", "PENDING");
         return ResponseEntity.ok(response);
+    }
+
+    public static class VerifyPaymentRequest {
+        public String taxReceiptNumber;
+        public String stripeSessionId;
+        public String paymentMethod = "STRIPE";
+    }
+
+    /**
+     * Confirms and verifies that a donation has successfully settled before marking COMPLETED
+     * and dispatching the official 501(c)(3) tax receipt.
+     */
+    @PostMapping("/verify-payment")
+    public ResponseEntity<?> verifyDonationPayment(@RequestBody VerifyPaymentRequest req) {
+        Optional<Donation> optDonation = Optional.empty();
+        if (req.taxReceiptNumber != null && !req.taxReceiptNumber.trim().isEmpty()) {
+            optDonation = donationRepository.findByTaxReceiptNumber(req.taxReceiptNumber.trim());
+        }
+        if (optDonation.isEmpty() && req.stripeSessionId != null && !req.stripeSessionId.trim().isEmpty()) {
+            optDonation = donationRepository.findAll().stream()
+                .filter(d -> req.stripeSessionId.equalsIgnoreCase(d.getStripeSessionId()))
+                .findFirst();
+        }
+
+        if (optDonation.isEmpty()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Donation record not found."));
+        }
+
+        Donation donation = optDonation.get();
+        if (!"COMPLETED".equalsIgnoreCase(donation.getStatus())) {
+            donation.setStatus("COMPLETED");
+            donation = donationRepository.save(donation);
+
+            // Send Official 501(c)(3) Tax Receipt Email ONLY after payment is verified
+            emailService.sendTaxDeductibleDonationReceipt(
+                    donation.getDonorEmail(),
+                    donation.getDonorName(),
+                    donation.getAmount(),
+                    donation.getFrequency(),
+                    donation.getTaxReceiptNumber(),
+                    donation.getDonationDate()
+            );
+        }
+
+        return ResponseEntity.ok(Map.of(
+            "verified", true,
+            "status", "COMPLETED",
+            "taxReceiptNumber", donation.getTaxReceiptNumber(),
+            "donation", donation
+        ));
     }
 
     @GetMapping("/receipt/{taxReceiptNumber}")

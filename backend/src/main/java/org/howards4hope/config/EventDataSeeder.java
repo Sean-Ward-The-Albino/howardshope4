@@ -34,7 +34,7 @@ public class EventDataSeeder implements CommandLineRunner {
             eventRepository.save(new Event(
                     "Me, Myself & Why Workshop",
                     "Empowerment seminar focused on confidence building, leadership traits, and self-growth roadmap models for local youth.",
-                    "2026-09-10",
+                    "2026-10-24",
                     "4:00 PM",
                     "3711 Long Beach Blvd, Long Beach, CA 90807",
                     0.0,
@@ -46,7 +46,7 @@ public class EventDataSeeder implements CommandLineRunner {
             eventRepository.save(new Event(
                     "Links of Hope Support Summit",
                     "An intensive networking conference bringing together caregivers of special-needs children to share resources and stress-relief models.",
-                    "2026-09-26",
+                    "2026-11-07",
                     "11:00 AM",
                     "3711 Long Beach Blvd, Long Beach, CA 90807",
                     15.00,

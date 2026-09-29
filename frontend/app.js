@@ -332,15 +332,36 @@ function formatStoryParagraphs(text, fallback = '') {
   return paras.map(p => `<p class="gala-story-paragraph" style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.85; margin: 0 0 16px 0;">${formatGalaAnimatedTitle(p)}</p>`).join('');
 }
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeUrl(url) {
+  if (!url) return '';
+  const clean = String(url).trim();
+  if (/^(https?:\/\/|\/|#|mailto:|tel:)/i.test(clean)) {
+    return clean.replace(/"/g, '&quot;');
+  }
+  return '#';
+}
+
 function formatGalaAnimatedTitle(title) {
   if (!title) return '';
   let text = String(title);
   // Strip any existing animation spans first to prevent double-wrapping
   text = text.replace(/<span class="gala-anim-frost">([^<]+)<\/span>/gi, '$1');
   text = text.replace(/<span class="gala-anim-flame">([^<]+)<\/span>/gi, '$1');
+  text = text.replace(/<span class="gala-anim-fusion"[^>]*>([^<]+)<\/span>/gi, '$1');
   return text
     .replace(/\b(frost)\b/gi, '<span class="gala-anim-frost">$1</span>')
-    .replace(/\b(flames?)\b/gi, '<span class="gala-anim-flame">$1</span>');
+    .replace(/\b(flames?)\b/gi, '<span class="gala-anim-flame">$1</span>')
+    .replace(/(\s+)(&|and)(\s+)/gi, '$1<span class="gala-anim-fusion" title="Elemental Fusion">$2</span>$3');
 }
 
 function formatGalaDisplayDate(dateStr) {
@@ -1030,10 +1051,10 @@ const state = {
   myTickets: loadSavedTickets(),
   galaAttendees: [],
   adminMetrics: {
-    totalAttendees: 52,
-    totalRevenue: 480.00,
+    totalAttendees: 0,
+    totalRevenue: 0.00,
     activeEvents: 4,
-    rsvpConversion: '89%'
+    rsvpConversion: '0%'
   }
 };
 
@@ -1042,7 +1063,7 @@ const mockEvents = [
   {
     id: "evt-001",
     title: "Me, Myself & Why Youth Seminar",
-    date: "2026-09-10",
+    date: "2026-10-24",
     time: "4:00 PM",
     location: "3711 Long Beach Blvd, #4055, Long Beach, CA 90807",
     price: 0,
@@ -1054,7 +1075,7 @@ const mockEvents = [
   {
     id: "evt-002",
     title: "Links of Hope Caregiver Respite Summit",
-    date: "2026-09-26",
+    date: "2026-11-07",
     time: "11:00 AM",
     location: "3711 Long Beach Blvd, #4055, Long Beach, CA 90807",
     price: 15.00,
@@ -1269,19 +1290,24 @@ const API = {
         return ticket;
       }
     } catch (e) {
-      console.warn("Spring Boot API offline/timed out, saving confirmed ticket locally.", e);
+      console.warn("Spring Boot API offline/timed out for bookTicket:", e);
     }
     
-    // Simulate booking ticket locally with guaranteed non-null fields
     const event = state.events.find(e => 
       e.id.toString() === eventId.toString() || 
       e.id.toString().replace('evt-', '') === eventId.toString().replace('evt-', '')
     );
     const unitPrice = event ? (event.price || 0) : 0;
+
+    // Critical Nonprofit Integrity Rule: Never mint a confirmed paid ticket if payment was not processed
+    if (unitPrice > 0 && paymentMethod !== 'DOOR' && paymentMethod !== 'FREE') {
+      throw new Error("Unable to complete paid ticket checkout. The payment could not be processed or verified by the backend. Please try again or select 'Pay at Gala Door'.");
+    }
+
     const totalPrice = unitPrice * quantity;
     const isInstallment = paymentPlanType !== 'FULL' && installmentCycles > 1;
     const cycles = isInstallment ? installmentCycles : 1;
-    const firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
+    const firstPayment = paymentMethod === 'DOOR' ? 0.0 : (isInstallment ? (totalPrice / cycles) : totalPrice);
     
     const ticket = {
       id: Math.floor(100000 + Math.random() * 900000),
@@ -1296,11 +1322,11 @@ const API = {
       quantity: quantity,
       pricePaid: firstPayment,
       paymentMethod: paymentMethod,
-      status: 'CONFIRMED',
+      status: paymentMethod === 'DOOR' ? 'PAY_AT_DOOR_PENDING' : 'CONFIRMED',
       paymentPlanType: isInstallment ? (paymentPlanType || 'INSTALLMENT') : 'FULL',
       installmentCycles: cycles,
-      installmentsPaid: 1,
-      remainingBalance: isInstallment ? (totalPrice - firstPayment) : 0,
+      installmentsPaid: paymentMethod === 'DOOR' ? 0 : 1,
+      remainingBalance: paymentMethod === 'DOOR' ? totalPrice : (isInstallment ? (totalPrice - firstPayment) : 0),
       purchaseDate: new Date().toISOString().split('T')[0]
     };
     saveTicketRecord(ticket);
@@ -1328,7 +1354,7 @@ const API = {
         return ticket;
       }
     } catch (e) {
-      console.warn("Guest booking REST API failed, using fallback.", e);
+      console.warn("Guest booking REST API failed for bookTicketGuest:", e);
     }
 
     const event = state.events.find(e => 
@@ -1336,10 +1362,16 @@ const API = {
       e.id.toString().replace('evt-', '') === eventId.toString().replace('evt-', '')
     );
     const unitPrice = event ? (event.price || 0) : 0;
+
+    // Critical Nonprofit Integrity Rule: Never mint a confirmed paid ticket if payment was not processed
+    if (unitPrice > 0 && paymentMethod !== 'DOOR' && paymentMethod !== 'FREE') {
+      throw new Error("Unable to complete paid ticket checkout. The payment could not be processed or verified by the backend. Please try again or select 'Pay at Gala Door'.");
+    }
+
     const totalPrice = unitPrice * quantity;
     const isInstallment = paymentPlanType !== 'FULL' && installmentCycles > 1;
     const cycles = isInstallment ? installmentCycles : 1;
-    const firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
+    const firstPayment = paymentMethod === 'DOOR' ? 0.0 : (isInstallment ? (totalPrice / cycles) : totalPrice);
 
     const ticket = {
       id: Math.floor(100000 + Math.random() * 900000),
@@ -1354,18 +1386,18 @@ const API = {
       quantity: quantity,
       pricePaid: firstPayment,
       paymentMethod: paymentMethod,
-      status: 'CONFIRMED',
+      status: paymentMethod === 'DOOR' ? 'PAY_AT_DOOR_PENDING' : 'CONFIRMED',
       paymentPlanType: isInstallment ? (paymentPlanType || 'INSTALLMENT') : 'FULL',
       installmentCycles: cycles,
-      installmentsPaid: 1,
-      remainingBalance: isInstallment ? (totalPrice - firstPayment) : 0,
+      installmentsPaid: paymentMethod === 'DOOR' ? 0 : 1,
+      remainingBalance: paymentMethod === 'DOOR' ? totalPrice : (isInstallment ? (totalPrice - firstPayment) : 0),
       purchaseDate: new Date().toISOString().split('T')[0]
     };
     saveTicketRecord(ticket);
     return ticket;
   },
 
-  async lookupTicket(ticketId = null, confirmationToken = null) {
+  async lookupTicket(ticketId = null, confirmationToken = null, email = null) {
     try {
       let url = `${this.baseUrl}/tickets/lookup?`;
       if (ticketId) url += `ticketId=${encodeURIComponent(ticketId)}&`;
@@ -1385,11 +1417,14 @@ const API = {
       console.warn("Lookup API offline, searching local state.", e);
     }
     
-    // Local fallback search from saved state
+    // Auto-detect if ticketId is an email address
+    const targetEmail = email || (ticketId && ticketId.includes('@') ? ticketId : null);
+
+    // Local fallback search from saved state without ReferenceError
     return state.myTickets.filter(t => 
       (ticketId && t.ticketId && t.ticketId.toLowerCase() === ticketId.toLowerCase()) ||
       (confirmationToken && t.confirmationToken && t.confirmationToken.toLowerCase() === confirmationToken.toLowerCase()) ||
-      (email && t.userEmail && t.userEmail.toLowerCase() === email.toLowerCase())
+      (targetEmail && t.userEmail && t.userEmail.toLowerCase() === targetEmail.toLowerCase())
     );
   },
 
@@ -1402,24 +1437,11 @@ const API = {
       });
       if (response.ok) return await response.json();
     } catch (e) {
-      console.warn("Donation API offline, simulating 501(c)(3) receipt.", e);
+      console.warn("Donation API checkout failed:", e);
     }
 
-    const receiptNum = 'H4H-TAX-' + new Date().getFullYear() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    return {
-      taxReceiptNumber: receiptNum,
-      donation: {
-        donorName: donationData.donorName || 'Generous Donor',
-        donorEmail: donationData.donorEmail,
-        amount: donationData.amount,
-        frequency: donationData.frequency || 'ONE_TIME',
-        paymentMethod: donationData.paymentMethod || 'STRIPE',
-        taxReceiptNumber: receiptNum,
-        donationDate: new Date().toISOString().split('T')[0],
-        ein: '86-1910919'
-      },
-      message: 'Donation successfully simulated and 501(c)(3) tax receipt generated!'
-    };
+    // Never fabricate a fake 501(c)(3) tax receipt on network failure. Fail honestly.
+    throw new Error("Donation gateway is temporarily unavailable. Your card was NOT charged and no 501(c)(3) tax receipt has been generated. Please try again in a few moments or donate directly via PayPal.");
   },
 
   async submitSupplyDonation(supplyData) {
@@ -1758,6 +1780,30 @@ if (authClose) {
   });
 }
 
+// Modal Backdrop Click & Escape Key Dismissals (Defense-in-depth UX)
+if (authModal) {
+  authModal.addEventListener('click', (e) => {
+    if (e.target === authModal) {
+      authModal.classList.remove('active');
+    }
+  });
+}
+
+const statusModalRoot = document.getElementById('status-modal');
+if (statusModalRoot) {
+  statusModalRoot.addEventListener('click', (e) => {
+    if (e.target === statusModalRoot) {
+      statusModalRoot.classList.remove('active');
+    }
+  });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+  }
+});
+
 if (authToggleLink) {
   authToggleLink.addEventListener('click', () => {
     isSignupMode = !isSignupMode;
@@ -1800,7 +1846,7 @@ function toggleAuthMode(isSignup) {
   }
 }
 
-// Dark Mode Logic
+// Dark Mode Logic: Respect user saved preference across sessions
 const themeBtn = document.getElementById('theme-toggle-btn');
 const mobileThemeBtn = document.getElementById('mobile-theme-toggle-btn');
 
@@ -1818,10 +1864,11 @@ function applyTheme(isDark) {
   }
 }
 
-// Explicit Light Mode Default (Clean Pearl White baseline)
-// Force light mode explicitly to clear any stuck dark mode states
-localStorage.setItem('theme', 'light');
-applyTheme(false);
+// Initialize theme from saved preference (preserves user preference)
+const savedThemePref = localStorage.getItem('theme');
+const prefersDarkScheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+const initialThemeIsDark = savedThemePref ? (savedThemePref === 'dark') : prefersDarkScheme;
+applyTheme(initialThemeIsDark);
 
 if (themeBtn) {
   themeBtn.addEventListener('click', () => {
@@ -3224,6 +3271,21 @@ const templates = {
             </div>
           </form>
         </div>
+
+        <!-- Dedicated Gala Assistance & Direct Concierge Inquiries Card -->
+        <div class="gala-inquiries-bar">
+          <div>
+            <h4><i class="fa-solid fa-headset" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 8px;"></i> Gala Assistance & Direct Inquiries</h4>
+            <p>Need custom table arrangements, dietary accommodations, or sponsorship details? Contact our team directly.</p>
+            <div style="font-size: 0.82rem; color: rgba(255,255,255,0.7); margin-top: 5px;">
+              <i class="fa-solid fa-location-dot" style="margin-right: 4px;"></i> 3711 Long Beach Blvd, #4055, Long Beach, CA 90807
+            </div>
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="tel:5624564501" class="btn btn-outline" style="color: #FFFFFF; border-color: rgba(255,255,255,0.45); font-weight: 700; font-size: 0.92rem;"><i class="fa-solid fa-phone" style="margin-right: 6px;"></i> (562) 456-4501</a>
+            <a href="mailto:info@howards4hope.org" class="btn btn-donate" style="font-weight: 700; font-size: 0.92rem; background: ${page.accentColor || 'var(--accent)'}; border-color: ${page.accentColor || 'var(--accent)'};"><i class="fa-solid fa-envelope" style="margin-right: 6px;"></i> info@howards4hope.org</a>
+          </div>
+        </div>
       </section>
     `;
   },
@@ -4466,7 +4528,13 @@ const templates = {
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 600; color: var(--primary); border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 10px; margin-top: 14px;">
-                      <span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> VALIDATED TICKET</span>
+                      ${tkt.status === 'CONFIRMED' || tkt.verifiedBackend ? `
+                        <span style="color: var(--success); font-weight: 700;"><i class="fa-solid fa-circle-check"></i> VALIDATED TICKET</span>
+                      ` : (tkt.status === 'PAY_AT_DOOR_PENDING' ? `
+                        <span style="color: #D97706; font-weight: 700;"><i class="fa-solid fa-clock"></i> PENDING DOOR PAYMENT</span>
+                      ` : `
+                        <span style="color: #64748B; font-weight: 700;" title="Local device record - not verified against live backend"><i class="fa-solid fa-shield-halved"></i> UNVERIFIED RECORD</span>
+                      `)}
                       <button class="btn btn-outline" onclick="window.print()" style="padding: 3px 8px; font-size: 0.75rem;">
                         <i class="fa-solid fa-print"></i> Print
                       </button>
@@ -4642,12 +4710,23 @@ async function refreshAdminMetrics() {
     });
     await Promise.all(promises);
   }
+
+  if (state.galaAttendees && state.galaAttendees.length > 0) {
+    totalAttendees += state.galaAttendees.length;
+    state.galaAttendees.forEach(a => {
+      totalRevenue += (Number(a.pricePaid) || 0);
+    });
+  }
+
+  const realConversion = uniqueVisitors > 0 
+    ? Math.min(100, Math.round((totalAttendees / uniqueVisitors) * 100)) + '%' 
+    : (totalAttendees > 0 ? '100%' : '0%');
   
   state.adminMetrics = {
-    totalAttendees: totalAttendees || 52,
-    totalRevenue: totalRevenue || 480.00,
+    totalAttendees: totalAttendees,
+    totalRevenue: totalRevenue,
     activeEvents: state.events.length,
-    rsvpConversion: rsvpConversion || (totalAttendees > 0 ? '94%' : '87%'),
+    rsvpConversion: (rsvpConversion && rsvpConversion !== '89%') ? rsvpConversion : realConversion,
     activeNow: activeNow,
     uniqueVisitors: uniqueVisitors,
     totalViews: totalViews
@@ -4772,7 +4851,7 @@ async function router() {
     contentDiv.innerHTML = templates.blogPost();
   } else if (hash === '#/blog') {
     contentDiv.innerHTML = templates.blog();
-  } else if (hash === '#/special-event') {
+  } else if (hash === '#/special-event' || hash === '#/gala') {
     syncCustomPageFromCloud().catch(() => {});
     contentDiv.innerHTML = templates.customEventPage();
     bindCustomEventPage();
@@ -4793,6 +4872,18 @@ async function router() {
 
   // Back to top on route change
   window.scrollTo(0, 0);
+
+  // Guarantee footer contact phone & email are consistently displayed on every page
+  const footerPhone = document.querySelector('footer .footer-contact-info a[href^="tel"]');
+  if (footerPhone) {
+    footerPhone.href = 'tel:5624564501';
+    footerPhone.innerText = '(562) 456-4501';
+  }
+  const footerEmail = document.querySelector('footer .footer-contact-info a[href^="mailto"]');
+  if (footerEmail) {
+    footerEmail.href = 'mailto:info@howards4hope.org';
+    footerEmail.innerText = 'info@howards4hope.org';
+  }
 }
 
 window.addEventListener('hashchange', router);
@@ -4836,12 +4927,39 @@ function initApp() {
   // Footer Outreach & Volunteer Form binding (available globally on every page)
   const footerOutreach = document.getElementById('footer-outreach-form');
   if (footerOutreach) {
-    footerOutreach.addEventListener('submit', (e) => {
+    footerOutreach.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('footer-name')?.value || 'Friend';
+      const email = document.getElementById('footer-email')?.value || '';
       const role = document.getElementById('footer-role')?.value || 'Involvement';
-      alert(`Thank you ${name}! Your outreach inquiry regarding "${role}" has been successfully sent to Howards 4 Hope. Our team will contact you shortly.`);
+      const message = document.getElementById('footer-message')?.value || '';
+
+      const submitBtn = footerOutreach.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+      }
+
+      try {
+        await fetch(`${API.baseUrl}/contact/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, role, message })
+        }).catch(() => {});
+
+        if (window.db) {
+          await window.db.collection('volunteerSubmissions').add({
+            name, email, role, message, submittedAt: new Date().toISOString()
+          }).catch(() => {});
+        }
+      } catch (ignored) {}
+
+      alert(`Thank you ${name}! Your outreach inquiry regarding "${role}" has been successfully sent to Howards 4 Hope (info@howards4hope.org). Our team will contact you shortly.`);
       footerOutreach.reset();
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Outreach Message';
+      }
     });
   }
 }
@@ -6044,12 +6162,39 @@ function bindDonationPortal() {
 function bindInvolvementForm() {
   const form = document.getElementById('involvement-form');
   if (form) {
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = document.getElementById('inv-name')?.value || 'Friend';
+      const email = document.getElementById('inv-email')?.value || '';
       const role = document.getElementById('inv-role')?.value || 'Involvement';
-      alert(`Application submitted! Thank you ${name} for standing with Howards 4 Hope as a ${role}. Our coordinate team will contact you within 48 hours.`);
+      const message = document.getElementById('inv-message')?.value || '';
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+      }
+
+      try {
+        await fetch(`${API.baseUrl}/contact/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, role, message })
+        }).catch(() => {});
+
+        if (window.db) {
+          await window.db.collection('volunteerSubmissions').add({
+            name, email, role, message, submittedAt: new Date().toISOString()
+          }).catch(() => {});
+        }
+      } catch (ignored) {}
+
+      alert(`Application submitted! Thank you ${name} for standing with Howards 4 Hope as a ${role}. Our coordination team will contact you at ${email || 'your email'} within 48 hours.`);
       form.reset();
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Application';
+      }
       window.location.hash = '#/';
     });
   }
@@ -7705,13 +7850,16 @@ function bindMyTicketsEvents() {
       // Fallback local lookup if backend returned empty or offline
       if (tickets.length === 0) {
         const qLower = q.toLowerCase();
-        tickets = state.myTickets.filter(t => 
+        const localMatches = state.myTickets.filter(t => 
           (t.userEmail && t.userEmail.toLowerCase() === qLower) ||
           (t.guestName && t.guestName.toLowerCase().includes(qLower)) ||
           (t.ticketId && t.ticketId.toLowerCase() === qLower) ||
           (t.confirmationToken && t.confirmationToken.toLowerCase() === qLower) ||
           (t.id && t.id.toString().toLowerCase() === qLower)
         );
+        tickets = localMatches.map(t => ({ ...t, verifiedBackend: false, deviceOnly: true }));
+      } else {
+        tickets = tickets.map(t => ({ ...t, verifiedBackend: true }));
       }
       
       lookupBtn.disabled = false;
@@ -7725,10 +7873,11 @@ function bindMyTicketsEvents() {
           </div>
         `;
       } else {
+        const hasVerified = tickets.some(t => t.verifiedBackend);
         resultsContainer.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 15px;">
             <h4 style="font-weight: 800; color: var(--primary); font-size: 1rem; margin: 0;">
-              <i class="fa-solid fa-circle-check" style="color: var(--success); margin-right: 6px;"></i> Verified Ticket Record (${tickets.length})
+              <i class="fa-solid ${hasVerified ? 'fa-circle-check' : 'fa-shield-halved'}" style="color: ${hasVerified ? 'var(--success)' : '#64748B'}; margin-right: 6px;"></i> ${hasVerified ? 'Verified Server Ticket' : 'Device Ticket Record'} (${tickets.length})
             </h4>
             <button class="btn btn-outline" onclick="window.print()" style="font-size: 0.75rem; padding: 4px 10px;">
               <i class="fa-solid fa-print"></i> Print Tickets
@@ -7738,14 +7887,14 @@ function bindMyTicketsEvents() {
             ${tickets.map(tkt => `
               <div style="padding: 20px; border-radius: 12px; background: #f8fafc; border-left: 6px solid var(--accent); border-top: 1px solid rgba(15,23,42,0.06); border-right: 1px solid rgba(15,23,42,0.06); border-bottom: 1px solid rgba(15,23,42,0.06); box-shadow: var(--shadow-sm);">
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                  <span style="font-weight: 800; color: var(--primary); font-size: 1.05rem;">${tkt.eventTitle || 'Community Workshop'}</span>
+                  <span style="font-weight: 800; color: var(--primary); font-size: 1.05rem;">${escapeHtml(tkt.eventTitle || 'Community Workshop')}</span>
                   <span class="event-badge" style="position: static; font-size: 0.75rem; padding: 3px 10px; background: var(--accent); color: var(--primary); font-weight: 700;">${tkt.quantity || 1} Ticket(s)</span>
                 </div>
                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">
-                  <i class="fa-regular fa-calendar" style="margin-right: 4px;"></i> ${tkt.eventDate || 'Scheduled'} &bull; 3711 Long Beach Blvd, Long Beach, CA
+                  <i class="fa-regular fa-calendar" style="margin-right: 4px;"></i> ${escapeHtml(tkt.eventDate || 'Scheduled')} &bull; 3711 Long Beach Blvd, Long Beach, CA
                 </div>
                 <div style="font-size: 0.8rem; color: var(--text-main); margin-bottom: 10px;">
-                  <strong>Attendee:</strong> ${tkt.guestName || tkt.userEmail || 'Valued Guest'}
+                  <strong>Attendee:</strong> ${escapeHtml(tkt.guestName || tkt.userEmail || 'Valued Guest')}
                 </div>
                 ${tkt.paymentPlanType === 'INSTALLMENT' ? `
                   <div class="installment-badge" style="margin-bottom: 10px;">
@@ -7753,8 +7902,14 @@ function bindMyTicketsEvents() {
                   </div>
                 ` : ''}
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 700; color: var(--primary); border-top: 1px dashed rgba(15,23,42,0.1); padding-top: 10px; margin-top: 10px;">
-                  <span style="font-family: monospace;">TOKEN: ${tkt.ticketId || tkt.confirmationToken || 'H4H-TKT-CONFIRMED'}</span>
-                  <span style="color: var(--success);"><i class="fa-solid fa-shield-check"></i> VALID ENTRY</span>
+                  <span style="font-family: monospace;">TOKEN: ${escapeHtml(tkt.ticketId || tkt.confirmationToken || 'H4H-TKT-CONFIRMED')}</span>
+                  ${tkt.status === 'CONFIRMED' && tkt.verifiedBackend ? `
+                    <span style="color: var(--success);"><i class="fa-solid fa-shield-check"></i> VALID ENTRY</span>
+                  ` : (tkt.status === 'PAY_AT_DOOR_PENDING' ? `
+                    <span style="color: #D97706;"><i class="fa-solid fa-clock"></i> PENDING DOOR PAYMENT</span>
+                  ` : `
+                    <span style="color: #64748B;" title="Not verified against live backend database"><i class="fa-solid fa-shield-halved"></i> UNVERIFIED RECORD</span>
+                  `)}
                 </div>
               </div>
             `).join('')}
