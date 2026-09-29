@@ -86,6 +86,41 @@ function showToast(type = 'info', title = '', message = '', duration = 4500) {
   container.appendChild(toast);
 }
 
+function showStatusModal({ title = 'Notice', icon = 'fa-circle-check', iconColor = 'var(--accent)', message = '', htmlContent = '', buttonText = 'Close', onConfirm = null }) {
+  const modal = document.getElementById('status-modal');
+  const body = document.getElementById('status-modal-body');
+  if (!modal || !body) return;
+
+  body.innerHTML = `
+    <div style="text-align: center; padding: 10px 0;">
+      <div style="width: 68px; height: 68px; border-radius: 50%; background: rgba(243, 156, 18, 0.12); color: ${iconColor}; display: inline-flex; align-items: center; justify-content: center; font-size: 2rem; margin-bottom: 16px;">
+        <i class="fa-solid ${icon}"></i>
+      </div>
+      <h3 style="font-size: 1.5rem; margin-bottom: 12px; color: var(--text-main); font-family: 'Playfair Display', serif;">${escapeHtml(title)}</h3>
+      ${message ? `<p style="font-size: 1rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">${escapeHtml(message)}</p>` : ''}
+      ${htmlContent ? `<div style="text-align: left; background: var(--bg-card); border: 1px solid rgba(15,23,42,0.08); border-radius: 10px; padding: 16px; margin-bottom: 20px; font-size: 0.95rem; line-height: 1.6;">${htmlContent}</div>` : ''}
+      <button type="button" id="status-modal-action-btn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 700; border-radius: 8px;">
+        ${escapeHtml(buttonText)}
+      </button>
+    </div>
+  `;
+
+  const actionBtn = document.getElementById('status-modal-action-btn');
+  if (actionBtn) {
+    actionBtn.onclick = () => {
+      modal.classList.remove('active');
+      if (typeof onConfirm === 'function') onConfirm();
+    };
+  }
+
+  const closeBtn = document.getElementById('status-modal-close');
+  if (closeBtn) {
+    closeBtn.onclick = () => modal.classList.remove('active');
+  }
+
+  modal.classList.add('active');
+}
+
 function formatAuthError(err) {
   if (!err) return "An unexpected error occurred. Please try again.";
   const code = (err.code || '').toLowerCase();
@@ -5747,11 +5782,33 @@ function bindCustomEventPage() {
           : '';
 
         showToast('success', 'Tickets Confirmed!', `Thank you ${name}! ${qty}x ${tierName} tickets booked.`, 6000);
-        alert(`🎉 Gala Tickets Confirmed!\n\nThank you, ${name}!\nYour reservation for ${qty}x ${tierName} has been booked for ${formatGalaDisplayDate(state.customPage.date)}.\n\nMaster Order: ${masterNumber}\n${ticketSummary}${planNotice}\n\n⚠️ Non-Refundable Policy: Gala tickets are non-refundable. For accommodations or transfer requests, please contact info@howards4hope.org at least 72 hours prior to the event.\n\nEach attendee ticket has been saved with food allergy notes and individual verification code for check-in and printing.`);
-        
+
         if (modal) modal.classList.remove('active');
         form.reset();
-        window.location.hash = '#/my-tickets';
+
+        showStatusModal({
+          title: '🎉 Gala Tickets Confirmed!',
+          icon: 'fa-ticket',
+          iconColor: '#059669',
+          message: `Thank you, ${name}! Your reservation for ${qty}x ${tierName} has been booked for ${formatGalaDisplayDate(state.customPage.date)}.`,
+          htmlContent: `
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div><strong>Master Order:</strong> <span style="font-family: monospace; background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; font-weight: 700;">${masterNumber}</span></div>
+              <div style="color: var(--text-main); font-size: 0.95rem;">${ticketSummary.replace(/\n/g, '<br>')}</div>
+              ${planNotice ? `<div style="color: var(--primary); font-weight: 600; font-size: 0.95rem;">${planNotice.replace(/\n/g, '<br>')}</div>` : ''}
+              <div style="background: rgba(220, 38, 38, 0.08); border-left: 4px solid #dc2626; padding: 10px 12px; border-radius: 6px; font-size: 0.85rem; color: #991b1b; margin-top: 4px;">
+                <i class="fa-solid fa-triangle-exclamation" style="margin-right: 4px;"></i> <strong>Non-Refundable Policy:</strong> Gala tickets are non-refundable. For accommodations or transfer requests, contact info@howards4hope.org at least 72 hours prior to the event.
+              </div>
+              <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
+                <i class="fa-solid fa-envelope-circle-check" style="color: #059669; margin-right: 4px;"></i> A confirmation email and tax receipt is dispatched to <strong>${escapeHtml(email)}</strong>.
+              </div>
+            </div>
+          `,
+          buttonText: 'View My Tickets in Portal',
+          onConfirm: () => {
+            window.location.hash = '#/my-tickets';
+          }
+        });
       } catch (err) {
         console.error("Error booking gala ticket:", err);
         showToast('warning', 'Reservation Logged', 'Reservation received! Our team will contact you directly to confirm.');
