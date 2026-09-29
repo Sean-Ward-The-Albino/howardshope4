@@ -13,6 +13,7 @@ service cloud.firestore {
         request.auth.token.email in [
           'avlorycorp@gmail.com',
           'howards4hope@gmail.com',
+          'info@howards4hope.org',
           'staff@howards4hope.org',
           'lacreashia@howards4hope.org',
           'lamar@howards4hope.org',
@@ -20,10 +21,6 @@ service cloud.firestore {
           'sean.ward.7777@gmail.com'
         ]
       );
-    }
-    
-    function isOwner(userEmail) {
-      return isAuthenticated() && request.auth.token.email == userEmail;
     }
 
     // --- EVENTS COLLECTION ---
@@ -58,7 +55,7 @@ service cloud.firestore {
     match /gala_attendees/{attendeeId} {
       allow read: if true;
       allow create: if true;
-      allow update, delete: if true;
+      allow update, delete: if isAdmin();
     }
 
     // --- DONATIONS & TAX RECEIPTS (Row-Level Security) ---
@@ -90,7 +87,13 @@ service cloud.firestore {
     // --- PLATFORM SETTINGS (Gala Page, Theme & Colors) ---
     match /settings/{docId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- TRIGGER EMAIL QUEUE (Firebase Extension Support) ---
+    match /mail/{mailId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
     }
 
     // Default Deny Rule for undefined paths

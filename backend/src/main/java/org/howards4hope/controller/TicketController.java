@@ -47,6 +47,28 @@ public class TicketController {
         public int installmentCycles = 1;
     }
 
+    private Event findOrResolveEvent(Long eventId) {
+        if (eventId == null) return null;
+        Optional<Event> optionalEvent = eventRepository.findById(eventId);
+        if (optionalEvent.isPresent()) {
+            return optionalEvent.get();
+        }
+        if (eventId == 9999L) {
+            return new Event(
+                "Howard's 4 Hope 2026 Gala: Frost & Flame",
+                "A night of celebration, hope, and community transformation.",
+                "2026-10-17",
+                "6:00 PM - 10:00 PM",
+                "The Grand Long Beach, 4101 E Willow St, Long Beach, CA",
+                150.0,
+                "/assets/images/hero-gala.webp",
+                "Gala",
+                "#0284c7"
+            );
+        }
+        return null;
+    }
+
     // --- SECURED TICKETING ENDPOINTS ---
 
     @PostMapping("/tickets/book")
@@ -58,18 +80,17 @@ public class TicketController {
         
         String userEmail = auth.getName();
         
-        Optional<Event> optionalEvent = eventRepository.findById(request.eventId);
-        if (optionalEvent.isEmpty()) {
+        Event event = findOrResolveEvent(request.eventId);
+        if (event == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Event not found.");
         }
 
-        Event event = optionalEvent.get();
-        
         if (event.getPrice() > 0 && "FREE".equalsIgnoreCase(request.paymentMethod)) {
             return ResponseEntity.badRequest().body("This is a paid event. Payment method cannot be FREE.");
         }
 
-        double totalPrice = event.getPrice() * request.quantity;
+        int qty = (request.quantity > 0) ? request.quantity : 1;
+        double totalPrice = event.getPrice() * qty;
         boolean isInstallment = "INSTALLMENT".equalsIgnoreCase(request.paymentPlanType) && request.installmentCycles > 1;
         int cycles = isInstallment ? request.installmentCycles : 1;
         double firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
@@ -80,7 +101,7 @@ public class TicketController {
                 event.getTitle(),
                 event.getDate(),
                 userEmail,
-                request.quantity,
+                qty,
                 firstPayment,
                 request.paymentMethod,
                 "CONFIRMED",
@@ -100,7 +121,7 @@ public class TicketController {
             savedTicket.getGuestName(),
             event.getTitle(),
             event.getDate(),
-            request.quantity,
+            qty,
             savedTicket.getTicketId(),
             firstPayment
         );
@@ -119,18 +140,17 @@ public class TicketController {
             return ResponseEntity.badRequest().body("Guest name is required.");
         }
 
-        Optional<Event> optionalEvent = eventRepository.findById(request.eventId);
-        if (optionalEvent.isEmpty()) {
+        Event event = findOrResolveEvent(request.eventId);
+        if (event == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Event not found.");
         }
-
-        Event event = optionalEvent.get();
 
         if (event.getPrice() > 0 && "FREE".equalsIgnoreCase(request.paymentMethod)) {
             return ResponseEntity.badRequest().body("This is a paid event. Payment method cannot be FREE.");
         }
 
-        double totalPrice = event.getPrice() * request.quantity;
+        int qty = (request.quantity > 0) ? request.quantity : 1;
+        double totalPrice = event.getPrice() * qty;
         boolean isInstallment = "INSTALLMENT".equalsIgnoreCase(request.paymentPlanType) && request.installmentCycles > 1;
         int cycles = isInstallment ? request.installmentCycles : 1;
         double firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
@@ -141,7 +161,7 @@ public class TicketController {
                 event.getTitle(),
                 event.getDate(),
                 request.guestEmail.trim(),
-                request.quantity,
+                qty,
                 firstPayment,
                 request.paymentMethod,
                 "CONFIRMED",
@@ -161,7 +181,7 @@ public class TicketController {
             savedTicket.getGuestName(),
             event.getTitle(),
             event.getDate(),
-            request.quantity,
+            qty,
             savedTicket.getTicketId(),
             firstPayment
         );
@@ -207,7 +227,7 @@ public class TicketController {
     
     @GetMapping("/admin/tickets/attendees/{eventId}")
     public ResponseEntity<List<Ticket>> getEventAttendees(@PathVariable Long eventId) {
-        if (!eventRepository.existsById(eventId)) {
+        if (eventId != 9999L && !eventRepository.existsById(eventId)) {
             return ResponseEntity.notFound().build();
         }
         List<Ticket> attendees = ticketRepository.findByEventId(eventId);

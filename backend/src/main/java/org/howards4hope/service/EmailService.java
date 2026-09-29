@@ -16,7 +16,7 @@ public class EmailService {
     private final String fromEmail;
 
     public EmailService(@Autowired(required = false) JavaMailSender mailSender,
-                        @Value("${spring.mail.username:howards4hope@gmail.com}") String fromEmail) {
+                        @Value("${spring.mail.username:info@howards4hope.org}") String fromEmail) {
         this.mailSender = mailSender;
         this.fromEmail = fromEmail;
     }
@@ -130,7 +130,7 @@ public class EmailService {
             "<strong>LaCreashia Willis-Howard</strong>, President & Co-Founder<br>" +
             "<strong>Lamar Howard Sr.</strong>, Vice President & Co-Founder</p>" +
             "</div>" +
-            "<div class='footer'>Howards 4 Hope &bull; 3711 Long Beach Blvd, #4055, Long Beach, CA 90807 &bull; howards4hope@gmail.com</div>" +
+            "<div class='footer'>Howards 4 Hope &bull; 3711 Long Beach Blvd, #4055, Long Beach, CA 90807 &bull; info@howards4hope.org</div>" +
             "</div></body></html>",
             donorName, taxReceiptNumber, donorName, donorEmail, donationDate, formattedAmount, frequencyText
         );
