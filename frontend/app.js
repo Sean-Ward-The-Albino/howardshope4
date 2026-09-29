@@ -3127,6 +3127,7 @@ const templates = {
           <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
             <a href="javascript:void(0)" onclick="document.getElementById('custom-pricing-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-donate" style="padding: 14px 32px; font-size: 1.05rem; background: ${page.accentColor || 'var(--accent)'} !important; border-color: ${page.accentColor || 'var(--accent)'} !important;"><i class="fa-solid fa-ticket"></i> Select Your Ticket</a>
             <a href="javascript:void(0)" onclick="document.getElementById('custom-story-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-outline" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-circle-info"></i> Event Details</a>
+            <a href="javascript:void(0)" onclick="document.getElementById('custom-attire-section').scrollIntoView({behavior: 'smooth'})" class="btn btn-outline" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-vest-patches"></i> Dress Code</a>
             <a href="#/my-tickets" class="btn btn-outline" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-magnifying-glass"></i> Check My Ticket</a>
           </div>
         </div>
@@ -3230,35 +3231,106 @@ const templates = {
         </div>
       </section>
 
+      <!-- --- ATTIRE & DRESS CODE SECTION: COME DRESSED TO REIGN --- -->
+      <section id="custom-attire-section" class="section" style="background: linear-gradient(135deg, #070B19 0%, #0F172A 50%, #1E293B 100%); color: #FFFFFF; padding: 85px 20px; position: relative; overflow: hidden; border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <!-- Background Ambient Element Glows -->
+        <div style="position: absolute; top: -100px; left: 8%; width: 420px; height: 420px; background: radial-gradient(circle, rgba(56, 189, 248, 0.14) 0%, transparent 70%); filter: blur(60px); pointer-events: none;"></div>
+        <div style="position: absolute; bottom: -100px; right: 8%; width: 450px; height: 450px; background: radial-gradient(circle, rgba(249, 115, 22, 0.14) 0%, transparent 70%); filter: blur(60px); pointer-events: none;"></div>
+
+        <div style="max-width: 1140px; margin: 0 auto; position: relative; z-index: 2;">
+          <div class="section-header" style="text-align: center; margin-bottom: 48px;">
+            <span class="section-tag" style="background: rgba(243, 156, 18, 0.15); color: #FBBF24; border: 1px solid rgba(243, 156, 18, 0.4); display: inline-flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-vest-patches"></i> Official Attire &amp; Dress Code
+            </span>
+            <h2 class="section-title" style="color: #FFFFFF; font-family: '${page.headlineFont || 'Playfair Display'}', serif; font-size: 2.85rem; margin-top: 14px; margin-bottom: 14px;">
+              Come Dressed to Reign
+            </h2>
+            <p class="section-subtitle" style="color: rgba(226, 232, 240, 0.92); font-size: 1.15rem; max-width: 760px; margin: 0 auto; line-height: 1.65;">
+              We invite you to choose your element for the evening. Embrace the Frost, ignite the Flame, or reign supreme by weaving both elements together.
+            </p>
+          </div>
+
+          <!-- Dual Element Showcase Grid -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 35px;">
+            
+            <!-- Card 1: Embrace the Frost -->
+            <div style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 16px; padding: 32px 28px; box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px); display: flex; flex-direction: column;">
+              <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+                <div style="width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(14, 165, 233, 0.1)); border: 1px solid rgba(56, 189, 248, 0.4); color: #38BDF8; display: flex; align-items: center; justify-content: center; font-size: 1.55rem;">
+                  <i class="fa-regular fa-snowflake"></i>
+                </div>
+                <div>
+                  <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.08em; color: #38BDF8;">The Cool Element</span>
+                  <h3 style="color: #FFFFFF; font-size: 1.35rem; font-family: '${page.headlineFont || 'Playfair Display'}', serif; margin: 0; font-weight: 700;">Embrace the Frost</h3>
+                </div>
+              </div>
+              <p style="color: #CBD5E1; font-size: 0.95rem; line-height: 1.65; margin: 0 0 18px 0; flex: 1;">
+                Step out in glacial elegance. Channel icy silvers, crystal whites, winter sky blues, and shimmering platinum finishes that capture the regal brilliance of winter.
+              </p>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.78rem;">
+                <span style="background: rgba(56, 189, 248, 0.12); color: #BAE6FD; padding: 4px 10px; border-radius: 50px; border: 1px solid rgba(56, 189, 248, 0.25);"><i class="fa-solid fa-circle" style="font-size: 0.45rem; vertical-align: middle; color: #38BDF8;"></i> Icy Silvers</span>
+                <span style="background: rgba(56, 189, 248, 0.12); color: #BAE6FD; padding: 4px 10px; border-radius: 50px; border: 1px solid rgba(56, 189, 248, 0.25);"><i class="fa-solid fa-circle" style="font-size: 0.45rem; vertical-align: middle; color: #E2E8F0;"></i> Crystal Whites</span>
+                <span style="background: rgba(56, 189, 248, 0.12); color: #BAE6FD; padding: 4px 10px; border-radius: 50px; border: 1px solid rgba(56, 189, 248, 0.25);"><i class="fa-solid fa-circle" style="font-size: 0.45rem; vertical-align: middle; color: #60A5FA;"></i> Winter Blues</span>
+              </div>
+            </div>
+
+            <!-- Card 2: Bring the Flame -->
+            <div style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid rgba(249, 115, 22, 0.35); border-radius: 16px; padding: 32px 28px; box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px); display: flex; flex-direction: column;">
+              <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+                <div style="width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, rgba(249, 115, 22, 0.25), rgba(234, 88, 12, 0.1)); border: 1px solid rgba(249, 115, 22, 0.4); color: #FB923C; display: flex; align-items: center; justify-content: center; font-size: 1.55rem;">
+                  <i class="fa-solid fa-fire-flame-curved"></i>
+                </div>
+                <div>
+                  <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.08em; color: #FB923C;">The Warm Element</span>
+                  <h3 style="color: #FFFFFF; font-size: 1.35rem; font-family: '${page.headlineFont || 'Playfair Display'}', serif; margin: 0; font-weight: 700;">Bring the Flame</h3>
+                </div>
+              </div>
+              <p style="color: #CBD5E1; font-size: 0.95rem; line-height: 1.65; margin: 0 0 18px 0; flex: 1;">
+                Radiate warmth and power. Stand out in rich golds, deep royal burgundies, burnt oranges, and smoldering ember reds that spark the energy of celebration.
+              </p>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.78rem;">
+                <span style="background: rgba(249, 115, 22, 0.12); color: #FED7AA; padding: 4px 10px; border-radius: 50px; border: 1px solid rgba(249, 115, 22, 0.25);"><i class="fa-solid fa-circle" style="font-size: 0.45rem; vertical-align: middle; color: #F59E0B;"></i> Rich Golds</span>
+                <span style="background: rgba(249, 115, 22, 0.12); color: #FED7AA; padding: 4px 10px; border-radius: 50px; border: 1px solid rgba(249, 115, 22, 0.25);"><i class="fa-solid fa-circle" style="font-size: 0.45rem; vertical-align: middle; color: #991B1B;"></i> Deep Burgundies</span>
+                <span style="background: rgba(249, 115, 22, 0.12); color: #FED7AA; padding: 4px 10px; border-radius: 50px; border: 1px solid rgba(249, 115, 22, 0.25);"><i class="fa-solid fa-circle" style="font-size: 0.45rem; vertical-align: middle; color: #EF4444;"></i> Ember Reds</span>
+              </div>
+            </div>
+
+            <!-- Card 3: Feeling Both? Wear Them Together -->
+            <div style="background: rgba(15, 23, 42, 0.85); border: 1.5px solid rgba(243, 156, 18, 0.45); border-radius: 16px; padding: 32px 28px; box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px); display: flex; flex-direction: column;">
+              <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+                <div style="width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, #38BDF8, #F97316); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.45rem; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <div>
+                  <span style="font-size: 0.72rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.08em; color: #FBBF24;">Elemental Fusion</span>
+                  <h3 style="color: #FFFFFF; font-size: 1.35rem; font-family: '${page.headlineFont || 'Playfair Display'}', serif; margin: 0; font-weight: 700;">Reign in Fusion</h3>
+                </div>
+              </div>
+              <p style="color: #CBD5E1; font-size: 0.95rem; line-height: 1.65; margin: 0 0 18px 0; flex: 1;">
+                Why choose when you can rule both? Pair cool silver silks with fiery gold jewelry, or a sharp obsidian suit with an amber sash or icy blue pocket square.
+              </p>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.78rem;">
+                <span style="background: rgba(243, 156, 18, 0.15); color: #FEF08A; padding: 4px 10px; border-radius: 50px; border: 1px solid rgba(243, 156, 18, 0.3);"><i class="fa-solid fa-circle" style="font-size: 0.45rem; vertical-align: middle; color: #F59E0B;"></i> Mixed Elements</span>
+                <span style="background: rgba(243, 156, 18, 0.15); color: #FEF08A; padding: 4px 10px; border-radius: 50px; border: 1px solid rgba(243, 156, 18, 0.3);"><i class="fa-solid fa-circle" style="font-size: 0.45rem; vertical-align: middle; color: #38BDF8;"></i> Statement Contrast</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Attire Guidance Banner -->
+          <div style="background: rgba(30, 41, 59, 0.75); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 14px; padding: 24px 30px; text-align: center; max-width: 900px; margin: 0 auto; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);">
+            <p style="color: #F8FAFC; font-size: 1.08rem; line-height: 1.75; margin: 0; font-family: '${page.headlineFont || 'Playfair Display'}', serif; font-style: italic;">
+              &ldquo;Think gowns, cocktail dresses, tuxedos, and sharp suits. Velvet, shimmer, and a touch of sparkle are more than welcome. It&#39;s January, so bring a wrap or statement coat and make an entrance.&rdquo;
+            </p>
+          </div>
+        </div>
+      </section>
+
       <!-- --- TIERED PRICING & FEATURES SECTION --- -->
       <section id="custom-pricing-section" class="section section-alt" style="padding-top: 60px;">
         <div class="section-header">
           <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">Tiered Entry & Tickets</span>
           <h2 class="section-title" style="font-family: '${page.headlineFont || 'Playfair Display'}', serif;">Select Your Ticket or Sponsorship Table</h2>
           <p class="section-subtitle">Reserve your seat for an unforgettable evening. All tiers have full access to main event features.  (dinner, entertainment and auctions).  All contributions support Howards 4 Hope 501(c)(3) mission initiatives. Payment plans are available at checkout.</p>
-        </div>
-
-        <!-- Gala Dress Code & Attire Motif Card -->
-        <div class="gala-dress-code-banner" style="max-width: 820px; margin: 0 auto 20px auto; background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.98)); border: 1.5px solid rgba(243, 156, 18, 0.45); border-radius: 12px; padding: 20px 24px; color: #FFFFFF; text-align: left; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);">
-          <div style="display: flex; align-items: flex-start; gap: 16px;">
-            <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #38BDF8, #F97316); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);">
-              <i class="fa-solid fa-vest-patches"></i>
-            </div>
-            <div style="flex: 1;">
-              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap;">
-                <h4 style="color: #F8FAFC; margin: 0; font-size: 1.08rem; font-family: 'Playfair Display', serif; font-weight: 700; letter-spacing: 0.02em;">
-                  Come Dressed to Reign
-                </h4>
-                <span style="background: rgba(243, 156, 18, 0.2); color: #FBBF24; border: 1px solid rgba(243, 156, 18, 0.4); font-size: 0.7rem; padding: 2px 8px; border-radius: 50px; font-weight: 700; text-transform: uppercase;">Attire &amp; Dress Code</span>
-              </div>
-              <p style="color: rgba(241, 245, 249, 0.95); font-size: 0.92rem; line-height: 1.6; margin: 0 0 8px 0;">
-                We invite you to choose your element for the evening. Embrace the <strong>Frost</strong> in icy silvers, crystal whites, and winter blues. Or bring the <strong>Flame</strong> in rich golds, deep burgundies, and ember reds. Feeling both? Wear them together.
-              </p>
-              <p style="color: rgba(203, 213, 225, 0.92); font-size: 0.88rem; line-height: 1.55; margin: 0; font-style: italic;">
-                Think gowns, cocktail dresses, tuxedos, and sharp suits. Velvet, shimmer, and a touch of sparkle are more than welcome. It's January, so bring a wrap or statement coat and make an entrance.
-              </p>
-            </div>
-          </div>
         </div>
 
         <!-- Gala Non-Refundable & 72h Contact Policy Banner -->

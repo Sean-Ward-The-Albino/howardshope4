@@ -265,8 +265,9 @@ public class EmailService {
      * Dispatches notification to staff when someone submits a Volunteer/Partner application.
      */
     public void sendVolunteerApplicationNotification(org.howards4hope.model.VolunteerApplication app) {
-        String staffEmail = fromEmail != null ? fromEmail : "howards4hope@gmail.com";
-        String subject = "🤝 New Volunteer / Partner Application: " + app.getFullName() + " (" + app.getRoleInterest() + ")";
+        String primaryStaffEmail = "info@howards4hope.org";
+        String secondaryStaffEmail = "howards4hope@gmail.com";
+        String subject = "📬 New Contact Inquiry / Outreach Application: " + app.getFullName() + " (" + app.getRoleInterest() + ")";
         String htmlContent = String.format(
             "<!DOCTYPE html><html><head><style>" +
             "body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;line-height:1.6;background:#f8fafc;padding:20px;}" +
@@ -275,23 +276,26 @@ public class EmailService {
             ".meta-row{padding:8px 0;border-bottom:1px solid #f1f5f9;}" +
             "</style></head><body>" +
             "<div class='card'>" +
-            "<div class='header'><h3 style='margin:0;color:#1E2761;'>🤝 New Get Involved / Volunteer Submission</h3></div>" +
-            "<div class='meta-row'><strong>Applicant Name:</strong> %s</div>" +
+            "<div class='header'><h3 style='margin:0;color:#1E2761;'>📬 New Contact Us / Outreach Submission</h3></div>" +
+            "<div class='meta-row'><strong>Sender Name:</strong> %s</div>" +
             "<div class='meta-row'><strong>Email Address:</strong> <a href='mailto:%s'>%s</a></div>" +
             "<div class='meta-row'><strong>Phone Number:</strong> %s</div>" +
-            "<div class='meta-row'><strong>Interest Area:</strong> <span style='background:#eff6ff;color:#2563EB;padding:2px 8px;border-radius:4px;font-weight:bold;'>%s</span></div>" +
+            "<div class='meta-row'><strong>Inquiry Area / Role:</strong> <span style='background:#eff6ff;color:#2563EB;padding:2px 8px;border-radius:4px;font-weight:bold;'>%s</span></div>" +
             "<div class='meta-row'><strong>Availability:</strong> %s</div>" +
-            "<div style='margin-top:15px;'><strong>Message / Background:</strong><br><p style='background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;'>%s</p></div>" +
-            "<p style='font-size:12px;color:#64748b;margin-top:20px;'>Submitted via howards4hope.org/#/get-involved.</p>" +
+            "<div style='margin-top:15px;'><strong>Message:</strong><br><p style='background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;'>%s</p></div>" +
+            "<p style='font-size:12px;color:#64748b;margin-top:20px;'>Submitted via Howards 4 Hope website (delivered to info@howards4hope.org).</p>" +
             "</div></body></html>",
             app.getFullName(), app.getEmail(), app.getEmail(), 
             app.getPhone() != null ? app.getPhone() : "Not provided",
             app.getRoleInterest(),
-            app.getAvailability() != null ? app.getAvailability() : "Flexible",
+            app.getAvailability() != null ? app.getAvailability() : "General",
             app.getMessage() != null ? app.getMessage() : "None"
         );
 
-        sendEmail(staffEmail, subject, htmlContent);
+        sendEmail(primaryStaffEmail, subject, htmlContent);
+        if (!primaryStaffEmail.equalsIgnoreCase(secondaryStaffEmail)) {
+            sendEmail(secondaryStaffEmail, subject, htmlContent);
+        }
     }
 
     /**
