@@ -25,6 +25,8 @@ ui-debug.log
 *.env
 !.env.example
 SETUP_CREDENTIALS_GUIDE.txt
+DNS_CONFIG_GUIDE.txt
+*DNS*.txt
 
 # --- FIREBASE SERVICE ACCOUNT CREDENTIALS (NEVER COMMIT) ---
 **/firebase-service-account.json
