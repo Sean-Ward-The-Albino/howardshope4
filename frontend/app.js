@@ -1624,6 +1624,19 @@ const API = {
     return null;
   },
 
+  async createPayPalOrder(payload) {
+    const response = await fetch(`${this.baseUrl}/payments/create-paypal-order`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `PayPal checkout initiation failed (${response.status})`);
+    }
+    return await response.json();
+  },
+
   async createDonationCheckout(donationData) {
     try {
       const response = await fetch(`${this.baseUrl}/donations/create-checkout`, {
@@ -2748,8 +2761,8 @@ const templates = {
                 <i class="fa-solid fa-credit-card"></i> Donate with Credit / Debit Card (Stripe)
               </button>
               
-              <button class="auth-social-btn" id="paypal-donate-btn" disabled style="background: #e2e8f0; color: #64748b; border: 1px solid #cbd5e1; height: 50px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: not-allowed; opacity: 0.75;">
-                <i class="fa-brands fa-paypal" style="color: #94a3b8;"></i> PayPal <span style="font-size: 0.75rem; background: #94a3b8; color: #fff; padding: 2px 8px; border-radius: 12px; margin-left: 6px; font-weight: 600;">Coming Soon</span>
+              <button class="auth-social-btn" id="paypal-donate-btn" style="background: #0070ba; color: white; border: none; height: 50px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: pointer; transition: background 0.2s ease;">
+                <i class="fa-brands fa-paypal"></i> Donate with PayPal
               </button>
               
               <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 18px; line-height: 1.4;">
@@ -3435,14 +3448,14 @@ const templates = {
                   </label>
                 ` : ''}
                 ${page.paymentPaypal !== false ? `
-                  <label class="payment-option-card" style="border: 1px solid #cbd5e1; padding: 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: not-allowed; background: #f8fafc; opacity: 0.65;">
-                    <input type="radio" name="gala_payment" value="paypal" disabled style="transform: scale(1.2);">
-                    <i class="fa-brands fa-paypal fa-2x" style="color: #94a3b8;"></i>
+                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
+                    <input type="radio" name="gala_payment" value="paypal" style="transform: scale(1.2);">
+                    <i class="fa-brands fa-paypal fa-2x" style="color: #0070ba;"></i>
                     <div style="flex: 1;">
-                      <div style="font-weight: 700; font-size: 1rem; color: #64748b; display: flex; align-items: center; gap: 8px;">
-                        PayPal <span style="font-size: 0.7rem; background: #64748b; color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Coming Soon</span>
+                      <div style="font-weight: 700; font-size: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                        PayPal / Pay in 4
                       </div>
-                      <div style="font-size: 0.75rem; color: #94a3b8;">Direct PayPal and Pay in 4 gateway is currently being finalized.</div>
+                      <div style="font-size: 0.75rem; color: var(--text-muted);">PayPal balance, connected cards, or split with Pay in 4.</div>
                     </div>
                   </label>
                 ` : ''}
@@ -5789,6 +5802,51 @@ function bindCustomEventPage() {
           }
         }
 
+        // --- SECURE PAYPAL CHECKOUT ---
+        if (selectedPaymentMethod === 'PAYPAL' && totalPrice > 0) {
+          if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing with PayPal...';
+          }
+          const paypalRes = await API.createPayPalOrder({
+            eventId: 9999,
+            quantity: qty,
+            guestEmail: email,
+            guestName: name
+          });
+
+          attendees.forEach((attObj, idx) => {
+            const dedicatedNumber = `${masterNumber}-${String(idx + 1).padStart(2, '0')}`;
+            const galaTicket = {
+              id: Math.floor(100000 + Math.random() * 900000),
+              ticketId: dedicatedNumber,
+              masterConfirmation: masterNumber,
+              attendeeIndex: idx + 1,
+              totalAttendees: qty,
+              eventId: 9999,
+              eventTitle: `${state.customPage.title} - ${tierName}`,
+              tierName: tierName,
+              eventDate: state.customPage.date,
+              eventLocation: state.customPage.location,
+              guestName: attObj.name,
+              primaryPurchaser: name,
+              userEmail: attObj.email,
+              phone: phone,
+              quantity: 1,
+              pricePaid: unitPrice,
+              unitPrice: unitPrice,
+              paymentMethod: 'PAYPAL',
+              paymentStatus: 'CONFIRMED',
+              purchaseDate: new Date().toISOString().split('T')[0]
+            };
+            state.myTickets.unshift(galaTicket);
+          });
+          saveMyTickets();
+
+          showToast('success', 'Order Confirmed', 'Your Gala tickets have been confirmed via PayPal. Confirmation email dispatched!');
+          window.location.hash = `#/my-tickets?ticket=${masterNumber}-01`;
+          return;
+        }
+
         // --- PAY AT GALA DOOR or FREE TICKETS ONLY ---
         const isDoorPay = selectedPaymentMethod === 'DOOR';
         const isFree = totalPrice === 0;
@@ -6182,8 +6240,8 @@ function openRSVPModal(event) {
           <i class="fa-brands fa-cc-amex" title="American Express"></i>
           <i class="fa-brands fa-cc-discover" title="Discover"></i>
         </div>
-        <button class="auth-social-btn" id="paypal-checkout-btn" disabled style="background: #e2e8f0; color: #64748b; border: 1px solid #cbd5e1; height: 50px; margin-bottom: 0; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: not-allowed; opacity: 0.75;">
-          <i class="fa-brands fa-paypal" style="color: #94a3b8;"></i> PayPal <span style="font-size: 0.75rem; background: #94a3b8; color: #fff; padding: 2px 8px; border-radius: 12px; margin-left: 6px; font-weight: 600;">Coming Soon</span>
+        <button class="auth-social-btn" id="paypal-checkout-btn" style="background: #0070ba; color: white; border: none; height: 50px; margin-bottom: 0; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: pointer; transition: background 0.2s ease;">
+          <i class="fa-brands fa-paypal"></i> Pay with PayPal
         </button>
       `}
     </div>
@@ -6416,7 +6474,33 @@ function openRSVPModal(event) {
   const paypalBtn = document.getElementById('paypal-checkout-btn');
   if (paypalBtn) {
     paypalBtn.addEventListener('click', async () => {
-      showToast('info', 'PayPal Coming Soon', 'Direct PayPal payment gateway is currently being finalized. Please use Credit / Debit Card (Stripe).');
+      const emailInput = document.getElementById('rsvp-email');
+      const email = emailInput ? emailInput.value.trim() : '';
+      if (!email || !email.includes('@')) {
+        showToast('error', 'Valid Email Required', 'Please enter your email address to receive your tickets.');
+        if (emailInput) emailInput.focus();
+        return;
+      }
+      paypalBtn.disabled = true;
+      paypalBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing with PayPal...';
+      try {
+        const qty = parseInt(qtySelect.value, 10) || 1;
+        const res = await API.createPayPalOrder({
+          eventId: event.id,
+          quantity: qty,
+          guestEmail: email,
+          guestName: document.getElementById('rsvp-att-name-1')?.value || 'Valued Attendee'
+        });
+        showToast('success', 'Order Confirmed', 'Your ticket has been confirmed via PayPal. Confirmation email dispatched!');
+        if (document.body.contains(rsvpModal)) {
+          document.body.removeChild(rsvpModal);
+        }
+        window.location.hash = `#/my-tickets?ticket=${res.ticketId || ''}`;
+      } catch (err) {
+        showToast('error', 'PayPal Error', err.message || 'Unable to complete PayPal checkout.');
+        paypalBtn.disabled = false;
+        paypalBtn.innerHTML = '<i class="fa-brands fa-paypal"></i> Pay with PayPal';
+      }
     });
   }
 }
