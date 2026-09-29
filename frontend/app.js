@@ -473,6 +473,10 @@ function loadCustomPage() {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && typeof parsed === 'object') {
+        if (parsed.title && (parsed.title.includes('Unmasking') || parsed.date === '2026-11-19')) {
+          delete parsed.title;
+          delete parsed.date;
+        }
         return Object.assign({}, DEFAULT_CUSTOM_PAGE, parsed);
       }
     }
@@ -539,6 +543,10 @@ async function syncCustomPageFromCloud() {
       if (doc.exists) {
         const cloudData = doc.data();
         if (cloudData && typeof cloudData === 'object') {
+          if (cloudData.title && (cloudData.title.includes('Unmasking') || cloudData.date === '2026-11-19')) {
+            cloudData.title = DEFAULT_CUSTOM_PAGE.title;
+            cloudData.date = DEFAULT_CUSTOM_PAGE.date;
+          }
           state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, state.customPage, cloudData);
           try {
             localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
@@ -555,6 +563,10 @@ async function syncCustomPageFromCloud() {
           if (snapshot && snapshot.exists) {
             const cloudData = snapshot.data();
             if (cloudData && typeof cloudData === 'object') {
+              if (cloudData.title && (cloudData.title.includes('Unmasking') || cloudData.date === '2026-11-19')) {
+                cloudData.title = DEFAULT_CUSTOM_PAGE.title;
+                cloudData.date = DEFAULT_CUSTOM_PAGE.date;
+              }
               state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, state.customPage, cloudData);
               try {
                 localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
@@ -3223,7 +3235,30 @@ const templates = {
         <div class="section-header">
           <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">Tiered Entry & Tickets</span>
           <h2 class="section-title" style="font-family: '${page.headlineFont || 'Playfair Display'}', serif;">Select Your Ticket or Sponsorship Table</h2>
-          <p class="section-subtitle">Reserve your seat for an unforgettable evening. All tiers have full access to main event features.  (dinner, entertainment and auctions).  All contributions support Howards 4 Hope 501(c)(3) mission initiatives</p>
+          <p class="section-subtitle">Reserve your seat for an unforgettable evening. All tiers have full access to main event features.  (dinner, entertainment and auctions).  All contributions support Howards 4 Hope 501(c)(3) mission initiatives. Payment plans are available at checkout.</p>
+        </div>
+
+        <!-- Gala Dress Code & Attire Motif Card -->
+        <div class="gala-dress-code-banner" style="max-width: 820px; margin: 0 auto 20px auto; background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.98)); border: 1.5px solid rgba(243, 156, 18, 0.45); border-radius: 12px; padding: 20px 24px; color: #FFFFFF; text-align: left; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);">
+          <div style="display: flex; align-items: flex-start; gap: 16px;">
+            <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #38BDF8, #F97316); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);">
+              <i class="fa-solid fa-vest-patches"></i>
+            </div>
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap;">
+                <h4 style="color: #F8FAFC; margin: 0; font-size: 1.08rem; font-family: 'Playfair Display', serif; font-weight: 700; letter-spacing: 0.02em;">
+                  Come Dressed to Reign
+                </h4>
+                <span style="background: rgba(243, 156, 18, 0.2); color: #FBBF24; border: 1px solid rgba(243, 156, 18, 0.4); font-size: 0.7rem; padding: 2px 8px; border-radius: 50px; font-weight: 700; text-transform: uppercase;">Attire &amp; Dress Code</span>
+              </div>
+              <p style="color: rgba(241, 245, 249, 0.95); font-size: 0.92rem; line-height: 1.6; margin: 0 0 8px 0;">
+                We invite you to choose your element for the evening. Embrace the <strong>Frost</strong> in icy silvers, crystal whites, and winter blues. Or bring the <strong>Flame</strong> in rich golds, deep burgundies, and ember reds. Feeling both? Wear them together.
+              </p>
+              <p style="color: rgba(203, 213, 225, 0.92); font-size: 0.88rem; line-height: 1.55; margin: 0; font-style: italic;">
+                Think gowns, cocktail dresses, tuxedos, and sharp suits. Velvet, shimmer, and a touch of sparkle are more than welcome. It's January, so bring a wrap or statement coat and make an entrance.
+              </p>
+            </div>
+          </div>
         </div>
 
         <!-- Gala Non-Refundable & 72h Contact Policy Banner -->
@@ -6000,6 +6035,9 @@ function bindCustomEventPage() {
               <div style="color: var(--text-main); font-size: 0.95rem;">${ticketSummary.replace(/\n/g, '<br>')}</div>
               <div style="background: rgba(220, 38, 38, 0.08); border-left: 4px solid #dc2626; padding: 10px 12px; border-radius: 6px; font-size: 0.85rem; color: #991b1b; margin-top: 4px;">
                 <i class="fa-solid fa-triangle-exclamation" style="margin-right: 4px;"></i> <strong>Non-Refundable Policy:</strong> Gala tickets are non-refundable. For accommodations or transfer requests, contact info@howards4hope.org at least 72 hours prior to the event.
+              </div>
+              <div style="background: rgba(243, 156, 18, 0.08); border-left: 4px solid #f59e0b; padding: 10px 12px; border-radius: 6px; font-size: 0.85rem; color: #92400e; margin-top: 4px;">
+                <i class="fa-solid fa-vest-patches" style="margin-right: 4px;"></i> <strong>Dress Code Reminder:</strong> Come dressed to reign! Choose your element (Frost in icy silvers, crystal whites, and winter blues; or Flame in rich golds, deep burgundies, and ember reds; or both).
               </div>
               <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
                 <i class="fa-solid fa-envelope-circle-check" style="color: #059669; margin-right: 4px;"></i> A confirmation is dispatched to <strong>${escapeHtml(email)}</strong>.

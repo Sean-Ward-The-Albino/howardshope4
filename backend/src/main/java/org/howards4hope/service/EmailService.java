@@ -31,6 +31,25 @@ public class EmailService {
         String formattedPrice = String.format("%.2f", totalPrice);
         String subject = "🎟️ Your Ticket Confirmation for " + eventTitle;
 
+        boolean isGala = eventTitle != null && (
+            eventTitle.toLowerCase().contains("gala") || 
+            eventTitle.toLowerCase().contains("frost") || 
+            eventTitle.toLowerCase().contains("flame") ||
+            eventTitle.toLowerCase().contains("reign")
+        );
+
+        String dressCodeSection = isGala ? (
+            "<div style='background:#fefce8;border-left:5px solid #f59e0b;border-radius:8px;padding:18px 20px;margin:22px 0;'>" +
+            "<h4 style='margin:0 0 8px 0;color:#92400e;font-size:15px;'>✨ Attire &amp; Dress Code: Come Dressed to Reign</h4>" +
+            "<p style='margin:0 0 8px 0;font-size:13.5px;color:#78350f;line-height:1.55;'>" +
+            "We invite you to choose your element for the evening. Embrace the <strong>Frost</strong> in icy silvers, crystal whites, and winter blues. Or bring the <strong>Flame</strong> in rich golds, deep burgundies, and ember reds. Feeling both? Wear them together." +
+            "</p>" +
+            "<p style='margin:0;font-size:13px;color:#92400e;line-height:1.5;font-style:italic;'>" +
+            "Think gowns, cocktail dresses, tuxedos, and sharp suits. Velvet, shimmer, and a touch of sparkle are more than welcome. It's January, so bring a wrap or statement coat and make an entrance." +
+            "</p>" +
+            "</div>"
+        ) : "";
+
         String htmlContent = String.format(
             "<!DOCTYPE html>" +
             "<html><head><style>" +
@@ -53,12 +72,13 @@ public class EmailService {
             "<p><strong>Total Paid:</strong> $%s USD</p>" +
             "<p><strong>Ticket Token:</strong> <code style='font-size:16px;background:#e2e8f0;padding:2px 6px;border-radius:4px;'>%s</code></p>" +
             "</div>" +
+            "%s" +
             "<p>Please present this Ticket Token or email at the reception desk upon arrival.</p>" +
             "<p>With hope and gratitude,<br><strong>The Howards 4 Hope Team</strong><br>Long Beach, CA</p>" +
             "</div>" +
             "<div class='footer'>Howards 4 Hope &bull; 501(c)(3) Public Charity &bull; EIN: 86-1910919<br>3711 Long Beach Blvd, #4055, Long Beach, CA 90807</div>" +
             "</div></body></html>",
-            guestName, eventTitle, eventDate, quantity, formattedPrice, ticketId
+            guestName, eventTitle, eventDate, quantity, formattedPrice, ticketId, dressCodeSection
         );
 
         // Attempt live SMTP transmission
