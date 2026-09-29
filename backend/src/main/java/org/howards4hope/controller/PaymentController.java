@@ -259,21 +259,34 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Customer email is required.");
         }
 
-        Optional<Event> optionalEvent = eventRepository.findById(request.eventId);
-        if (optionalEvent.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        Event event = findOrResolveEvent(request.eventId);
+        if (event == null && (request.unitPrice == null || request.unitPrice <= 0)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Event not found."));
         }
 
-        Event event = optionalEvent.get();
+        String eventTitle = (request.eventTitle != null && !request.eventTitle.trim().isEmpty())
+                ? request.eventTitle.trim()
+                : (event != null ? event.getTitle() : "Event Pass");
+        String eventDate = (request.eventDate != null && !request.eventDate.trim().isEmpty())
+                ? request.eventDate.trim()
+                : (event != null ? event.getDate() : LocalDate.now().toString());
+
+        double unitPrice = (request.unitPrice != null && request.unitPrice > 0)
+                ? request.unitPrice
+                : (event != null ? event.getPrice() : 0.0);
+
+        int qty = (request.quantity > 0) ? request.quantity : 1;
+        double totalPrice = unitPrice * qty;
+
         String ticketId = "H4H-PAYPAL-" + System.currentTimeMillis();
 
         Ticket ticket = new Ticket(
-                event.getId(),
-                event.getTitle(),
-                event.getDate(),
+                request.eventId != null ? request.eventId : 9999L,
+                eventTitle,
+                eventDate,
                 customerEmail,
-                request.quantity,
-                event.getPrice() * request.quantity,
+                qty,
+                totalPrice,
                 "PAYPAL",
                 "CONFIRMED",
                 LocalDate.now().toString()
@@ -286,11 +299,11 @@ public class PaymentController {
         emailService.sendTicketConfirmationEmail(
                 customerEmail,
                 guestName,
-                event.getTitle(),
-                event.getDate(),
-                request.quantity,
+                eventTitle,
+                eventDate,
+                qty,
                 savedTicket.getTicketId(),
-                event.getPrice() * request.quantity
+                totalPrice
         );
 
         Map<String, String> response = new HashMap<>();
