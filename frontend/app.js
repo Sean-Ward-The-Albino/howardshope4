@@ -18,6 +18,7 @@ firebase.initializeApp(firebaseConfig);
 const ADMIN_WHITELIST = [
   'avlorycorp@gmail.com',
   'howards4hope@gmail.com',
+  'info@howards4hope.org',
   'staff@howards4hope.org',
   'lacreashia@howards4hope.org',
   'lamar@howards4hope.org',
@@ -230,9 +231,9 @@ const DEFAULT_CUSTOM_PAGE = {
   pageBgColor: "#FFFFFF",
   savedColors: ["#0B132B", "#1E2761", "#F39C12", "#2563EB", "#10B981", "#3B0712", "#FFFFFF", "#18181B"],
   storyTitle: "An Evening Dedicated to Hope & Healing",
-  description: "The Unmasking Hope Annual Charity Gala & Awards is our signature gathering of the year, bringing together corporate partners, community leaders, and devoted advocates to celebrate our resilient community and secure vital funding for families across Long Beach.\n\nThroughout this inspiring evening, we honor extraordinary caregivers who champion individuals with disabilities, spotlight youth scholarship recipients, and reflect on the milestones achieved through our community wellness, mentorship, and single-parent relief programs.\n\nTogether, our collective presence and generosity ensure that no caregiver walks alone, no child is denied life-changing educational opportunities, and every family in need is met with dignity, nourishment, and unwavering hope.",
+  description: "The Unmasking Hope Annual Charity Gala & Awards is our signature gathering of the year, bringing together corporate partners, community leaders, and devoted advocates to celebrate our resilient community and secure vital funding for families across Long Beach.\n\nThroughout this inspiring evening, we honor extraordinary caregivers who champion individuals with disabilities, spotlight youth scholarship recipients, and reflect on the milestones achieved through our community wellness, mentorship, and single working and student parent relief programs.\n\nTogether, our collective presence and generosity ensure that no caregiver walks alone, no child is denied life-changing educational opportunities, and every family in need is met with dignity, nourishment, and unwavering hope.",
   impactTitle: "100% Mission-Focused Proceeds",
-  impactDesc: "Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency single-parent food security toolkits.",
+  impactDesc: "Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency toolkits for single working and student parents.",
   allowInstallments: true,
   installmentCycles: 4,
   splitInterval: "ALL",
@@ -2120,7 +2121,7 @@ const templates = {
           <div class="calendar-card animate-hover" style="padding: 24px; text-align: center;">
             <div style="font-size: 2rem; color: var(--accent); margin-bottom: 15px;"><i class="fa-solid fa-house-chimney-medical"></i></div>
             <h3 style="color: var(--primary); margin-bottom: 10px;">Single Parent Aid</h3>
-            <p style="color: var(--text-muted); font-size: 0.95rem;">Equipping low-income single parents with career guidance and emergency grant assistance via The H.O.P.E. Program.</p>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">Equipping single working AND student parents with career guidance, essential welfare toolkits, and emergency grant assistance via The H.O.P.E. Program.</p>
           </div>
         </div>
       </section>
@@ -2175,10 +2176,10 @@ const templates = {
           <div style="flex: 1.2; min-width: 320px;">
             <h3 style="font-size: 1.75rem; margin-bottom: 1.5rem; color: var(--primary);">Restoring Dignity, Rebuilding Lives</h3>
             <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Howards 4 Hope (H4H) was established out of personal lived experiences and a passionate commitment to assist disadvantaged and underserved individuals and families in Long Beach and Southern California.</p>
-            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Our mission is to restore hope and enhance lives by empowering youth, supporting caregivers of individuals with disabilities, and equipping low-income single parents with actionable life skills, advocacy roadmaps, and economic toolkits.</p>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Our mission is to restore hope and enhance lives by empowering youth, supporting caregivers of individuals with disabilities, and uplifting single working AND student parents in Long Beach with actionable life skills, advocacy roadmaps, and economic toolkits.</p>
             <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 20px;">
               <div style="padding: 12px 18px; background: var(--bg-base); border-radius: var(--radius-sm); border-left: 3px solid var(--secondary);">
-                <strong><i class="fa-solid fa-phone" style="color: var(--secondary); margin-right: 6px;"></i> (562) 481-5556</strong>
+                <strong><i class="fa-solid fa-phone" style="color: var(--secondary); margin-right: 6px;"></i> (562) 456-4501</strong>
               </div>
               <div style="padding: 12px 18px; background: var(--bg-base); border-radius: var(--radius-sm); border-left: 3px solid var(--accent);">
                 <strong><i class="fa-solid fa-envelope" style="color: var(--accent); margin-right: 6px;"></i> info@howards4hope.org</strong>
@@ -2519,7 +2520,7 @@ const templates = {
                 <div class="tax-receipt-header">
                   <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: 0.5px;">HOWARDS 4 HOPE</div>
                   <div style="font-size: 0.8rem; color: #475569;">A California Non-Profit Public Benefit Corporation</div>
-                  <div style="font-size: 0.8rem; color: #475569;">3711 Long Beach Blvd, #4055, Long Beach, CA 90807 | Tel: (562) 481-5556</div>
+                  <div style="font-size: 0.8rem; color: #475569;">3711 Long Beach Blvd, #4055, Long Beach, CA 90807 | Tel: (562) 456-4501</div>
                   <div style="font-size: 0.85rem; font-weight: 700; margin-top: 4px; color: #0f172a;">Federal Tax-Exempt ID (EIN): 86-1910919</div>
                   <div class="tax-receipt-title" style="margin-top: 10px; font-size: 1.15rem;">Official Written Acknowledgment & Tax Receipt</div>
                 </div>
@@ -2828,7 +2829,7 @@ const templates = {
             </span>
             <h2 class="section-title" style="margin-bottom: 12px;">A Message of Hope: Watch Our Mission in Action</h2>
             <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 28px; max-width: 700px; margin-left: auto; margin-right: auto;">
-              See firsthand how your presence, partnership, and generosity directly transform the lives of youth, single parents, and caregivers in Long Beach.
+              See firsthand how your presence, partnership, and generosity directly transform the lives of youth, single working AND student parents, and caregivers in Long Beach.
             </p>
             
             <div class="gala-video-wrapper">
@@ -2859,7 +2860,7 @@ const templates = {
             </div>
             <div style="background: var(--bg-card); border-left: 4px solid ${page.accentColor || 'var(--accent)'}; padding: 20px; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); margin-bottom: 25px;">
               <h4 style="color: var(--primary); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-hand-holding-heart" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 6px;"></i> ${page.impactTitle || '100% Mission-Focused Proceeds'}</h4>
-              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">${page.impactDesc || 'Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency single-parent food security toolkits.'}</p>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">${page.impactDesc || 'Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency toolkits for single working and student parents.'}</p>
             </div>
             
             <!-- Program Schedule Timeline -->
@@ -7791,7 +7792,7 @@ function initCommunityCarousel() {
       image: "https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?auto=format&fit=crop&q=80&w=1200",
       tag: "Single Parent Aid",
       title: "The H.O.P.E. Program - Economic Empowerment & Aid",
-      desc: "Equipping low-income single parents with career guidance, essential welfare toolkits, and emergency grant assistance."
+      desc: "Equipping single working AND student parents with career guidance, essential welfare toolkits, and emergency grant assistance."
     },
     {
       image: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=1200",
