@@ -215,9 +215,9 @@ const DEFAULT_CUSTOM_PAGE = {
   enabled: true,
   navLabel: "Featured Gala",
   slug: "special-event",
-  title: "Unmasking Hope: Annual Charity Gala & Awards",
+  title: "Frost & Flame: Reign of Hope",
   subtitle: "Join community leaders, families, and philanthropists for an inspiring evening of unity, awards, and empowerment to rebuild lives in Long Beach.",
-  date: "2026-11-19",
+  date: "2027-01-30",
   time: "6:00 PM – 10:00 PM PST",
   location: "Grand Ballroom, 3711 Long Beach Blvd, Long Beach, CA 90807",
   dressCode: "Semi-Formal / Cocktail Attire",
@@ -231,7 +231,7 @@ const DEFAULT_CUSTOM_PAGE = {
   pageBgColor: "#FFFFFF",
   savedColors: ["#0B132B", "#1E2761", "#F39C12", "#2563EB", "#10B981", "#3B0712", "#FFFFFF", "#18181B"],
   storyTitle: "An Evening Dedicated to Hope & Healing",
-  description: "The Unmasking Hope Annual Charity Gala & Awards is our signature gathering of the year, bringing together corporate partners, community leaders, and devoted advocates to celebrate our resilient community and secure vital funding for families across Long Beach.\n\nThroughout this inspiring evening, we honor extraordinary caregivers who champion individuals with disabilities, spotlight youth scholarship recipients, and reflect on the milestones achieved through our community wellness, mentorship, and single working and student parent relief programs.\n\nTogether, our collective presence and generosity ensure that no caregiver walks alone, no child is denied life-changing educational opportunities, and every family in need is met with dignity, nourishment, and unwavering hope.",
+  description: "Frost & Flame: Reign of Hope is our signature gathering of the year, bringing together corporate partners, community leaders, and devoted advocates to celebrate our resilient community and secure vital funding for families across Long Beach.\n\nThroughout this inspiring evening, we honor extraordinary caregivers who champion individuals with disabilities, spotlight youth scholarship recipients, and reflect on the milestones achieved through our community wellness, mentorship, and single working and student parent relief programs.\n\nTogether, our collective presence and generosity ensure that no caregiver walks alone, no child is denied life-changing educational opportunities, and every family in need is met with dignity, nourishment, and unwavering hope.",
   impactTitle: "100% Mission-Focused Proceeds",
   impactDesc: "Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency toolkits for single working and student parents.",
   allowInstallments: true,
@@ -325,11 +325,11 @@ function formatStoryParagraphs(text, fallback = '') {
   const content = (text && String(text).trim()) ? String(text).trim() : (fallback || '');
   if (!content) return '';
   if (content.includes('<p>') && content.includes('</p>')) {
-    return formatGalaAnimatedTitle(content);
+    return content;
   }
   const paras = content.split(/\r?\n+/).map(p => p.trim()).filter(Boolean);
   if (paras.length === 0) return '';
-  return paras.map(p => `<p class="gala-story-paragraph" style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.85; margin: 0 0 16px 0;">${formatGalaAnimatedTitle(p)}</p>`).join('');
+  return paras.map(p => `<p class="gala-story-paragraph" style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.85; margin: 0 0 16px 0;">${escapeHtml(p)}</p>`).join('');
 }
 
 function escapeHtml(str) {
@@ -397,9 +397,6 @@ function loadCustomPage() {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && typeof parsed === 'object') {
-        if (!parsed.schedule || !Array.isArray(parsed.schedule) || parsed.schedule.length === 0) {
-          parsed.schedule = DEFAULT_CUSTOM_PAGE.schedule;
-        }
         return Object.assign({}, DEFAULT_CUSTOM_PAGE, parsed);
       }
     }
@@ -414,35 +411,51 @@ async function saveCustomPage(pageConfig) {
   } catch (e) {}
   updateCustomPageNavLinks();
 
-  // Cloud Persistence via Firebase Firestore
+  const cleanSchedule = (state.customPage.schedule || []).map(s => ({
+    time: String(s.time || 'TBA'),
+    title: String(s.title || 'Scheduled Activity'),
+    desc: String(s.desc || '')
+  }));
+
+  const payload = {
+    ...state.customPage,
+    schedule: cleanSchedule,
+    updatedAt: new Date().toISOString()
+  };
+
+  // 1. Cloud Persistence via Firebase Firestore
   try {
     if (typeof firebase !== 'undefined' && firebase.firestore) {
       const firestoreDb = firebase.firestore();
-      const cleanSchedule = (state.customPage.schedule || []).map(s => ({
-        time: String(s.time || 'TBA'),
-        title: String(s.title || 'Scheduled Activity'),
-        desc: String(s.desc || '')
-      }));
-
-      const payload = {
-        ...state.customPage,
-        schedule: cleanSchedule,
+      await firestoreDb.collection('settings').doc('gala_page').set({
+        ...payload,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-
-      await firestoreDb.collection('settings').doc('gala_page').set(payload, { merge: true });
+      }, { merge: true });
       console.log("Gala page configuration successfully synced globally to Firestore cloud.", payload);
-      return true;
     }
   } catch (err) {
     console.error("Firestore gala_page save error:", err);
-    showToast('warning', 'Cloud Sync Notice', 'Saved to local device cache. Cloud sync error: ' + (err.message || 'Permission denied'));
-    return false;
   }
+
+  // 2. Server Persistence via Backend REST API
+  try {
+    const backendRes = await fetch('/api/settings/gala_page', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (backendRes.ok) {
+      console.log("Gala page configuration successfully synced to backend REST storage.");
+    }
+  } catch (err) {
+    console.warn("Backend /api/settings/gala_page save notice:", err);
+  }
+
   return true;
 }
 
 async function syncCustomPageFromCloud() {
+  let loadedFromCloud = false;
   try {
     if (typeof firebase !== 'undefined' && firebase.firestore) {
       const firestoreDb = firebase.firestore();
@@ -450,23 +463,12 @@ async function syncCustomPageFromCloud() {
       if (doc.exists) {
         const cloudData = doc.data();
         if (cloudData && typeof cloudData === 'object') {
-          if (!cloudData.schedule || !Array.isArray(cloudData.schedule) || cloudData.schedule.length === 0) {
-            cloudData.schedule = (state.customPage && state.customPage.schedule && state.customPage.schedule.length > 0)
-              ? state.customPage.schedule
-              : DEFAULT_CUSTOM_PAGE.schedule;
-          }
-          state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, cloudData);
+          state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, state.customPage, cloudData);
           try {
             localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
           } catch (e) {}
           updateCustomPageNavLinks();
-          if (window.location.hash.startsWith('#/special-event')) {
-            const contentDiv = document.getElementById('app-content');
-            if (contentDiv) {
-              contentDiv.innerHTML = templates.customEventPage();
-              bindCustomEventPage();
-            }
-          }
+          loadedFromCloud = true;
         }
       }
 
@@ -477,17 +479,13 @@ async function syncCustomPageFromCloud() {
           if (snapshot && snapshot.exists) {
             const cloudData = snapshot.data();
             if (cloudData && typeof cloudData === 'object') {
-              if (!cloudData.schedule || !Array.isArray(cloudData.schedule) || cloudData.schedule.length === 0) {
-                cloudData.schedule = (state.customPage && state.customPage.schedule && state.customPage.schedule.length > 0)
-                  ? state.customPage.schedule
-                  : DEFAULT_CUSTOM_PAGE.schedule;
-              }
-              state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, cloudData);
+              state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, state.customPage, cloudData);
               try {
                 localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
               } catch (e) {}
               updateCustomPageNavLinks();
-              if (window.location.hash.startsWith('#/special-event')) {
+              const hash = window.location.hash || '';
+              if (hash.startsWith('#/special-event') || hash.startsWith('#/gala')) {
                 const contentDiv = document.getElementById('app-content');
                 if (contentDiv) {
                   contentDiv.innerHTML = templates.customEventPage();
@@ -501,6 +499,32 @@ async function syncCustomPageFromCloud() {
     }
   } catch (err) {
     console.warn("Could not sync gala page from Firestore:", err);
+  }
+
+  // Fallback to Backend REST API if Firestore not available or not yet written
+  if (!loadedFromCloud) {
+    try {
+      const res = await fetch('/api/settings/gala_page');
+      if (res.ok) {
+        const backendData = await res.json();
+        if (backendData && typeof backendData === 'object') {
+          state.customPage = Object.assign({}, DEFAULT_CUSTOM_PAGE, state.customPage, backendData);
+          try {
+            localStorage.setItem('h4h_custom_page', JSON.stringify(state.customPage));
+          } catch (e) {}
+          updateCustomPageNavLinks();
+        }
+      }
+    } catch (e) {}
+  }
+
+  const hash = window.location.hash || '';
+  if (hash.startsWith('#/special-event') || hash.startsWith('#/gala')) {
+    const contentDiv = document.getElementById('app-content');
+    if (contentDiv) {
+      contentDiv.innerHTML = templates.customEventPage();
+      bindCustomEventPage();
+    }
   }
 }
 
@@ -1022,6 +1046,96 @@ function updateCustomPageNavLinks() {
   }
 }
 
+// Media Library & Image Converter Helpers
+function loadMediaLibrary() {
+  try {
+    const saved = localStorage.getItem('h4h_media_library');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return [
+    {
+      id: 'asset-default-banner',
+      name: 'Default Gala Fair Banner',
+      format: 'image/webp',
+      formatLabel: 'WEBP',
+      url: 'assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18 (2).webp',
+      width: 1200,
+      height: 675,
+      sizeKb: 142,
+      createdAt: '2026-04-11'
+    },
+    {
+      id: 'asset-default-logo',
+      name: 'Howards 4 Hope Shield Logo',
+      format: 'image/png',
+      formatLabel: 'PNG',
+      url: 'assets/logos/logo.png',
+      width: 512,
+      height: 512,
+      sizeKb: 88,
+      createdAt: '2026-01-01'
+    }
+  ];
+}
+
+async function saveMediaAsset(asset) {
+  if (!asset || !asset.url) return;
+  state.mediaLibrary = [asset, ...(state.mediaLibrary || []).filter(a => a.id !== asset.id)];
+  try {
+    localStorage.setItem('h4h_media_library', JSON.stringify(state.mediaLibrary.slice(0, 30)));
+  } catch (e) {}
+
+  // Cloud sync to Firestore
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      await db.collection('settings').doc('media_library').set({
+        assets: state.mediaLibrary.slice(0, 30),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+  } catch (e) {
+    console.warn("Firestore media library sync notice:", e);
+  }
+}
+
+async function deleteMediaAsset(assetId) {
+  state.mediaLibrary = (state.mediaLibrary || []).filter(a => a.id !== assetId);
+  try {
+    localStorage.setItem('h4h_media_library', JSON.stringify(state.mediaLibrary));
+  } catch (e) {}
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      await db.collection('settings').doc('media_library').set({
+        assets: state.mediaLibrary,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+  } catch (e) {}
+}
+
+async function syncMediaLibraryFromCloud() {
+  try {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+      const db = firebase.firestore();
+      const doc = await db.collection('settings').doc('media_library').get();
+      if (doc.exists) {
+        const data = doc.data();
+        if (data && Array.isArray(data.assets) && data.assets.length > 0) {
+          state.mediaLibrary = data.assets;
+          try {
+            localStorage.setItem('h4h_media_library', JSON.stringify(state.mediaLibrary));
+          } catch (e) {}
+        }
+      }
+    }
+  } catch (e) {}
+}
+
 // Global App State
 const state = {
   user: null,
@@ -1036,6 +1150,7 @@ const state = {
   events: [],
   categoryColors: loadCategoryColors(),
   customPage: loadCustomPage(),
+  mediaLibrary: loadMediaLibrary(),
   selectedCategoryFilter: 'all',
   selectedDate: new Date(),
   selectedEvent: null,
@@ -2851,12 +2966,12 @@ const templates = {
             <i class="fa-solid fa-crown" style="margin-right: 6px;"></i> Featured Special Event
           </div>
           <h1 class="hero-title" style="font-size: 3.2rem; margin-bottom: 1rem; color: ${page.heroTextColor || '#FFFFFF'} !important; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${formatGalaAnimatedTitle(page.title)}</h1>
-          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px; color: ${page.heroTextColor || '#FFFFFF'} !important; opacity: 0.92; font-family: '${page.bodyFont || 'Plus Jakarta Sans'}', sans-serif;">${formatGalaAnimatedTitle(page.subtitle)}</p>
+          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px; color: ${page.heroTextColor || '#FFFFFF'} !important; opacity: 0.92; font-family: '${page.bodyFont || 'Plus Jakarta Sans'}', sans-serif;">${escapeHtml(page.subtitle)}</p>
           
           <div class="special-event-meta-bar">
             <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-regular fa-calendar"></i> ${formatGalaDisplayDate(page.date)}</div>
-            <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-regular fa-clock"></i> ${page.time}</div>
-            <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-solid fa-location-dot"></i> ${page.location}</div>
+            <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-regular fa-clock"></i> ${escapeHtml(page.time)}</div>
+            <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(page.location)}</div>
           </div>
 
           <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
@@ -2874,9 +2989,12 @@ const templates = {
             <span class="section-tag" style="background: rgba(243,156,18,0.15); color: ${page.accentColor || 'var(--accent)'}; border-color: rgba(243,156,18,0.3);">
               <i class="fa-brands fa-youtube" style="margin-right: 6px;"></i> Gala Video Spotlight
             </span>
-            <h2 class="section-title" style="margin-bottom: 12px;">A Message of Hope: Watch Our Mission in Action</h2>
-            <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 28px; max-width: 700px; margin-left: auto; margin-right: auto;">
-              See firsthand how your presence, partnership, and generosity directly transform the lives of youth, single working AND student parents, and caregivers in Long Beach.
+            <h2 class="section-title" style="margin-bottom: 12px;">You Don't Want to Miss This Year!</h2>
+            <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 10px; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+              This is what happens when our community shows up. Relive the unforgettable moments from last year's gala.
+            </p>
+            <p style="color: var(--primary); font-size: 1.1rem; font-weight: 700; margin-bottom: 28px; max-width: 700px; margin-left: auto; margin-right: auto;">
+              Purchase your ticket now for this year’s Frost &amp; Flame: Reign of Hope on January 30, 2027!
             </p>
             
             <div class="gala-video-wrapper">
@@ -2901,13 +3019,13 @@ const templates = {
         <div class="special-event-grid">
           <div>
             <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">About The Gala</span>
-            <h2 class="section-title" style="text-align: left; margin-bottom: 20px; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${formatGalaAnimatedTitle(page.storyTitle || 'An Evening Dedicated to Hope & Healing')}</h2>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 20px; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${escapeHtml(page.storyTitle || 'An Evening Dedicated to Hope & Healing')}</h2>
             <div class="gala-story-paragraphs" style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 25px;">
               ${formatStoryParagraphs(page.description, DEFAULT_CUSTOM_PAGE.description)}
             </div>
             <div style="background: var(--bg-card); border-left: 4px solid ${page.accentColor || 'var(--accent)'}; padding: 20px; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); margin-bottom: 25px;">
-              <h4 style="color: var(--primary); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-hand-holding-heart" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 6px;"></i> ${page.impactTitle || '100% Mission-Focused Proceeds'}</h4>
-              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">${page.impactDesc || 'Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency toolkits for single working and student parents.'}</p>
+              <h4 style="color: var(--primary); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-hand-holding-heart" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 6px;"></i> ${escapeHtml(page.impactTitle || '100% Mission-Focused Proceeds')}</h4>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">${escapeHtml(page.impactDesc || 'Every ticket reservation, sponsorship table, and auction bid directly funds our Long Beach youth workshops, caregiver respite days, and emergency toolkits for single working and student parents.')}</p>
             </div>
             
             <!-- Program Schedule Timeline -->
@@ -2925,9 +3043,9 @@ const templates = {
                   ${page.schedule.map(item => `
                     <div class="timeline-item">
                       <div class="timeline-dot" style="border-color: ${page.accentColor || 'var(--accent)'};"></div>
-                      <div class="timeline-time">${item.time || 'TBA'}</div>
-                      <div class="timeline-title">${formatGalaAnimatedTitle(item.title)}</div>
-                      ${item.desc ? `<div class="timeline-desc">${formatGalaAnimatedTitle(item.desc)}</div>` : ''}
+                      <div class="timeline-time">${escapeHtml(item.time || 'TBA')}</div>
+                      <div class="timeline-title">${escapeHtml(item.title)}</div>
+                      ${item.desc ? `<div class="timeline-desc">${escapeHtml(item.desc)}</div>` : ''}
                     </div>
                   `).join('')}
                 </div>
@@ -3321,6 +3439,9 @@ const templates = {
           </button>
           <button type="button" class="admin-tab-btn" data-tab="adm-pane-gala-roster">
             <i class="fa-solid fa-clipboard-user" style="color: var(--secondary);"></i> Gala Attendees & Catering <span class="tab-badge" id="adm-gala-roster-count">${(state.galaAttendees && state.galaAttendees.length) || 0}</span>
+          </button>
+          <button type="button" class="admin-tab-btn" data-tab="adm-pane-media">
+            <i class="fa-solid fa-photo-film" style="color: #38BDF8;"></i> Media &amp; Image Studio <span class="tab-badge" id="adm-media-count">${(state.mediaLibrary && state.mediaLibrary.length) || 0}</span>
           </button>
         </div>
 
@@ -4032,8 +4153,21 @@ const templates = {
 
               <!-- BANNER IMAGE -->
               <div class="form-group" style="margin-bottom: 18px;">
-                <label style="font-size: 0.85rem; font-weight: 700;">Banner Image Asset Path / URL</label>
-                <input type="text" id="adm-custom-banner" class="form-control" value="${state.customPage.bannerImage || ''}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+                  <label style="font-size: 0.85rem; font-weight: 700; margin: 0;">Banner Image Asset Path / URL</label>
+                  <button type="button" class="btn btn-outline admin-tab-jump-btn" data-target-tab="adm-pane-media" style="padding: 4px 10px; font-size: 0.78rem; font-weight: 700; color: #0284C7; border-color: #0284C7;">
+                    <i class="fa-solid fa-photo-film"></i> Convert / Choose from Media Studio
+                  </button>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="adm-custom-banner" class="form-control" value="${state.customPage.bannerImage || ''}" placeholder="e.g. assets/... or upload via Media Studio" style="flex: 1; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(15,23,42,0.15);">
+                  <button type="button" id="adm-quick-pick-banner-btn" class="btn btn-primary" style="padding: 0 16px; font-size: 0.85rem; white-space: nowrap;">
+                    <i class="fa-solid fa-images"></i> Pick Stored
+                  </button>
+                </div>
+                <div id="adm-banner-preview-thumb" style="margin-top: 8px;">
+                  ${state.customPage.bannerImage ? `<img src="${state.customPage.bannerImage}" alt="Banner Preview" style="height: 64px; max-width: 180px; border-radius: 6px; border: 1px solid rgba(15,23,42,0.1); object-fit: cover;">` : ''}
+                </div>
               </div>
 
               <!-- PAGE THEME & FULL COLOR CUSTOMIZATION -->
@@ -4418,6 +4552,146 @@ const templates = {
             </div>
           </div>
         </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB PANE 7: MEDIA STUDIO & IMAGE CONVERTER (PNG & WEBP)   -->
+        <!-- ========================================================= -->
+        <div class="admin-tab-pane" id="adm-pane-media">
+          <div style="max-width: 1250px; margin: 0 auto 3rem auto;">
+            <!-- Header -->
+            <div style="margin-bottom: 24px;">
+              <h3 style="font-size: 1.4rem; color: var(--primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-photo-film" style="color: #0284C7;"></i> Media Studio &amp; Image Converter
+              </h3>
+              <p style="font-size: 0.88rem; color: var(--text-muted); margin: 4px 0 0 0;">
+                Convert and optimize event photography, sponsor assets, and banners into ultra-lightweight WebP or crisp PNG formats. Saved assets can be applied directly to the Gala Hero Banner or future events with a single click.
+              </p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px; margin-bottom: 30px;">
+              <!-- Upload & Conversion Controls Card -->
+              <div class="calendar-card" style="padding: 24px;">
+                <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 800; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--accent);"></i> Convert New Image
+                </h4>
+
+                <!-- Drag & Drop Zone -->
+                <div id="adm-img-dropzone" style="border: 2px dashed #0284C7; border-radius: 12px; padding: 30px 20px; text-align: center; background: rgba(2, 132, 199, 0.03); cursor: pointer; transition: all 0.2s ease; margin-bottom: 20px;">
+                  <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2.4rem; color: #0284C7; margin-bottom: 10px; display: block;"></i>
+                  <div style="font-weight: 700; color: var(--primary); font-size: 0.95rem; margin-bottom: 4px;">Click or drag &amp; drop an image here</div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">Supports JPG, JPEG, PNG, WEBP, GIF, SVG, BMP</div>
+                  <input type="file" id="adm-img-upload-input" accept="image/*" style="display: none;">
+                </div>
+
+                <!-- Conversion Options -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                  <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px;">Target Format</label>
+                    <select id="adm-img-format" class="form-control" style="width: 100%; height: 42px; font-weight: 700;">
+                      <option value="image/webp" selected>WEBP (Ultra-Compressed &amp; Modern)</option>
+                      <option value="image/png">PNG (Lossless High Quality)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 6px;">Target Resolution</label>
+                    <select id="adm-img-res" class="form-control" style="width: 100%; height: 42px; font-weight: 600;">
+                      <option value="1920" selected>1920px (Full HD Gala Banner)</option>
+                      <option value="1200">1200px (Feature &amp; Story Image)</option>
+                      <option value="800">800px (Event Card / Content Box)</option>
+                      <option value="400">400px (Thumbnail / Icon)</option>
+                      <option value="original">Original Dimensions (No Resize)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="adm-img-quality-container" style="margin-bottom: 20px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="font-size: 0.82rem; font-weight: 700; margin: 0;">WebP Quality Compression</label>
+                    <span id="adm-img-quality-val" style="font-size: 0.85rem; font-weight: 800; color: #0284C7;">85%</span>
+                  </div>
+                  <input type="range" id="adm-img-quality" min="10" max="100" value="85" style="width: 100%; accent-color: #0284C7; cursor: pointer;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">
+                    <span>Smallest File (30%)</span>
+                    <span>Balanced (85% Recommended)</span>
+                    <span>Max Quality (100%)</span>
+                  </div>
+                </div>
+
+                <button type="button" id="adm-convert-img-btn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px;" disabled>
+                  <i class="fa-solid fa-arrows-rotate"></i> Convert &amp; Optimize Image
+                </button>
+              </div>
+
+              <!-- Optimization Comparison & Actions Card -->
+              <div class="calendar-card" style="padding: 24px; display: flex; flex-direction: column;">
+                <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 800; margin: 0 0 16px 0; display: flex; align-items: center; justify-content: space-between;">
+                  <span><i class="fa-solid fa-sliders" style="color: var(--secondary); margin-right: 6px;"></i> Optimization Comparison</span>
+                  <span id="adm-img-savings-badge" style="display: none; background: #DCFCE7; color: #166534; font-size: 0.78rem; font-weight: 800; padding: 4px 10px; border-radius: 50px;">
+                    0% Smaller
+                  </span>
+                </h4>
+
+                <div id="adm-img-empty-state" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; border: 1px dashed rgba(15,23,42,0.12); border-radius: 10px;">
+                  <i class="fa-regular fa-image" style="font-size: 3rem; color: rgba(15,23,42,0.2); margin-bottom: 12px;"></i>
+                  <div style="font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">No image selected yet</div>
+                  <div style="font-size: 0.82rem; color: var(--text-muted); max-width: 320px;">Upload an image on the left to inspect file sizes, preview conversions, and apply it directly to your site.</div>
+                </div>
+
+                <div id="adm-img-result-card" style="display: none; flex: 1; flex-direction: column;">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
+                    <!-- Original Preview -->
+                    <div style="background: #F8FAFC; border: 1px solid rgba(15,23,42,0.08); border-radius: 8px; padding: 12px; text-align: center;">
+                      <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Original File</div>
+                      <img id="adm-img-orig-thumb" src="" alt="Original Preview" style="width: 100%; height: 130px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; background: white;">
+                      <div id="adm-img-orig-info" style="font-size: 0.78rem; color: var(--text-main); font-weight: 600;">-- KB</div>
+                    </div>
+
+                    <!-- Converted Preview -->
+                    <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 12px; text-align: center;">
+                      <div style="font-size: 0.75rem; font-weight: 800; color: #166534; text-transform: uppercase; margin-bottom: 8px;">Converted File</div>
+                      <img id="adm-img-conv-thumb" src="" alt="Converted Preview" style="width: 100%; height: 130px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; background: white;">
+                      <div id="adm-img-conv-info" style="font-size: 0.78rem; color: #166534; font-weight: 700;">-- KB</div>
+                    </div>
+                  </div>
+
+                  <!-- Actions -->
+                  <div style="display: flex; flex-direction: column; gap: 10px; margin-top: auto;">
+                    <button type="button" id="adm-apply-gala-banner-btn" class="btn btn-donate" style="width: 100%; padding: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                      <i class="fa-solid fa-crown"></i> Set as Live Gala Hero Banner
+                    </button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <button type="button" id="adm-save-asset-btn" class="btn btn-primary" style="padding: 10px; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fa-solid fa-bookmark"></i> Save to Media Library
+                      </button>
+                      <button type="button" id="adm-download-converted-btn" class="btn btn-outline" style="padding: 10px; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="fa-solid fa-download"></i> Download File
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Organization Media Library Gallery -->
+            <div class="calendar-card" style="padding: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <h4 style="font-size: 1.15rem; color: var(--primary); font-weight: 800; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-images" style="color: var(--secondary);"></i> Organization Media Library
+                  </h4>
+                  <p style="font-size: 0.84rem; color: var(--text-muted); margin: 0;">Stored images available for Gala Hero Banners, story cards, and promotional events.</p>
+                </div>
+                <span class="event-badge" id="adm-media-total-badge" style="position: static; background: var(--accent); color: var(--primary); font-weight: 700; font-size: 0.8rem; padding: 6px 14px;">
+                  ${(state.mediaLibrary && state.mediaLibrary.length) || 0} Assets Stored
+                </span>
+              </div>
+
+              <div id="adm-media-gallery-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px;">
+                <!-- Populated dynamically by initAdminMediaStudio() -->
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     `;
   },
@@ -4471,7 +4745,7 @@ const templates = {
                   <div class="calendar-card ticket-receipt-card" style="border-left: 6px solid ${isGala ? 'var(--accent)' : 'var(--secondary)'}; position: relative; overflow: hidden; padding: 22px; box-shadow: var(--shadow-md);">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                       <div>
-                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin: 0;">${isGala ? formatGalaAnimatedTitle(tkt.eventTitle || 'Howards 4 Hope Gala') : (tkt.eventTitle || 'Howards 4 Hope Event')}</h4>
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin: 0;">${escapeHtml(tkt.eventTitle || (isGala ? 'Frost & Flame: Reign of Hope' : 'Howards 4 Hope Event'))}</h4>
                         <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-top: 4px;">
                           <i class="fa-solid fa-calendar-day"></i> ${displayDate}
                         </div>
@@ -6295,7 +6569,7 @@ function bindAdminDashboard() {
     }
     const subEl = document.getElementById('gala-live-subtitle-preview');
     if (subEl) {
-      subEl.innerHTML = formatGalaAnimatedTitle(subtitle);
+      subEl.textContent = subtitle;
       subEl.style.color = heroText;
       subEl.style.fontFamily = `'${bodyFont}', sans-serif`;
     }
@@ -7811,6 +8085,391 @@ function bindAdminDashboard() {
       }
     });
   }
+
+  // Initialize Media Studio & Image Converter
+  initAdminMediaStudio();
+}
+
+function initAdminMediaStudio() {
+  const fileInput = document.getElementById('adm-img-upload-input');
+  const dropZone = document.getElementById('adm-img-dropzone');
+  const formatSelect = document.getElementById('adm-img-format');
+  const qualityContainer = document.getElementById('adm-img-quality-container');
+  const qualitySlider = document.getElementById('adm-img-quality');
+  const qualityVal = document.getElementById('adm-img-quality-val');
+  const resSelect = document.getElementById('adm-img-res');
+  const convertBtn = document.getElementById('adm-convert-img-btn');
+  const emptyState = document.getElementById('adm-img-empty-state');
+  const resultCard = document.getElementById('adm-img-result-card');
+  const origThumb = document.getElementById('adm-img-orig-thumb');
+  const origInfo = document.getElementById('adm-img-orig-info');
+  const convThumb = document.getElementById('adm-img-conv-thumb');
+  const convInfo = document.getElementById('adm-img-conv-info');
+  const savingsBadge = document.getElementById('adm-img-savings-badge');
+  const saveAssetBtn = document.getElementById('adm-save-asset-btn');
+  const applyGalaBannerBtn = document.getElementById('adm-apply-gala-banner-btn');
+  const downloadConvertedBtn = document.getElementById('adm-download-converted-btn');
+  const galleryGrid = document.getElementById('adm-media-gallery-grid');
+  const totalBadge = document.getElementById('adm-media-total-badge');
+  const tabMediaCount = document.getElementById('adm-media-count');
+  const quickPickBannerBtn = document.getElementById('adm-quick-pick-banner-btn');
+  const customBannerInput = document.getElementById('adm-custom-banner');
+  const bannerThumb = document.getElementById('adm-banner-preview-thumb');
+
+  let currentSourceFile = null;
+  let currentLoadedImg = null;
+  let convertedDataUrl = null;
+  let convertedSizeKb = 0;
+  let origSizeKb = 0;
+
+  function renderGallery() {
+    if (!galleryGrid) return;
+    const assets = state.mediaLibrary || [];
+    if (totalBadge) totalBadge.innerText = `${assets.length} Asset${assets.length === 1 ? '' : 's'} Stored`;
+    if (tabMediaCount) tabMediaCount.innerText = assets.length;
+
+    if (assets.length === 0) {
+      galleryGrid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-muted); background: #f8fafc; border-radius: 8px; border: 1px dashed rgba(15,23,42,0.1);">
+          <i class="fa-regular fa-images" style="font-size: 2rem; color: rgba(15,23,42,0.2); margin-bottom: 8px; display: block;"></i>
+          No media assets in library yet. Convert an image above to save it here!
+        </div>
+      `;
+      return;
+    }
+
+    galleryGrid.innerHTML = assets.map(asset => {
+      const isBanner = state.customPage && state.customPage.bannerImage === asset.url;
+      return `
+        <div class="calendar-card" style="padding: 14px; display: flex; flex-direction: column; border-top: 3px solid ${isBanner ? 'var(--accent)' : 'rgba(15,23,42,0.1)'}; background: white; box-shadow: var(--shadow-sm);">
+          <div style="position: relative; margin-bottom: 10px; overflow: hidden; border-radius: 6px; background: #0b132b; height: 140px; display: flex; align-items: center; justify-content: center;">
+            <img src="${asset.url}" alt="${escapeHtml(asset.name)}" style="width: 100%; height: 100%; object-fit: cover;">
+            <span style="position: absolute; top: 8px; left: 8px; background: rgba(15,23,42,0.85); color: #38BDF8; font-family: monospace; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 4px;">
+              ${asset.formatLabel || 'IMG'}
+            </span>
+            ${isBanner ? `
+              <span style="position: absolute; top: 8px; right: 8px; background: var(--accent); color: var(--primary); font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 4px;">
+                <i class="fa-solid fa-crown"></i> Active Gala Banner
+              </span>
+            ` : ''}
+          </div>
+          <div style="font-weight: 700; font-size: 0.88rem; color: var(--primary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(asset.name)}">
+            ${escapeHtml(asset.name)}
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 12px;">
+            <span>${asset.width || '?'} &times; ${asset.height || '?'} px</span>
+            <span>${asset.sizeKb || '?'} KB</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-top: auto;">
+            <button type="button" class="btn btn-donate set-as-gala-banner-btn" data-url="${escapeHtml(asset.url)}" style="padding: 6px 10px; font-size: 0.78rem; font-weight: 700; width: 100%;">
+              <i class="fa-solid fa-crown" style="margin-right: 4px;"></i> Set as Gala Banner
+            </button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px;">
+              <button type="button" class="btn btn-outline copy-asset-url-btn" data-url="${escapeHtml(asset.url)}" style="padding: 5px 8px; font-size: 0.75rem;" title="Copy Data URL">
+                <i class="fa-regular fa-copy"></i> Copy
+              </button>
+              <button type="button" class="btn btn-outline download-asset-btn" data-url="${escapeHtml(asset.url)}" data-name="${escapeHtml(asset.name)}" data-format="${asset.formatLabel || 'WEBP'}" style="padding: 5px 8px; font-size: 0.75rem;" title="Download">
+                <i class="fa-solid fa-download"></i> Save
+              </button>
+              <button type="button" class="btn btn-outline delete-asset-btn" data-id="${asset.id}" style="color: var(--danger); border-color: var(--danger); padding: 5px 8px; font-size: 0.75rem;" title="Delete">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Attach card event listeners
+    galleryGrid.querySelectorAll('.set-as-gala-banner-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const url = btn.getAttribute('data-url');
+        state.customPage.bannerImage = url;
+        if (customBannerInput) customBannerInput.value = url;
+        if (bannerThumb) bannerThumb.innerHTML = `<img src="${url}" alt="Banner Preview" style="height: 64px; max-width: 180px; border-radius: 6px; border: 1px solid rgba(15,23,42,0.1); object-fit: cover;">`;
+        await saveCustomPage(state.customPage);
+        updateGalaStudioLivePreview();
+        renderGallery();
+        showToast('success', 'Gala Banner Updated', 'Selected image is now live as the Gala Hero Banner!');
+      });
+    });
+
+    galleryGrid.querySelectorAll('.copy-asset-url-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = btn.getAttribute('data-url');
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url).then(() => {
+            showToast('info', 'Copied to Clipboard', 'Image URL copied to clipboard.');
+          });
+        }
+      });
+    });
+
+    galleryGrid.querySelectorAll('.download-asset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = btn.getAttribute('data-url');
+        const name = (btn.getAttribute('data-name') || 'h4h-image').replace(/\.[a-zA-Z0-9]+$/, '');
+        const fmt = (btn.getAttribute('data-format') || 'WEBP').toLowerCase();
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name}.${fmt}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+    });
+
+    galleryGrid.querySelectorAll('.delete-asset-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        if (confirm("Delete this asset from your organization media library?")) {
+          await deleteMediaAsset(id);
+          renderGallery();
+          showToast('info', 'Asset Removed', 'Image removed from library.');
+        }
+      });
+    });
+  }
+
+  // Quick picker from Gala Studio
+  if (quickPickBannerBtn) {
+    quickPickBannerBtn.addEventListener('click', () => {
+      const assets = state.mediaLibrary || [];
+      if (assets.length === 0) {
+        showToast('warning', 'No Assets in Library', 'Please upload or convert images in the Media Studio tab first.');
+        return;
+      }
+      const pickerOverlay = document.createElement('div');
+      pickerOverlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+      pickerOverlay.innerHTML = `
+        <div style="background: white; border-radius: 12px; max-width: 700px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg);">
+          <div style="padding: 18px 24px; border-bottom: 1px solid rgba(15,23,42,0.08); display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; font-size: 1.15rem; color: var(--primary); font-weight: 800;">
+              <i class="fa-solid fa-images" style="color: var(--accent); margin-right: 6px;"></i> Select Stored Banner Image
+            </h4>
+            <button type="button" id="picker-close-btn" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+          </div>
+          <div style="padding: 20px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px;">
+            ${assets.map(a => `
+              <div class="picker-asset-choice" data-url="${escapeHtml(a.url)}" style="border: 2px solid rgba(15,23,42,0.1); border-radius: 8px; padding: 8px; cursor: pointer; transition: all 0.15s ease; text-align: center;">
+                <img src="${a.url}" alt="${escapeHtml(a.name)}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; margin-bottom: 6px;">
+                <div style="font-weight: 700; font-size: 0.78rem; color: var(--primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(a.name)}</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">${a.formatLabel || 'IMG'} &bull; ${a.sizeKb || '?'} KB</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      document.body.appendChild(pickerOverlay);
+
+      pickerOverlay.querySelector('#picker-close-btn').addEventListener('click', () => pickerOverlay.remove());
+      pickerOverlay.addEventListener('click', (e) => {
+        if (e.target === pickerOverlay) pickerOverlay.remove();
+      });
+
+      pickerOverlay.querySelectorAll('.picker-asset-choice').forEach(choice => {
+        choice.addEventListener('mouseenter', () => choice.style.borderColor = 'var(--accent)');
+        choice.addEventListener('mouseleave', () => choice.style.borderColor = 'rgba(15,23,42,0.1)');
+        choice.addEventListener('click', async () => {
+          const url = choice.getAttribute('data-url');
+          state.customPage.bannerImage = url;
+          if (customBannerInput) customBannerInput.value = url;
+          if (bannerThumb) bannerThumb.innerHTML = `<img src="${url}" alt="Banner Preview" style="height: 64px; max-width: 180px; border-radius: 6px; border: 1px solid rgba(15,23,42,0.1); object-fit: cover;">`;
+          await saveCustomPage(state.customPage);
+          updateGalaStudioLivePreview();
+          pickerOverlay.remove();
+          showToast('success', 'Banner Selected', 'New banner image set and synced.');
+        });
+      });
+    });
+  }
+
+  // Format selection change
+  if (formatSelect && qualityContainer) {
+    formatSelect.addEventListener('change', () => {
+      const isWebp = formatSelect.value === 'image/webp';
+      qualityContainer.style.display = isWebp ? 'block' : 'none';
+    });
+  }
+
+  if (qualitySlider && qualityVal) {
+    qualitySlider.addEventListener('input', () => {
+      qualityVal.innerText = `${qualitySlider.value}%`;
+    });
+  }
+
+  // Dropzone click & drag events
+  if (dropZone && fileInput) {
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = 'var(--accent)';
+      dropZone.style.background = 'rgba(243, 156, 18, 0.08)';
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.style.borderColor = '#0284C7';
+      dropZone.style.background = 'rgba(2, 132, 199, 0.03)';
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = '#0284C7';
+      dropZone.style.background = 'rgba(2, 132, 199, 0.03)';
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFileSelect(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+      }
+    });
+  }
+
+  function handleFileSelect(file) {
+    if (!file || !file.type.startsWith('image/')) {
+      showToast('error', 'Invalid File', 'Please select a valid image file.');
+      return;
+    }
+    currentSourceFile = file;
+    origSizeKb = Math.round(file.size / 1024) || 1;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        currentLoadedImg = img;
+        if (convertBtn) convertBtn.disabled = false;
+        processConversion();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function processConversion() {
+    if (!currentLoadedImg || !currentSourceFile) return;
+    const targetMime = formatSelect ? formatSelect.value : 'image/webp';
+    const quality = targetMime === 'image/webp' ? (parseInt(qualitySlider ? qualitySlider.value : '85', 10) / 100) : 0.92;
+    const resSetting = resSelect ? resSelect.value : '1920';
+
+    let targetWidth = currentLoadedImg.naturalWidth;
+    let targetHeight = currentLoadedImg.naturalHeight;
+
+    if (resSetting !== 'original') {
+      const maxW = parseInt(resSetting, 10);
+      if (targetWidth > maxW) {
+        const ratio = maxW / targetWidth;
+        targetWidth = maxW;
+        targetHeight = Math.round(targetHeight * ratio);
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(currentLoadedImg, 0, 0, targetWidth, targetHeight);
+
+    convertedDataUrl = canvas.toDataURL(targetMime, quality);
+    const base64Len = convertedDataUrl.length - (convertedDataUrl.indexOf(',') + 1);
+    convertedSizeKb = Math.round((base64Len * 3) / 4 / 1024) || 1;
+
+    // Display comparison
+    if (emptyState) emptyState.style.display = 'none';
+    if (resultCard) resultCard.style.display = 'flex';
+
+    if (origThumb) origThumb.src = currentLoadedImg.src;
+    if (origInfo) origInfo.innerText = `${currentLoadedImg.naturalWidth} × ${currentLoadedImg.naturalHeight}px • ${origSizeKb} KB`;
+
+    if (convThumb) convThumb.src = convertedDataUrl;
+    if (convInfo) convInfo.innerText = `${targetWidth} × ${targetHeight}px • ${convertedSizeKb} KB (${targetMime === 'image/webp' ? 'WEBP' : 'PNG'})`;
+
+    if (savingsBadge) {
+      savingsBadge.style.display = 'inline-block';
+      if (convertedSizeKb < origSizeKb) {
+        const pct = Math.round((1 - (convertedSizeKb / origSizeKb)) * 100);
+        savingsBadge.style.background = '#DCFCE7';
+        savingsBadge.style.color = '#166534';
+        savingsBadge.innerText = `${pct}% Smaller!`;
+      } else {
+        savingsBadge.style.background = '#F1F5F9';
+        savingsBadge.style.color = 'var(--text-muted)';
+        savingsBadge.innerText = 'Optimized';
+      }
+    }
+  }
+
+  if (convertBtn) {
+    convertBtn.addEventListener('click', processConversion);
+  }
+
+  // Save to Media Library
+  if (saveAssetBtn) {
+    saveAssetBtn.addEventListener('click', async () => {
+      if (!convertedDataUrl || !currentSourceFile) return;
+      saveAssetBtn.disabled = true;
+      saveAssetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+      const targetMime = formatSelect ? formatSelect.value : 'image/webp';
+      const ext = targetMime === 'image/webp' ? '.webp' : '.png';
+      const baseName = currentSourceFile.name.replace(/\.[^/.]+$/, '');
+      const asset = {
+        id: 'asset-' + Date.now(),
+        name: `${baseName}${ext}`,
+        format: targetMime,
+        formatLabel: targetMime === 'image/webp' ? 'WEBP' : 'PNG',
+        url: convertedDataUrl,
+        width: convThumb.naturalWidth || 1200,
+        height: convThumb.naturalHeight || 675,
+        sizeKb: convertedSizeKb,
+        createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      };
+      await saveMediaAsset(asset);
+      renderGallery();
+      saveAssetBtn.disabled = false;
+      saveAssetBtn.innerHTML = '<i class="fa-solid fa-bookmark"></i> Save to Media Library';
+      showToast('success', 'Asset Saved', `Saved "${asset.name}" to Organization Media Library.`);
+    });
+  }
+
+  // Apply as Live Gala Hero Banner
+  if (applyGalaBannerBtn) {
+    applyGalaBannerBtn.addEventListener('click', async () => {
+      if (!convertedDataUrl) return;
+      applyGalaBannerBtn.disabled = true;
+      applyGalaBannerBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Publishing Banner...';
+      state.customPage.bannerImage = convertedDataUrl;
+      if (customBannerInput) customBannerInput.value = convertedDataUrl;
+      if (bannerThumb) bannerThumb.innerHTML = `<img src="${convertedDataUrl}" alt="Banner Preview" style="height: 64px; max-width: 180px; border-radius: 6px; border: 1px solid rgba(15,23,42,0.1); object-fit: cover;">`;
+      await saveCustomPage(state.customPage);
+      updateGalaStudioLivePreview();
+      applyGalaBannerBtn.disabled = false;
+      applyGalaBannerBtn.innerHTML = '<i class="fa-solid fa-crown"></i> Set as Live Gala Hero Banner';
+      showToast('success', 'Gala Banner Published', 'Optimized banner is now live on the Gala page!');
+    });
+  }
+
+  // Download converted file
+  if (downloadConvertedBtn) {
+    downloadConvertedBtn.addEventListener('click', () => {
+      if (!convertedDataUrl || !currentSourceFile) return;
+      const targetMime = formatSelect ? formatSelect.value : 'image/webp';
+      const ext = targetMime === 'image/webp' ? '.webp' : '.png';
+      const baseName = currentSourceFile.name.replace(/\.[^/.]+$/, '');
+      const a = document.createElement('a');
+      a.href = convertedDataUrl;
+      a.download = `${baseName}-optimized${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+  }
+
+  // Initial render
+  renderGallery();
+  syncMediaLibraryFromCloud().then(() => renderGallery());
 }
 
 function bindMyTicketsEvents() {

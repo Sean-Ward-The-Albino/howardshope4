@@ -84,10 +84,10 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
-    // --- PLATFORM SETTINGS (Gala Page, Theme & Colors) ---
+    // --- PLATFORM SETTINGS (Gala Page, Itinerary, Media Library & Customization) ---
     match /settings/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
 
     // --- TRIGGER EMAIL QUEUE (Firebase Extension Support) ---

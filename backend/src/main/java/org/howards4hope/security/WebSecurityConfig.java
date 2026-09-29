@@ -62,6 +62,7 @@ public class WebSecurityConfig {
                 .requestMatchers("/api/donations/create-checkout", "/api/donations/receipt/**", "/api/donations/verify-payment/**", "/api/donations/in-kind-supplies").permitAll()
                 .requestMatchers("/api/tickets/book-guest", "/api/tickets/lookup", "/api/tickets/verify/**").permitAll()
                 .requestMatchers("/api/blog", "/api/blog/**", "/api/outreach/apply", "/api/outreach/**", "/api/contact/**").permitAll()
+                .requestMatchers("/api/settings/**").permitAll()
                 .requestMatchers("/api/analytics/track").permitAll()
                 .requestMatchers("/api/newsletter/subscribe").permitAll()
                 

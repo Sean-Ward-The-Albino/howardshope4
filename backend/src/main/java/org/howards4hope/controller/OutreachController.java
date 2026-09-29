@@ -72,7 +72,7 @@ public class OutreachController {
         app.setFullName(name);
         app.setEmail(email);
         app.setRoleInterest(role);
-        app.setStatementOfIntent(message);
+        app.setMessage(message);
         VolunteerApplication saved = volunteerRepository.save(app);
 
         new Thread(() -> {
