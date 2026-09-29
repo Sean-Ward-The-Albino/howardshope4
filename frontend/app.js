@@ -3192,7 +3192,7 @@ const templates = {
         <div class="section-header">
           <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">Tiered Entry & Tickets</span>
           <h2 class="section-title" style="font-family: '${page.headlineFont || 'Playfair Display'}', serif;">Select Your Ticket or Sponsorship Table</h2>
-          <p class="section-subtitle">Reserve your seat for an unforgettable evening. All contributions support Howards 4 Hope 501(c)(3) mission initiatives.</p>
+          <p class="section-subtitle">Reserve your seat for an unforgettable evening. All tiers have full access to main event features.  (dinner, entertainment and auctions).  All contributions support Howards 4 Hope 501(c)(3) mission initiatives</p>
         </div>
 
         <!-- Gala Non-Refundable & 72h Contact Policy Banner -->
