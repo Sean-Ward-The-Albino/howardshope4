@@ -1597,6 +1597,7 @@ const API = {
       (ticketId && t.ticketId && t.ticketId.toLowerCase() === ticketId.toLowerCase()) ||
       (confirmationToken && t.confirmationToken && t.confirmationToken.toLowerCase() === confirmationToken.toLowerCase()) ||
       (targetEmail && t.userEmail && t.userEmail.toLowerCase() === targetEmail.toLowerCase())
+    );
   },
 
   async createStripeCheckout(payload) {

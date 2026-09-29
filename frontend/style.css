@@ -6313,6 +6313,7 @@ input:checked+.admin-slider:before {
   );
   background-size: 220% 100%;
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   -webkit-text-stroke: 0.5px rgba(255, 255, 255, 0.95);
   letter-spacing: 0.5px;
@@ -6353,6 +6354,7 @@ input:checked+.admin-slider:before {
   );
   background-size: 220% 100%;
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   -webkit-text-stroke: 0.5px rgba(254, 240, 138, 0.95);
   letter-spacing: 0.5px;
@@ -6400,6 +6402,7 @@ input:checked+.admin-slider:before {
   );
   background-size: 100% 100%;
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   -webkit-text-stroke: 0.75px rgba(255, 255, 255, 0.95);
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9));
