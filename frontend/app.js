@@ -151,7 +151,7 @@ function formatAuthError(err) {
 }
 
 // Stripe Configuration
-const STRIPE_PUBLISHABLE_KEY = "pk_test_51U9viMJCbXhpJ798PQ3RTLGTwmeft50L5GJFTRLuxrXJ0XRjFaMvslrGThOzQI1IUiSTOvkbMdIvwLffdGMTcTU500KEUc9ehI";
+const STRIPE_PUBLISHABLE_KEY = "pk_live_51U9vi8JJa3Fg4Rx1rWg9dE6jiqU4V9piNJdtYfZYIACZTve9aWps2yRC6HBymsGYhr8yajrZNgiCi9VgnmRJheE300KvEwdaFq";
 let stripeClient = null;
 try {
   if (typeof Stripe !== 'undefined') {
@@ -2724,8 +2724,8 @@ const templates = {
                 <i class="fa-solid fa-credit-card"></i> Donate with Credit / Debit Card (Stripe)
               </button>
               
-              <button class="auth-social-btn" id="paypal-donate-btn" style="background: #ffc439; color: #003087; border: none; height: 50px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
-                <i class="fa-brands fa-paypal"></i> Donate securely with PayPal
+              <button class="auth-social-btn" id="paypal-donate-btn" disabled style="background: #e2e8f0; color: #64748b; border: 1px solid #cbd5e1; height: 50px; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: not-allowed; opacity: 0.75;">
+                <i class="fa-brands fa-paypal" style="color: #94a3b8;"></i> PayPal <span style="font-size: 0.75rem; background: #94a3b8; color: #fff; padding: 2px 8px; border-radius: 12px; margin-left: 6px; font-weight: 600;">Coming Soon</span>
               </button>
               
               <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 18px; line-height: 1.4;">
@@ -3411,12 +3411,14 @@ const templates = {
                   </label>
                 ` : ''}
                 ${page.paymentPaypal !== false ? `
-                  <label class="payment-option-card" style="border: 2px solid rgba(15,23,42,0.1); padding: 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; background: var(--bg-base);">
-                    <input type="radio" name="gala_payment" value="paypal" required ${page.paymentStripe === false ? 'checked' : ''} style="transform: scale(1.2);">
-                    <i class="fa-brands fa-paypal fa-2x" style="color: #00457C;"></i>
-                    <div>
-                      <div style="font-weight: 700; font-size: 1rem;">PayPal / Pay in 4</div>
-                      <div style="font-size: 0.75rem; color: var(--text-muted);">PayPal balance, bank transfer, Pay in 4</div>
+                  <label class="payment-option-card" style="border: 1px solid #cbd5e1; padding: 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 15px; cursor: not-allowed; background: #f8fafc; opacity: 0.65;">
+                    <input type="radio" name="gala_payment" value="paypal" disabled style="transform: scale(1.2);">
+                    <i class="fa-brands fa-paypal fa-2x" style="color: #94a3b8;"></i>
+                    <div style="flex: 1;">
+                      <div style="font-weight: 700; font-size: 1rem; color: #64748b; display: flex; align-items: center; gap: 8px;">
+                        PayPal <span style="font-size: 0.7rem; background: #64748b; color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: 600;">Coming Soon</span>
+                      </div>
+                      <div style="font-size: 0.75rem; color: #94a3b8;">Direct PayPal and Pay in 4 gateway is currently being finalized.</div>
                     </div>
                   </label>
                 ` : ''}
@@ -6103,8 +6105,8 @@ function openRSVPModal(event) {
           <i class="fa-brands fa-cc-amex" title="American Express"></i>
           <i class="fa-brands fa-cc-discover" title="Discover"></i>
         </div>
-        <button class="auth-social-btn" id="paypal-checkout-btn" style="background: #ffc439; color: #003087; border: none; height: 50px; margin-bottom: 0; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
-          <i class="fa-brands fa-paypal"></i> Pay securely with PayPal
+        <button class="auth-social-btn" id="paypal-checkout-btn" disabled style="background: #e2e8f0; color: #64748b; border: 1px solid #cbd5e1; height: 50px; margin-bottom: 0; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: not-allowed; opacity: 0.75;">
+          <i class="fa-brands fa-paypal" style="color: #94a3b8;"></i> PayPal <span style="font-size: 0.75rem; background: #94a3b8; color: #fff; padding: 2px 8px; border-radius: 12px; margin-left: 6px; font-weight: 600;">Coming Soon</span>
         </button>
       `}
     </div>
