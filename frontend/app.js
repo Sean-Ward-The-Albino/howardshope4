@@ -1597,7 +1597,30 @@ const API = {
       (ticketId && t.ticketId && t.ticketId.toLowerCase() === ticketId.toLowerCase()) ||
       (confirmationToken && t.confirmationToken && t.confirmationToken.toLowerCase() === confirmationToken.toLowerCase()) ||
       (targetEmail && t.userEmail && t.userEmail.toLowerCase() === targetEmail.toLowerCase())
-    );
+  },
+
+  async createStripeCheckout(payload) {
+    const response = await fetch(`${this.baseUrl}/payments/create-stripe-checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Stripe checkout initiation failed (${response.status})`);
+    }
+    return await response.json();
+  },
+
+  async verifyTicketSession(sessionId, ticketId) {
+    try {
+      const url = `${this.baseUrl}/payments/verify-session?sessionId=${encodeURIComponent(sessionId)}${ticketId ? `&ticketId=${encodeURIComponent(ticketId)}` : ''}`;
+      const response = await fetch(url);
+      if (response.ok) return await response.json();
+    } catch (e) {
+      console.warn("Verify session request failed:", e);
+    }
+    return null;
   },
 
   async createDonationCheckout(donationData) {
@@ -5710,6 +5733,65 @@ function bindCustomEventPage() {
           planLabel = `Monthly (${cycles} Mos) ($${perPaymentAmount.toFixed(2)} / mo)`;
         }
 
+        // --- CRITICAL SECURITY: If user chose Stripe and totalPrice > 0, redirect to Stripe Checkout ---
+        if (selectedPaymentMethod === 'STRIPE' && totalPrice > 0) {
+          if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting to Secure Stripe Checkout...';
+          }
+
+          const pendingOrder = {
+            masterNumber,
+            tierName,
+            attendees,
+            qty,
+            unitPrice,
+            totalPrice,
+            planType,
+            planLabel,
+            installmentFreq,
+            cycles,
+            perPaymentAmount,
+            isSplit,
+            name,
+            email,
+            phone,
+            date: state.customPage.date,
+            location: state.customPage.location,
+            eventTitle: `${state.customPage.title} - ${tierName}`
+          };
+          try {
+            sessionStorage.setItem('h4h_pending_gala_order', JSON.stringify(pendingOrder));
+          } catch(e) {}
+
+          const checkoutData = await API.createStripeCheckout({
+            eventId: 9999,
+            quantity: qty,
+            unitPrice: unitPrice,
+            eventTitle: `${state.customPage.title} - ${tierName}`,
+            eventDate: state.customPage.date,
+            guestEmail: email,
+            guestName: name,
+            paymentPlanType: planType,
+            installmentCycles: cycles,
+            successUrl: `${window.location.origin}/#/my-tickets?status=success&session_id={CHECKOUT_SESSION_ID}&master=${masterNumber}`,
+            cancelUrl: `${window.location.origin}/#/gala?status=cancelled`
+          });
+
+          if (checkoutData && checkoutData.checkoutUrl && checkoutData.checkoutUrl.startsWith('http')) {
+            if (submitBtn) {
+              submitBtn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Redirecting to Stripe Checkout...';
+            }
+            window.location.href = checkoutData.checkoutUrl;
+            return;
+          } else {
+            throw new Error(checkoutData?.error || "Stripe checkout session could not be established. Please try again.");
+          }
+        }
+
+        // --- PAY AT GALA DOOR or FREE TICKETS ONLY ---
+        const isDoorPay = selectedPaymentMethod === 'DOOR';
+        const isFree = totalPrice === 0;
+
         const createdTickets = [];
 
         attendees.forEach((attObj, idx) => {
@@ -5732,19 +5814,19 @@ function bindCustomEventPage() {
             primaryPurchaser: name,
             userEmail: attObj.email,
             phone: phone,
-            quantity: 1, // Individual ticket per attendee
-            pricePaid: isSplit ? (perPaymentAmount / qty) : unitPrice,
+            quantity: 1,
+            pricePaid: isDoorPay ? 0.0 : (isSplit ? (perPaymentAmount / qty) : unitPrice),
             unitPrice: unitPrice,
             totalOrderPrice: totalPrice,
             paymentMethod: selectedPaymentMethod,
-            status: 'CONFIRMED',
+            status: isDoorPay ? 'PAY_AT_DOOR_PENDING' : 'CONFIRMED',
             paymentPlanType: planType,
             paymentPlanLabel: planLabel,
             installmentFrequency: installmentFreq,
             installmentCycles: cycles,
             installmentAmount: perPaymentAmount,
-            installmentsPaid: 1,
-            remainingBalance: isSplit ? (totalPrice - perPaymentAmount) : 0,
+            installmentsPaid: isDoorPay ? 0 : 1,
+            remainingBalance: isDoorPay ? totalPrice : (isSplit ? (totalPrice - perPaymentAmount) : 0),
             dietaryPreference: attObj.dietaryPreference,
             allergyNotes: attObj.allergyNotes,
             hasAllergy: attObj.hasAllergy,
@@ -5755,7 +5837,7 @@ function bindCustomEventPage() {
           createdTickets.push(galaTicket);
         });
 
-        // Backend sync & email dispatch
+        // Backend sync
         try {
           await API.bookTicketGuest(
             9999, 
@@ -5779,30 +5861,25 @@ function bindCustomEventPage() {
           ? `All ${attendees.length} tickets have been issued with unique ticket numbers:\n${masterNumber}-01 through ${masterNumber}-${String(attendees.length).padStart(2, '0')}.`
           : `Dedicated Ticket ID: ${masterNumber}-01`;
 
-        const planNotice = isSplit
-          ? `\n\nPayment Schedule: ${planLabel} (${cycles} installments). First installment of $${perPaymentAmount.toFixed(2)} paid today.`
-          : '';
-
-        showToast('success', 'Tickets Confirmed!', `Thank you ${name}! ${qty}x ${tierName} tickets booked.`, 6000);
-
         if (modal) modal.classList.remove('active');
         form.reset();
 
         showStatusModal({
-          title: '🎉 Gala Tickets Confirmed!',
-          icon: 'fa-ticket',
-          iconColor: '#059669',
-          message: `Thank you, ${name}! Your reservation for ${qty}x ${tierName} has been booked for ${formatGalaDisplayDate(state.customPage.date)}.`,
+          title: isDoorPay ? '📋 Reservation Logged (Pay at Door)' : '🎉 Gala Tickets Confirmed!',
+          icon: isDoorPay ? 'fa-clipboard-check' : 'fa-ticket',
+          iconColor: isDoorPay ? '#d97706' : '#059669',
+          message: isDoorPay 
+            ? `Thank you, ${name}! Your reservation for ${qty}x ${tierName} has been booked. Balance of $${totalPrice.toFixed(2)} is due at Gala check-in door.`
+            : `Thank you, ${name}! Your free reservation for ${qty}x ${tierName} has been booked for ${formatGalaDisplayDate(state.customPage.date)}.`,
           htmlContent: `
             <div style="display: flex; flex-direction: column; gap: 10px;">
               <div><strong>Master Order:</strong> <span style="font-family: monospace; background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; font-weight: 700;">${masterNumber}</span></div>
               <div style="color: var(--text-main); font-size: 0.95rem;">${ticketSummary.replace(/\n/g, '<br>')}</div>
-              ${planNotice ? `<div style="color: var(--primary); font-weight: 600; font-size: 0.95rem;">${planNotice.replace(/\n/g, '<br>')}</div>` : ''}
               <div style="background: rgba(220, 38, 38, 0.08); border-left: 4px solid #dc2626; padding: 10px 12px; border-radius: 6px; font-size: 0.85rem; color: #991b1b; margin-top: 4px;">
                 <i class="fa-solid fa-triangle-exclamation" style="margin-right: 4px;"></i> <strong>Non-Refundable Policy:</strong> Gala tickets are non-refundable. For accommodations or transfer requests, contact info@howards4hope.org at least 72 hours prior to the event.
               </div>
               <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
-                <i class="fa-solid fa-envelope-circle-check" style="color: #059669; margin-right: 4px;"></i> A confirmation email and tax receipt is dispatched to <strong>${escapeHtml(email)}</strong>.
+                <i class="fa-solid fa-envelope-circle-check" style="color: #059669; margin-right: 4px;"></i> A confirmation is dispatched to <strong>${escapeHtml(email)}</strong>.
               </div>
             </div>
           `,
@@ -5813,8 +5890,7 @@ function bindCustomEventPage() {
         });
       } catch (err) {
         console.error("Error booking gala ticket:", err);
-        showToast('warning', 'Reservation Logged', 'Reservation received! Our team will contact you directly to confirm.');
-        if (modal) modal.classList.remove('active');
+        showToast('error', 'Checkout Notice', err.message || 'Unable to complete reservation. Please try again.');
       } finally {
         if (submitBtn) {
           submitBtn.innerHTML = 'Confirm & Book Reservation';
@@ -6221,8 +6297,12 @@ function openRSVPModal(event) {
 
   const processTicketIssuance = (paymentMethod, details, plan) => {
     const qty = parseInt(qtySelect.value, 10);
-    const masterCode = 'H4H-TKT-' + Math.floor(100000 + Math.random() * 900000);
     const totalPrice = event.price * qty;
+    if (totalPrice > 0 && paymentMethod !== 'DOOR' && paymentMethod !== 'FREE') {
+      showToast('error', 'Payment Required', 'Paid tickets require secure Stripe payment verification.');
+      return;
+    }
+    const masterCode = 'H4H-TKT-' + Math.floor(100000 + Math.random() * 900000);
     const isInstallment = plan.planType === 'INSTALLMENT';
 
     details.attendees.forEach((attName, idx) => {
@@ -6267,10 +6347,18 @@ function openRSVPModal(event) {
       : `Ticket ID: ${masterCode}-01.`;
 
     showToast('success', 'Tickets Confirmed!', `Thank you ${details.name}! ${qty} ticket(s) confirmed.`);
-    alert(`🎉 Tickets Confirmed!\n\nThank you ${details.name}!\n${ticketMsg}\nConfirmation sent to ${details.email}.\n\nAll tickets are saved and ready to view or print under "My Tickets".`);
+    showStatusModal({
+      title: '🎉 Tickets Confirmed!',
+      icon: 'fa-ticket',
+      iconColor: '#059669',
+      message: `Thank you ${details.name}! ${qty} ticket(s) confirmed.\n${ticketMsg}\nConfirmation sent to ${details.email}.`,
+      buttonText: 'View My Tickets',
+      onConfirm: () => {
+        window.location.hash = '#/my-tickets';
+      }
+    });
 
     rsvpModal.remove();
-    window.location.hash = '#/my-tickets';
   };
 
   const freeBtn = document.getElementById('confirm-free-rsvp-btn');
@@ -6288,17 +6376,46 @@ function openRSVPModal(event) {
       const details = getGuestDetails();
       if (!details) return;
       const plan = getSelectedPlan();
-      processTicketIssuance('STRIPE', details, plan);
+      const qty = parseInt(qtySelect.value, 10);
+
+      stripeBtn.disabled = true;
+      stripeBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting to Secure Stripe Checkout...';
+
+      try {
+        const checkoutData = await API.createStripeCheckout({
+          eventId: Number(String(event.id).replace('evt-', '')),
+          quantity: qty,
+          unitPrice: event.price,
+          eventTitle: event.title,
+          eventDate: event.date,
+          guestEmail: details.email,
+          guestName: details.name,
+          paymentPlanType: plan.planType,
+          installmentCycles: plan.cycles,
+          successUrl: `${window.location.origin}/#/my-tickets?status=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}/#/events?status=cancelled`
+        });
+
+        if (checkoutData && checkoutData.checkoutUrl && checkoutData.checkoutUrl.startsWith('http')) {
+          stripeBtn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Redirecting to Stripe Checkout...';
+          window.location.href = checkoutData.checkoutUrl;
+          return;
+        } else {
+          throw new Error(checkoutData?.error || "Stripe checkout session could not be established.");
+        }
+      } catch (err) {
+        console.error("Stripe checkout error:", err);
+        showToast('error', 'Checkout Error', err.message || 'Unable to connect to Stripe checkout. Please try again.');
+        stripeBtn.disabled = false;
+        stripeBtn.innerHTML = '<i class="fa-solid fa-credit-card"></i> Pay with Credit / Debit Card (Stripe)';
+      }
     });
   }
   
   const paypalBtn = document.getElementById('paypal-checkout-btn');
   if (paypalBtn) {
     paypalBtn.addEventListener('click', async () => {
-      const details = getGuestDetails();
-      if (!details) return;
-      const plan = getSelectedPlan();
-      processTicketIssuance('PAYPAL', details, plan);
+      showToast('info', 'PayPal Coming Soon', 'Direct PayPal payment gateway is currently being finalized. Please use Credit / Debit Card (Stripe).');
     });
   }
 }
@@ -8575,6 +8692,96 @@ function bindMyTicketsEvents() {
   const queryInput = document.getElementById('lookup-guest-query');
   const lookupBtn = document.getElementById('lookup-guest-btn');
   const resultsContainer = document.getElementById('lookup-results-container');
+
+  // Handle return from Stripe Checkout
+  const urlParams = new URLSearchParams(window.location.search || window.location.hash.split('?')[1] || '');
+  const sessionId = urlParams.get('session_id');
+  const sessionTicketId = urlParams.get('ticket');
+  const masterNumber = urlParams.get('master');
+
+  if (sessionId) {
+    showToast('info', 'Verifying Stripe Payment...', 'Confirming transaction details with Stripe...');
+    API.verifyTicketSession(sessionId, sessionTicketId).then(res => {
+      if (res && res.verified) {
+        // Finalize pending gala order if present
+        try {
+          const rawPending = sessionStorage.getItem('h4h_pending_gala_order');
+          if (rawPending) {
+            const pending = JSON.parse(rawPending);
+            if (!masterNumber || pending.masterNumber === masterNumber) {
+              (pending.attendees || []).forEach((attObj, idx) => {
+                const dedicatedNumber = `${pending.masterNumber}-${String(idx + 1).padStart(2, '0')}`;
+                const galaTicket = {
+                  id: Math.floor(100000 + Math.random() * 900000),
+                  ticketId: dedicatedNumber,
+                  masterConfirmation: pending.masterNumber,
+                  confirmationToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                  attendeeIndex: idx + 1,
+                  totalAttendees: pending.qty,
+                  eventId: 9999,
+                  eventTitle: pending.eventTitle,
+                  tierName: pending.tierName,
+                  eventDate: pending.date,
+                  eventLocation: pending.location,
+                  guestName: attObj.name,
+                  primaryPurchaser: pending.name,
+                  userEmail: attObj.email,
+                  phone: pending.phone,
+                  quantity: 1,
+                  pricePaid: pending.isSplit ? (pending.perPaymentAmount / pending.qty) : pending.unitPrice,
+                  unitPrice: pending.unitPrice,
+                  totalOrderPrice: pending.totalPrice,
+                  paymentMethod: 'STRIPE',
+                  status: 'CONFIRMED',
+                  paymentPlanType: pending.planType,
+                  paymentPlanLabel: pending.planLabel,
+                  installmentFrequency: pending.installmentFreq,
+                  installmentCycles: pending.cycles,
+                  installmentAmount: pending.perPaymentAmount,
+                  installmentsPaid: 1,
+                  remainingBalance: pending.isSplit ? (pending.totalPrice - pending.perPaymentAmount) : 0,
+                  dietaryPreference: attObj.dietaryPreference,
+                  allergyNotes: attObj.allergyNotes,
+                  hasAllergy: attObj.hasAllergy,
+                  purchaseDate: new Date().toISOString().split('T')[0]
+                };
+                saveTicketRecord(galaTicket);
+              });
+              sessionStorage.removeItem('h4h_pending_gala_order');
+            }
+          }
+        } catch(e) {
+          console.warn("Gala pending order finalization notice:", e);
+        }
+
+        showStatusModal({
+          title: '🎉 Payment Verified & Tickets Confirmed!',
+          icon: 'fa-circle-check',
+          iconColor: '#059669',
+          message: 'Your payment was successfully processed by Stripe! Your tickets have been verified and confirmed.',
+          buttonText: 'View My Tickets',
+          onConfirm: () => {
+            if (queryInput && (sessionTicketId || masterNumber)) {
+              queryInput.value = sessionTicketId || masterNumber;
+              lookupBtn.click();
+            }
+          }
+        });
+        if (queryInput && (sessionTicketId || masterNumber)) {
+          queryInput.value = sessionTicketId || masterNumber;
+          lookupBtn.click();
+        }
+      } else {
+        showStatusModal({
+          title: 'Payment Verification Notice',
+          icon: 'fa-triangle-exclamation',
+          iconColor: '#d97706',
+          message: 'Your payment was not completed or is still processing. If your card was charged, your ticket will appear shortly.',
+          buttonText: 'OK'
+        });
+      }
+    });
+  }
   
   if (lookupBtn && queryInput) {
     lookupBtn.addEventListener('click', async () => {

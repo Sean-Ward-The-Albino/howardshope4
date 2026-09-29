@@ -55,11 +55,38 @@ public class PaymentController {
 
     public static class PaymentRequest {
         public Long eventId;
-        public int quantity;
-        public String successUrl;
-        public String cancelUrl;
+        public int quantity = 1;
+        public Double unitPrice;
+        public String eventTitle;
+        public String eventDate;
         public String guestEmail;
         public String guestName;
+        public String paymentPlanType = "FULL";
+        public int installmentCycles = 1;
+        public String successUrl;
+        public String cancelUrl;
+    }
+
+    private Event findOrResolveEvent(Long eventId) {
+        if (eventId == null) return null;
+        Optional<Event> optionalEvent = eventRepository.findById(eventId);
+        if (optionalEvent.isPresent()) {
+            return optionalEvent.get();
+        }
+        if (eventId == 9999L) {
+            return new Event(
+                "Howard's 4 Hope 2026 Gala: Frost & Flame",
+                "A night of celebration, hope, and community transformation.",
+                "2026-10-17",
+                "6:00 PM - 10:00 PM",
+                "The Grand Long Beach, 4101 E Willow St, Long Beach, CA",
+                150.0,
+                "/assets/images/hero-gala.webp",
+                "Gala",
+                "#0284c7"
+            );
+        }
+        return null;
     }
 
     // --- SECURE STRIPE CHECKOUT ROUTING ---
@@ -73,58 +100,88 @@ public class PaymentController {
                 ? request.guestName.trim() : "Valued Attendee";
 
         if (customerEmail == null || customerEmail.trim().isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Customer or guest email is required.");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Customer or guest email is required."));
         }
         
-        Optional<Event> optionalEvent = eventRepository.findById(request.eventId);
-        if (optionalEvent.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        Event event = findOrResolveEvent(request.eventId);
+        if (event == null && (request.unitPrice == null || request.unitPrice <= 0)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Event not found."));
         }
-        
-        Event event = optionalEvent.get();
+
+        String eventTitle = (request.eventTitle != null && !request.eventTitle.trim().isEmpty())
+                ? request.eventTitle.trim()
+                : (event != null ? event.getTitle() : "Event Pass");
+        String eventDate = (request.eventDate != null && !request.eventDate.trim().isEmpty())
+                ? request.eventDate.trim()
+                : (event != null ? event.getDate() : LocalDate.now().toString());
+
+        double unitPrice = (request.unitPrice != null && request.unitPrice > 0)
+                ? request.unitPrice
+                : (event != null ? event.getPrice() : 0.0);
+
+        int qty = (request.quantity > 0) ? request.quantity : 1;
+        double totalPrice = unitPrice * qty;
+
+        if (totalPrice <= 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Free tickets do not require Stripe payment."));
+        }
+
+        boolean isInstallment = "INSTALLMENT".equalsIgnoreCase(request.paymentPlanType) 
+                || (request.paymentPlanType != null && !request.paymentPlanType.equals("FULL") && request.installmentCycles > 1);
+        int cycles = isInstallment ? Math.max(1, request.installmentCycles) : 1;
+        double chargeAmount = isInstallment ? (totalPrice / cycles) : totalPrice;
+        long chargeAmountCents = Math.round(chargeAmount * 100);
+
         String ticketId = "H4H-TKT-" + System.currentTimeMillis();
         
         try {
-            // Set the active Stripe API key dynamically
             com.stripe.Stripe.apiKey = stripeApiKey;
 
-            SessionCreateParams params = SessionCreateParams.builder()
-                    .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
+            String baseSuccessUrl = request.successUrl != null ? request.successUrl : "https://howards4hope.org/#/my-tickets";
+            String delimiter = baseSuccessUrl.contains("?") ? "&" : "?";
+            String successRedirect = baseSuccessUrl + delimiter + "session_id={CHECKOUT_SESSION_ID}&ticket=" + ticketId;
+            String cancelRedirect = request.cancelUrl != null ? request.cancelUrl : "https://howards4hope.org/#/events";
+
+            SessionCreateParams.Builder paramsBuilder = SessionCreateParams.builder()
                     .setMode(SessionCreateParams.Mode.PAYMENT)
-                    .setSuccessUrl((request.successUrl != null ? request.successUrl : "https://howards4hope.org/#/my-tickets") + "?session_id={CHECKOUT_SESSION_ID}&ticket=" + ticketId)
-                    .setCancelUrl(request.cancelUrl != null ? request.cancelUrl : "https://howards4hope.org/#/events")
+                    .setSuccessUrl(successRedirect)
+                    .setCancelUrl(cancelRedirect)
                     .setCustomerEmail(customerEmail)
                     .putMetadata("type", "EVENT_TICKET")
                     .putMetadata("ticketId", ticketId)
-                    .putMetadata("eventId", String.valueOf(event.getId()))
-                    .putMetadata("eventTitle", event.getTitle())
-                    .putMetadata("eventDate", event.getDate())
+                    .putMetadata("eventId", String.valueOf(request.eventId != null ? request.eventId : 9999L))
+                    .putMetadata("eventTitle", eventTitle)
+                    .putMetadata("eventDate", eventDate)
                     .putMetadata("guestName", guestName)
                     .putMetadata("guestEmail", customerEmail)
-                    .putMetadata("quantity", String.valueOf(request.quantity))
+                    .putMetadata("quantity", String.valueOf(qty))
+                    .putMetadata("unitPrice", String.valueOf(unitPrice))
+                    .putMetadata("totalPrice", String.valueOf(totalPrice))
+                    .putMetadata("chargeAmount", String.valueOf(chargeAmount))
+                    .putMetadata("paymentPlanType", request.paymentPlanType != null ? request.paymentPlanType : "FULL")
+                    .putMetadata("installmentCycles", String.valueOf(cycles))
                     .addLineItem(SessionCreateParams.LineItem.builder()
-                            .setQuantity((long) request.quantity)
+                            .setQuantity(1L)
                             .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
                                     .setCurrency("usd")
-                                    .setUnitAmount((long) (event.getPrice() * 100))
+                                    .setUnitAmount(chargeAmountCents)
                                     .setProductData(SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                            .setName(event.getTitle() + " - Pass")
-                                            .setDescription("Howards 4 Hope Event Admission: " + event.getDate())
+                                            .setName(eventTitle + (isInstallment ? " (Installment 1 of " + cycles + ")" : " - Admission Pass"))
+                                            .setDescription("Howard's 4 Hope: " + eventTitle + " | " + eventDate + (isInstallment ? " | Initial payment of " + cycles + " installments" : ""))
                                             .build())
                                     .build())
-                            .build())
-                    .build();
+                            .build());
 
-            Session session = Session.create(params);
+            Session session = Session.create(paramsBuilder.build());
 
             // Generate a pending ticket record matching this session id
             Ticket ticket = new Ticket(
-                    event.getId(),
-                    event.getTitle(),
-                    event.getDate(),
+                    request.eventId != null ? request.eventId : 9999L,
+                    eventTitle,
+                    eventDate,
                     customerEmail,
-                    request.quantity,
-                    event.getPrice() * request.quantity,
+                    qty,
+                    chargeAmount,
                     "STRIPE",
                     "PENDING_PAYMENT",
                     LocalDate.now().toString()
@@ -140,39 +197,51 @@ public class PaymentController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            log.info("Stripe direct API offline or mock mode: {}", e.getMessage());
-            
-            Ticket ticket = new Ticket(
-                    event.getId(),
-                    event.getTitle(),
-                    event.getDate(),
-                    customerEmail,
-                    request.quantity,
-                    event.getPrice() * request.quantity,
-                    "STRIPE",
-                    "CONFIRMED",
-                    LocalDate.now().toString()
-            );
-            ticket.setTicketId(ticketId);
-            ticket.setGuestName(guestName);
-            Ticket savedTicket = ticketRepository.save(ticket);
+            log.error("Stripe Checkout creation failed: {}", e.getMessage(), e);
+            Map<String, String> err = new HashMap<>();
+            err.put("error", "Unable to establish Stripe Checkout session: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+        }
+    }
 
-            // Dispatch instant confirmation email
-            emailService.sendTicketConfirmationEmail(
-                    customerEmail,
-                    guestName,
-                    event.getTitle(),
-                    event.getDate(),
-                    request.quantity,
-                    savedTicket.getTicketId(),
-                    event.getPrice() * request.quantity
-            );
+    @GetMapping("/verify-session")
+    public ResponseEntity<?> verifySession(@RequestParam String sessionId, @RequestParam(required = false) String ticketId) {
+        try {
+            com.stripe.Stripe.apiKey = stripeApiKey;
+            Session session = Session.retrieve(sessionId);
+            if (session != null && ("paid".equalsIgnoreCase(session.getPaymentStatus()) || "complete".equalsIgnoreCase(session.getStatus()))) {
+                String tId = ticketId != null && !ticketId.trim().isEmpty() ? ticketId.trim() : 
+                        (session.getMetadata() != null ? session.getMetadata().get("ticketId") : null);
+                if (tId != null) {
+                    Optional<Ticket> optTicket = ticketRepository.findByTicketId(tId);
+                    if (optTicket.isPresent()) {
+                        Ticket ticket = optTicket.get();
+                        if (!"CONFIRMED".equalsIgnoreCase(ticket.getStatus())) {
+                            ticket.setStatus("CONFIRMED");
+                            ticketRepository.save(ticket);
 
-            Map<String, String> response = new HashMap<>();
-            response.put("checkoutUrl", "#/my-tickets?ticket=" + ticketId);
-            response.put("ticketId", ticketId);
-            response.put("message", "Pass confirmed and confirmation email dispatched!");
-            return ResponseEntity.ok(response);
+                            // Dispatch confirmation email
+                            emailService.sendTicketConfirmationEmail(
+                                    ticket.getUserEmail(),
+                                    ticket.getGuestName(),
+                                    ticket.getEventTitle(),
+                                    ticket.getEventDate(),
+                                    ticket.getQuantity(),
+                                    ticket.getTicketId(),
+                                    ticket.getPricePaid()
+                            );
+                            log.info("Ticket {} verified and confirmed via session query.", tId);
+                        }
+                        return ResponseEntity.ok(Map.of("verified", true, "ticket", ticket));
+                    }
+                }
+                return ResponseEntity.ok(Map.of("verified", true, "message", "Payment verified by Stripe."));
+            } else {
+                return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(Map.of("verified", false, "error", "Payment not completed on Stripe."));
+            }
+        } catch (Exception e) {
+            log.error("Error verifying Stripe session: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 
