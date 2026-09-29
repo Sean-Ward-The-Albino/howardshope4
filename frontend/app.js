@@ -324,12 +324,50 @@ function formatStoryParagraphs(text, fallback = '') {
   const content = (text && String(text).trim()) ? String(text).trim() : (fallback || '');
   if (!content) return '';
   if (content.includes('<p>') && content.includes('</p>')) {
-    return content;
+    return formatGalaAnimatedTitle(content);
   }
   const paras = content.split(/\r?\n+/).map(p => p.trim()).filter(Boolean);
   if (paras.length === 0) return '';
-  return paras.map(p => `<p class="gala-story-paragraph" style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.85; margin: 0 0 16px 0;">${p}</p>`).join('');
+  return paras.map(p => `<p class="gala-story-paragraph" style="color: var(--text-muted); font-size: 1.05rem; line-height: 1.85; margin: 0 0 16px 0;">${formatGalaAnimatedTitle(p)}</p>`).join('');
 }
+
+function formatGalaAnimatedTitle(title) {
+  if (!title) return '';
+  let text = String(title);
+  // Strip any existing animation spans first to prevent double-wrapping
+  text = text.replace(/<span class="gala-anim-frost">([^<]+)<\/span>/gi, '$1');
+  text = text.replace(/<span class="gala-anim-flame">([^<]+)<\/span>/gi, '$1');
+  return text
+    .replace(/\b(frost)\b/gi, '<span class="gala-anim-frost">$1</span>')
+    .replace(/\b(flames?)\b/gi, '<span class="gala-anim-flame">$1</span>');
+}
+
+function formatGalaDisplayDate(dateStr) {
+  if (!dateStr) return '';
+  const str = String(dateStr).trim();
+  if (/[a-zA-Z]+ \d{1,2}, \d{4}/.test(str)) {
+    return str;
+  }
+  const parts = str.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    if (month >= 0 && month < 12 && !isNaN(day) && !isNaN(year)) {
+      return `${monthNames[month]} ${day}, ${year}`;
+    }
+  }
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+  return str;
+}
+
 
 function loadCustomPage() {
   try {
@@ -2764,11 +2802,11 @@ const templates = {
           <div class="hero-tag" style="background: rgba(243,156,18,0.2); color: ${page.accentColor || 'var(--accent)'} !important; border-color: ${page.accentColor || 'var(--accent)'} !important;">
             <i class="fa-solid fa-crown" style="margin-right: 6px;"></i> Featured Special Event
           </div>
-          <h1 class="hero-title" style="font-size: 3.2rem; margin-bottom: 1rem; color: ${page.heroTextColor || '#FFFFFF'} !important; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${page.title}</h1>
-          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px; color: ${page.heroTextColor || '#FFFFFF'} !important; opacity: 0.92; font-family: '${page.bodyFont || 'Plus Jakarta Sans'}', sans-serif;">${page.subtitle}</p>
+          <h1 class="hero-title" style="font-size: 3.2rem; margin-bottom: 1rem; color: ${page.heroTextColor || '#FFFFFF'} !important; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${formatGalaAnimatedTitle(page.title)}</h1>
+          <p class="hero-subtitle" style="margin: 0 auto 25px auto; font-size: 1.15rem; max-width: 750px; color: ${page.heroTextColor || '#FFFFFF'} !important; opacity: 0.92; font-family: '${page.bodyFont || 'Plus Jakarta Sans'}', sans-serif;">${formatGalaAnimatedTitle(page.subtitle)}</p>
           
           <div class="special-event-meta-bar">
-            <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-regular fa-calendar"></i> ${page.date}</div>
+            <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-regular fa-calendar"></i> ${formatGalaDisplayDate(page.date)}</div>
             <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-regular fa-clock"></i> ${page.time}</div>
             <div class="special-meta-chip" style="color: ${page.heroTextColor || '#FFFFFF'} !important; border-color: rgba(255,255,255,0.3);"><i class="fa-solid fa-location-dot"></i> ${page.location}</div>
           </div>
@@ -2815,7 +2853,7 @@ const templates = {
         <div class="special-event-grid">
           <div>
             <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">About The Gala</span>
-            <h2 class="section-title" style="text-align: left; margin-bottom: 20px; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${page.storyTitle || 'An Evening Dedicated to Hope & Healing'}</h2>
+            <h2 class="section-title" style="text-align: left; margin-bottom: 20px; font-family: '${page.headlineFont || 'Playfair Display'}', serif;">${formatGalaAnimatedTitle(page.storyTitle || 'An Evening Dedicated to Hope & Healing')}</h2>
             <div class="gala-story-paragraphs" style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 25px;">
               ${formatStoryParagraphs(page.description, DEFAULT_CUSTOM_PAGE.description)}
             </div>
@@ -2840,8 +2878,8 @@ const templates = {
                     <div class="timeline-item">
                       <div class="timeline-dot" style="border-color: ${page.accentColor || 'var(--accent)'};"></div>
                       <div class="timeline-time">${item.time || 'TBA'}</div>
-                      <div class="timeline-title">${item.title}</div>
-                      ${item.desc ? `<div class="timeline-desc">${item.desc}</div>` : ''}
+                      <div class="timeline-title">${formatGalaAnimatedTitle(item.title)}</div>
+                      ${item.desc ? `<div class="timeline-desc">${formatGalaAnimatedTitle(item.desc)}</div>` : ''}
                     </div>
                   `).join('')}
                 </div>
@@ -2860,7 +2898,7 @@ const templates = {
               <img src="${page.bannerImage || 'assets/2026/Fairs/WEBP/WhatsApp Image 2026-04-11 at 11.06.18 (2).webp'}" alt="Event Banner" style="width: 100%; height: 280px; object-fit: cover; border-radius: var(--radius-md); margin-bottom: 20px;">
               <h3 style="font-size: 1.25rem; color: var(--primary); font-weight: 800; margin-bottom: 12px; font-family: '${page.headlineFont || 'Playfair Display'}', serif;"><i class="fa-solid fa-building-columns" style="color: ${page.accentColor || 'var(--accent)'}; margin-right: 8px;"></i> Venue & Host Details</h3>
               <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Location:</strong> ${page.location}</p>
-              <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Date & Time:</strong> ${page.date} at ${page.time}</p>
+              <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 8px;"><strong>Date & Time:</strong> ${formatGalaDisplayDate(page.date)} at ${page.time}</p>
               <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;"><strong>Dress Code:</strong> ${page.dressCode || 'Semi-Formal / Cocktail Attire'}</p>
               <div style="display: flex; gap: 10px;">
                 <a href="${getGoogleCalendarUrl(page.title, page.date, page.location, page.description)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="flex: 1; text-align: center; font-size: 0.85rem; padding: 10px 8px;">
@@ -2881,6 +2919,16 @@ const templates = {
           <span class="section-tag" style="color: ${page.accentColor || 'var(--accent)'};">Tiered Entry & Tickets</span>
           <h2 class="section-title" style="font-family: '${page.headlineFont || 'Playfair Display'}', serif;">Select Your Ticket or Sponsorship Table</h2>
           <p class="section-subtitle">Reserve your seat for an unforgettable evening. All contributions support Howards 4 Hope 501(c)(3) mission initiatives.</p>
+        </div>
+
+        <!-- Gala Non-Refundable & 72h Contact Policy Banner -->
+        <div class="gala-policy-banner" style="max-width: 820px; margin: 0 auto 32px auto; background: rgba(220, 38, 38, 0.05); border: 1.5px solid rgba(220, 38, 38, 0.25); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; text-align: left; box-shadow: var(--shadow-sm);">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; flex-shrink: 0;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div style="font-size: 0.92rem; color: var(--text-main); line-height: 1.55;">
+            <strong style="color: #991B1B;"><i class="fa-solid fa-ban" style="margin-right: 4px;"></i> Gala Ticket Policy:</strong> Tickets and table reservations for the Gala are <strong>strictly non-refundable</strong>. If you require special accommodations or have inquiries regarding your reservation, please contact our team at <a href="mailto:info@howards4hope.org" style="color: #991B1B; font-weight: 700; text-decoration: underline;">info@howards4hope.org</a> at least <strong>72 hours prior</strong> to the event.
+          </div>
         </div>
 
         <div class="pricing-tiers-grid">
@@ -3004,6 +3052,14 @@ const templates = {
                 <div id="custom-attendee-inputs-box" style="display: flex; flex-direction: column; gap: 10px;"></div>
               </div>
               
+              <!-- Gala Non-Refundable & 72h Notice -->
+              <div style="background: rgba(220, 38, 38, 0.05); border: 1px solid rgba(220, 38, 38, 0.2); border-radius: 8px; padding: 12px 14px; margin-bottom: 18px; font-size: 0.82rem; color: #991B1B; line-height: 1.45; display: flex; align-items: start; gap: 10px;">
+                <i class="fa-solid fa-circle-exclamation" style="margin-top: 2px; flex-shrink: 0; color: #DC2626;"></i>
+                <div>
+                  <strong>Important Notice:</strong> Gala tickets are <strong>non-refundable</strong>. Please contact <a href="mailto:info@howards4hope.org" style="color: #991B1B; text-decoration: underline; font-weight: 700;">info@howards4hope.org</a> at least <strong>72 hours prior</strong> to the event for any guest transfers or special accommodations.
+                </div>
+              </div>
+
               <button type="button" class="btn btn-primary" id="checkout-next-btn" style="width: 100%; padding: 16px; font-weight: 800; font-size: 1.05rem;">
                 Continue to Payment <i class="fa-solid fa-arrow-right" style="margin-left: 8px;"></i>
               </button>
@@ -3150,6 +3206,12 @@ const templates = {
                     </div>
                   </label>
                 ` : ''}
+              </div>
+
+              <!-- Gala Non-Refundable Policy (Step 2) -->
+              <div style="background: rgba(220, 38, 38, 0.06); border-left: 4px solid #DC2626; padding: 12px 14px; border-radius: 6px; margin-bottom: 20px; font-size: 0.82rem; color: var(--text-main); line-height: 1.45;">
+                <strong style="color: #991B1B;"><i class="fa-solid fa-ban" style="margin-right: 5px;"></i> Non-Refundable Gala Policy:</strong>
+                All Gala ticket purchases and installment reservations are non-refundable. For accommodations, dietary adjustments, or transfers, you must contact <a href="mailto:info@howards4hope.org" style="color: #991B1B; font-weight: 700; text-decoration: underline;">info@howards4hope.org</a> at least <strong>72 hours prior</strong> to the gala.
               </div>
 
               <div style="display: flex; gap: 12px;">
@@ -4339,13 +4401,16 @@ const templates = {
                 </button>
               </div>
               <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem;">
-                ${state.myTickets.map(tkt => `
-                  <div class="calendar-card ticket-receipt-card" style="border-left: 6px solid var(--accent); position: relative; overflow: hidden; padding: 22px; box-shadow: var(--shadow-md);">
+                ${state.myTickets.map(tkt => {
+                  const isGala = tkt.eventId === 9999 || (tkt.ticketId && tkt.ticketId.includes('GALA')) || (tkt.eventTitle && tkt.eventTitle.toLowerCase().includes('gala'));
+                  const displayDate = (isGala && tkt.eventDate) ? formatGalaDisplayDate(tkt.eventDate) : (tkt.eventDate || 'Confirmed');
+                  return `
+                  <div class="calendar-card ticket-receipt-card" style="border-left: 6px solid ${isGala ? 'var(--accent)' : 'var(--secondary)'}; position: relative; overflow: hidden; padding: 22px; box-shadow: var(--shadow-md);">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                       <div>
-                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin: 0;">${tkt.eventTitle || 'Howards 4 Hope Event'}</h4>
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin: 0;">${isGala ? formatGalaAnimatedTitle(tkt.eventTitle || 'Howards 4 Hope Gala') : (tkt.eventTitle || 'Howards 4 Hope Event')}</h4>
                         <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-top: 4px;">
-                          <i class="fa-solid fa-calendar-day"></i> ${tkt.eventDate || 'Confirmed'}
+                          <i class="fa-solid fa-calendar-day"></i> ${displayDate}
                         </div>
                       </div>
                       <span class="event-badge" style="position: static; background: var(--accent); color: var(--primary); font-size: 0.75rem; font-weight: 700;">
@@ -4381,6 +4446,12 @@ const templates = {
                       </div>
                     ` : ''}
 
+                    ${isGala ? `
+                      <div style="font-size: 0.76rem; background: rgba(220, 38, 38, 0.07); color: #B91C1C; padding: 7px 10px; border-radius: 6px; border: 1px solid rgba(220, 38, 38, 0.22); margin-top: 10px; margin-bottom: 6px; line-height: 1.4;">
+                        <i class="fa-solid fa-ban" style="margin-right: 4px;"></i><strong>Gala Policy:</strong> Tickets are non-refundable. For accommodations or inquiries, contact <a href="mailto:info@howards4hope.org" style="color: #991B1B; text-decoration: underline; font-weight: 700;">info@howards4hope.org</a> at least 72 hours prior to the event.
+                      </div>
+                    ` : ''}
+
                     <div style="background: #f8fafc; border: 1px solid rgba(15,23,42,0.08); border-radius: 8px; padding: 10px 12px; margin-top: 12px;">
                       <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Ticket Verification Code</div>
                       <div style="font-family: monospace; font-size: 0.95rem; font-weight: 800; color: var(--primary); margin-top: 2px;">
@@ -4400,7 +4471,8 @@ const templates = {
                       </button>
                     </div>
                   </div>
-                `).join('')}
+                  `;
+                }).join('')}
               </div>
             </div>
           ` : `
@@ -5242,7 +5314,7 @@ function bindCustomEventPage() {
           : '';
 
         showToast('success', 'Tickets Confirmed!', `Thank you ${name}! ${qty}x ${tierName} tickets booked.`, 6000);
-        alert(`🎉 Gala Tickets Confirmed!\n\nThank you, ${name}!\nYour reservation for ${qty}x ${tierName} has been booked.\n\nMaster Order: ${masterNumber}\n${ticketSummary}${planNotice}\n\nEach attendee ticket has been saved with food allergy notes and individual verification code for check-in and printing.`);
+        alert(`🎉 Gala Tickets Confirmed!\n\nThank you, ${name}!\nYour reservation for ${qty}x ${tierName} has been booked for ${formatGalaDisplayDate(state.customPage.date)}.\n\nMaster Order: ${masterNumber}\n${ticketSummary}${planNotice}\n\n⚠️ Non-Refundable Policy: Gala tickets are non-refundable. For accommodations or transfer requests, please contact info@howards4hope.org at least 72 hours prior to the event.\n\nEach attendee ticket has been saved with food allergy notes and individual verification code for check-in and printing.`);
         
         if (modal) modal.classList.remove('active');
         form.reset();
@@ -6071,18 +6143,18 @@ function bindAdminDashboard() {
     }
     const titleEl = document.getElementById('gala-live-title-preview');
     if (titleEl) {
-      titleEl.innerText = title;
+      titleEl.innerHTML = formatGalaAnimatedTitle(title);
       titleEl.style.color = heroText;
       titleEl.style.fontFamily = `'${headlineFont}', serif`;
     }
     const subEl = document.getElementById('gala-live-subtitle-preview');
     if (subEl) {
-      subEl.innerText = subtitle;
+      subEl.innerHTML = formatGalaAnimatedTitle(subtitle);
       subEl.style.color = heroText;
       subEl.style.fontFamily = `'${bodyFont}', sans-serif`;
     }
     const dateEl = document.getElementById('gala-live-date-preview');
-    if (dateEl) dateEl.innerHTML = `<i class="fa-regular fa-calendar"></i> ${date}`;
+    if (dateEl) dateEl.innerHTML = `<i class="fa-regular fa-calendar"></i> ${formatGalaDisplayDate(date)}`;
     const timeEl = document.getElementById('gala-live-time-preview');
     if (timeEl) timeEl.innerHTML = `<i class="fa-regular fa-clock"></i> ${time}`;
     const locEl = document.getElementById('gala-live-loc-preview');
