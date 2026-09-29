@@ -245,6 +245,28 @@ function getCategoryColor(category) {
   return "#1E2761";
 }
 
+function isEventPast(dateStr) {
+  if (!dateStr) return false;
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const parts = String(dateStr).trim().split('-');
+    if (parts.length === 3) {
+      const eventDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      eventDate.setHours(0, 0, 0, 0);
+      return today.getTime() > eventDate.getTime();
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      d.setHours(0, 0, 0, 0);
+      return today.getTime() > d.getTime();
+    }
+  } catch (e) {
+    console.error("Error in isEventPast:", e);
+  }
+  return false;
+}
+
 // Custom Event & Campaign Page Studio State
 const DEFAULT_CUSTOM_PAGE = {
   enabled: true,
@@ -2407,21 +2429,30 @@ const templates = {
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem;">
           ${state.events.slice(0, 3).map(event => {
             const catColor = getCategoryColor(event.category);
+            const isPast = isEventPast(event.date);
             return `
-              <div class="event-hifi-card animate-hover">
+              <div class="event-hifi-card animate-hover ${isPast ? 'is-past-event' : ''}">
                 <div class="event-banner" style="background-image: url('${event.banner}')">
                   <span class="event-badge" style="background-color: ${catColor}; color: white; border: 1px solid rgba(255,255,255,0.3);">${event.category}</span>
+                  ${isPast ? `<span class="event-badge past-pill-badge"><i class="fa-solid fa-clock-rotate-left"></i> Past Event</span>` : ''}
                 </div>
                 <div class="event-body">
                   <div class="event-meta">
                     <span class="event-meta-item"><i class="fa-solid fa-calendar-days"></i> ${event.date}</span>
                     <span class="event-meta-item"><i class="fa-solid fa-clock"></i> ${event.time}</span>
+                    ${isPast ? `<span class="event-meta-item" style="color: #64748B; font-weight: 700;"><i class="fa-solid fa-clock-rotate-left"></i> Past Event</span>` : ''}
                   </div>
                   <h3>${event.title}</h3>
                   <p class="event-desc">${event.desc}</p>
                   <div class="event-footer">
                     <span class="event-price ${event.price === 0 ? 'free' : ''}">${event.price === 0 ? 'FREE' : '$' + event.price.toFixed(2)}</span>
-                    <a href="#/events?register=${event.id}" class="btn btn-primary" style="padding: 8px 18px; font-size: 0.85rem;"><i class="fa-solid fa-ticket"></i> RSVP / Register</a>
+                    ${isPast ? `
+                      <span class="btn btn-outline" style="padding: 8px 18px; font-size: 0.85rem; opacity: 0.85; cursor: default; background: rgba(100, 116, 139, 0.08); border-color: #94A3B8; color: #475569;">
+                        <i class="fa-solid fa-calendar-check"></i> Past Event
+                      </span>
+                    ` : `
+                      <a href="#/events?register=${event.id}" class="btn btn-primary" style="padding: 8px 18px; font-size: 0.85rem;"><i class="fa-solid fa-ticket"></i> RSVP / Register</a>
+                    `}
                   </div>
                 </div>
               </div>
@@ -3808,6 +3839,9 @@ const templates = {
                   <div>
                     <label class="form-label">Date</label>
                     <input type="date" class="form-control" id="adm-evt-date" required>
+                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 5px; line-height: 1.4;">
+                      <i class="fa-solid fa-circle-info" style="color: var(--secondary);"></i> Past dates allowed. Events with past dates automatically display with a <strong>"Past Event"</strong> badge and closed registrations.
+                    </div>
                   </div>
                   <div>
                     <label class="form-label">Time</label>
@@ -3916,10 +3950,22 @@ const templates = {
                   <tbody>
                     ${state.events.map(evt => {
                       const evtColor = evt.color || getCategoryColor(evt.category);
+                      const isPast = isEventPast(evt.date);
                       return `
                         <tr style="border-bottom: 1px solid rgba(15, 23, 42, 0.04);">
                           <td style="padding: 12px 6px;">
-                            <div style="font-weight: 700; color: var(--primary);">${evt.title}</div>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                              <span style="font-weight: 700; color: var(--primary);">${evt.title}</span>
+                              ${isPast ? `
+                                <span style="background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                                  <i class="fa-solid fa-clock-rotate-left"></i> Past Event
+                                </span>
+                              ` : `
+                                <span style="background: #DCFCE7; color: #166534; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                                  <i class="fa-regular fa-clock"></i> Upcoming
+                                </span>
+                              `}
+                            </div>
                             <div style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-regular fa-calendar"></i> ${evt.date} &bull; ${evt.time || ''}</div>
                           </td>
                           <td style="padding: 12px 6px;">
@@ -6095,16 +6141,19 @@ function bindCalendarEvents(targetEventId) {
   function renderEventDetail(event) {
     state.selectedEvent = event;
     const catColor = event.color || getCategoryColor(event.category);
+    const isPast = isEventPast(event.date);
     if (placeholder) {
       placeholder.innerHTML = `
-        <div class="event-hifi-card" style="margin: 0; animation: modalEnter var(--transition-fast);">
+        <div class="event-hifi-card ${isPast ? 'is-past-event' : ''}" style="margin: 0; animation: modalEnter var(--transition-fast);">
           <div class="event-banner" style="background-image: url('${event.banner}')">
             <span class="event-badge" style="background-color: ${catColor}; color: white; border: 1px solid rgba(255,255,255,0.3);">${event.category}</span>
+            ${isPast ? `<span class="event-badge past-pill-badge"><i class="fa-solid fa-clock-rotate-left"></i> Past Event</span>` : ''}
           </div>
           <div class="event-body">
             <div class="event-meta">
               <span class="event-meta-item"><i class="fa-solid fa-calendar-days"></i> ${event.date}</span>
               <span class="event-meta-item"><i class="fa-solid fa-clock"></i> ${event.time}</span>
+              ${isPast ? `<span class="event-meta-item" style="color: #64748B; font-weight: 700;"><i class="fa-solid fa-clock-rotate-left"></i> Past Event</span>` : ''}
             </div>
             <h3>${event.title}</h3>
             <p class="event-desc">${event.desc}</p>
@@ -6113,20 +6162,28 @@ function bindCalendarEvents(targetEventId) {
             </div>
             <div class="event-footer">
               <span class="event-price ${event.price === 0 ? 'free' : ''}" style="font-size: 1.5rem;">${event.price === 0 ? 'FREE' : '$' + event.price.toFixed(2)}</span>
-              <button class="btn btn-primary" id="rsvp-trigger-btn">
-                <i class="fa-solid fa-receipt"></i> ${event.price === 0 ? 'Book Free Seat' : 'Purchase Ticket'}
-              </button>
+              ${isPast ? `
+                <button class="btn btn-outline" disabled style="opacity: 0.8; cursor: not-allowed; border-color: #94A3B8; color: #475569; background: rgba(100, 116, 139, 0.08);">
+                  <i class="fa-solid fa-calendar-check"></i> Past Event (Concluded)
+                </button>
+              ` : `
+                <button class="btn btn-primary" id="rsvp-trigger-btn">
+                  <i class="fa-solid fa-receipt"></i> ${event.price === 0 ? 'Book Free Seat' : 'Purchase Ticket'}
+                </button>
+              `}
             </div>
           </div>
         </div>
       `;
       
-      // Bind RSVP checkout click
-      const rsvpBtn = document.getElementById('rsvp-trigger-btn');
-      if (rsvpBtn) {
-        rsvpBtn.addEventListener('click', () => {
-          openRSVPModal(event);
-        });
+      // Bind RSVP checkout click only for active upcoming events
+      if (!isPast) {
+        const rsvpBtn = document.getElementById('rsvp-trigger-btn');
+        if (rsvpBtn) {
+          rsvpBtn.addEventListener('click', () => {
+            openRSVPModal(event);
+          });
+        }
       }
     }
   }
@@ -6169,6 +6226,15 @@ function bindCalendarEvents(targetEventId) {
 
 // RSVP Ticket Options Modal with Payment Splitting & Dedicated Ticket Support
 function openRSVPModal(event) {
+  if (isEventPast(event.date)) {
+    showStatusModal({
+      title: 'Past Event',
+      icon: 'fa-calendar-xmark',
+      iconColor: '#64748B',
+      message: `"${event.title}" took place on ${event.date} and has already concluded. Registrations and ticket bookings are closed for past events.`
+    });
+    return;
+  }
   state.cartEvent = event;
   
   const rsvpModal = document.createElement('div');
@@ -7644,19 +7710,27 @@ function bindAdminDashboard() {
       };
       
       const res = await API.createEvent(payload);
-      if (res) {
-        alert("Event published successfully to backend database!");
+      const newEvtObj = {
+        id: (res && res.id) ? res.id : ('evt-' + Math.floor(1000 + Math.random()*9000)),
+        title, date, time, location, price, desc,
+        banner: bannerUrl,
+        category, color,
+        allowInstallments,
+        installmentCycles,
+        installmentFrequency
+      };
+      
+      const existingIdx = state.events.findIndex(x => x.id.toString() === newEvtObj.id.toString());
+      if (existingIdx >= 0) {
+        state.events[existingIdx] = newEvtObj;
       } else {
-        alert("Published locally (Backend offline or running in mock client mode).");
-        state.events.push({
-          id: 'evt-' + Math.floor(1000 + Math.random()*9000),
-          title, date, time, location, price, desc,
-          banner: bannerUrl,
-          category, color,
-          allowInstallments,
-          installmentCycles,
-          installmentFrequency
-        });
+        state.events.unshift(newEvtObj);
+      }
+
+      if (isEventPast(date)) {
+        showToast('info', 'Past Event Recorded', `"${title}" has been saved as an archived past event.`);
+      } else {
+        showToast('success', 'Event Published', `"${title}" has been published to the events schedule.`);
       }
       eventForm.reset();
       router();

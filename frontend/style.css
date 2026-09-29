@@ -6601,4 +6601,27 @@ input:checked+.admin-slider:before {
   font-size: 0.92rem;
   margin: 0;
   line-height: 1.5;
+}
+
+/* Past Events Styling & Archival Badges */
+.event-badge.past-pill-badge {
+  left: auto !important;
+  right: 16px !important;
+  background: #475569 !important;
+  color: #F8FAFC !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  letter-spacing: 0.02em;
+}
+
+.event-hifi-card.is-past-event {
+  border-color: rgba(148, 163, 184, 0.35) !important;
+}
+
+.event-hifi-card.is-past-event .event-banner {
+  filter: saturate(0.85);
 }
