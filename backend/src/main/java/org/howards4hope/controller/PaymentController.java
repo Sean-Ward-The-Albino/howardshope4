@@ -26,6 +26,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Locale;
+
 @RestController
 @RequestMapping("/api/payments")
 public class PaymentController {
@@ -37,6 +47,15 @@ public class PaymentController {
 
     @Value("${stripe.webhook.secret:whsec_mock_secret}")
     private String webhookSecret;
+
+    @Value("${paypal.client.id:mock_paypal_client_id}")
+    private String paypalClientId;
+
+    @Value("${paypal.client.secret:mock_paypal_client_secret}")
+    private String paypalClientSecret;
+
+    @Value("${paypal.mode:live}")
+    private String paypalMode;
 
     private final EventRepository eventRepository;
     private final TicketRepository ticketRepository;
@@ -245,6 +264,28 @@ public class PaymentController {
         }
     }
 
+    private String getPayPalAccessToken() throws Exception {
+        String baseUrl = "sandbox".equalsIgnoreCase(paypalMode) ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+        String authStr = paypalClientId + ":" + paypalClientSecret;
+        String base64Auth = Base64.getEncoder().encodeToString(authStr.getBytes(StandardCharsets.UTF_8));
+
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/v1/oauth2/token"))
+                .header("Authorization", "Basic " + base64Auth)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString("grant_type=client_credentials"))
+                .build();
+
+        HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) {
+            log.error("PayPal OAuth failed with HTTP {}: {}", resp.statusCode(), resp.body());
+            throw new IllegalStateException("PayPal Gateway Authentication failed (HTTP " + resp.statusCode() + "). Please verify your PayPal Client ID and Secret or choose Stripe.");
+        }
+        JsonNode root = new ObjectMapper().readTree(resp.body());
+        return root.get("access_token").asText();
+    }
+
     // --- SECURE PAYPAL CHECKOUT ROUTING ---
 
     @PostMapping("/create-paypal-order")
@@ -256,7 +297,7 @@ public class PaymentController {
                 ? request.guestName.trim() : "Valued Attendee";
 
         if (customerEmail == null || customerEmail.trim().isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Customer email is required.");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Customer email is required."));
         }
 
         Event event = findOrResolveEvent(request.eventId);
@@ -280,38 +321,125 @@ public class PaymentController {
 
         String ticketId = "H4H-PAYPAL-" + System.currentTimeMillis();
 
-        Ticket ticket = new Ticket(
-                request.eventId != null ? request.eventId : 9999L,
-                eventTitle,
-                eventDate,
-                customerEmail,
-                qty,
+        try {
+            String accessToken = getPayPalAccessToken();
+            String baseUrl = "sandbox".equalsIgnoreCase(paypalMode) ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+
+            String orderPayload = String.format(Locale.US,
+                "{\"intent\":\"CAPTURE\",\"purchase_units\":[{\"reference_id\":\"%s\",\"description\":\"%s\",\"amount\":{\"currency_code\":\"USD\",\"value\":\"%.2f\"}}],\"application_context\":{\"brand_name\":\"Howards 4 Hope\",\"user_action\":\"PAY_NOW\",\"return_url\":\"https://howards4hope-b06f6.web.app/#/my-tickets?paypal_status=success&ticketId=%s\",\"cancel_url\":\"https://howards4hope-b06f6.web.app/#/gala?paypal_status=cancelled\"}}",
+                ticketId,
+                eventTitle.replace("\"", "\\\""),
                 totalPrice,
-                "PAYPAL",
-                "CONFIRMED",
-                LocalDate.now().toString()
-        );
-        ticket.setTicketId(ticketId);
-        ticket.setGuestName(guestName);
-        Ticket savedTicket = ticketRepository.save(ticket);
+                ticketId
+            );
 
-        // Dispatch instant confirmation email
-        emailService.sendTicketConfirmationEmail(
-                customerEmail,
-                guestName,
-                eventTitle,
-                eventDate,
-                qty,
-                savedTicket.getTicketId(),
-                totalPrice
-        );
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest orderReq = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v2/checkout/orders"))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(orderPayload))
+                    .build();
 
-        Map<String, String> response = new HashMap<>();
-        response.put("orderId", "PAYPAL-ORDER-" + System.currentTimeMillis());
-        response.put("checkoutUrl", "#/my-tickets?ticket=" + ticketId);
-        response.put("ticketId", ticketId);
-        response.put("status", "COMPLETED");
-        return ResponseEntity.ok(response);
+            HttpResponse<String> orderResp = client.send(orderReq, HttpResponse.BodyHandlers.ofString());
+            if (orderResp.statusCode() < 200 || orderResp.statusCode() >= 300) {
+                log.error("PayPal Order creation failed with HTTP {}: {}", orderResp.statusCode(), orderResp.body());
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "PayPal gateway error: " + orderResp.body()));
+            }
+
+            JsonNode orderNode = new ObjectMapper().readTree(orderResp.body());
+            String orderId = orderNode.get("id").asText();
+            String checkoutUrl = null;
+            if (orderNode.has("links")) {
+                for (JsonNode link : orderNode.get("links")) {
+                    if ("approve".equalsIgnoreCase(link.get("rel").asText())) {
+                        checkoutUrl = link.get("href").asText();
+                        break;
+                    }
+                }
+            }
+
+            // Save ticket as PENDING_PAYMENT (DO NOT dispatch email until PayPal captures payment)
+            Ticket ticket = new Ticket(
+                    request.eventId != null ? request.eventId : 9999L,
+                    eventTitle,
+                    eventDate,
+                    customerEmail,
+                    qty,
+                    totalPrice,
+                    "PAYPAL",
+                    "PENDING_PAYMENT",
+                    LocalDate.now().toString()
+            );
+            ticket.setTicketId(ticketId);
+            ticket.setGuestName(guestName);
+            ticketRepository.save(ticket);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("orderId", orderId);
+            response.put("checkoutUrl", checkoutUrl != null ? checkoutUrl : "");
+            response.put("ticketId", ticketId);
+            response.put("status", "CREATED");
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("PayPal Order creation error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage() != null ? e.getMessage() : "PayPal checkout could not be initiated."));
+        }
+    }
+
+    @PostMapping("/capture-paypal-order")
+    public ResponseEntity<?> capturePayPalOrder(@RequestParam String orderId, @RequestParam(required = false) String ticketId) {
+        try {
+            String accessToken = getPayPalAccessToken();
+            String baseUrl = "sandbox".equalsIgnoreCase(paypalMode) ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v2/checkout/orders/" + orderId + "/capture"))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{}"))
+                    .build();
+
+            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            JsonNode root = new ObjectMapper().readTree(resp.body());
+            String status = root.has("status") ? root.get("status").asText() : "";
+
+            if ("COMPLETED".equalsIgnoreCase(status)) {
+                if (ticketId != null) {
+                    Optional<Ticket> optTicket = ticketRepository.findByTicketId(ticketId);
+                    if (optTicket.isPresent()) {
+                        Ticket t = optTicket.get();
+                        if (!"CONFIRMED".equalsIgnoreCase(t.getStatus())) {
+                            t.setStatus("CONFIRMED");
+                            ticketRepository.save(t);
+
+                            emailService.sendTicketConfirmationEmail(
+                                    t.getUserEmail(),
+                                    t.getGuestName(),
+                                    t.getEventTitle(),
+                                    t.getEventDate(),
+                                    t.getQuantity(),
+                                    t.getTicketId(),
+                                    t.getPricePaid()
+                            );
+                            log.info("PayPal Ticket {} confirmed and email sent.", ticketId);
+                        }
+                        return ResponseEntity.ok(Map.of("success", true, "status", "COMPLETED", "ticket", t));
+                    }
+                }
+                return ResponseEntity.ok(Map.of("success", true, "status", "COMPLETED"));
+            } else {
+                return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                        .body(Map.of("error", "PayPal payment not completed. Status: " + status));
+            }
+        } catch (Exception e) {
+            log.error("PayPal Order capture error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Unable to capture PayPal payment: " + e.getMessage()));
+        }
     }
 
     // --- CRYPTOGRAPHICALLY VERIFIED STRIPE WEBHOOK ---

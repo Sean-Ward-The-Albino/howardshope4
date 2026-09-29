@@ -1637,6 +1637,19 @@ const API = {
     return await response.json();
   },
 
+  async capturePayPalOrder(orderId, ticketId) {
+    try {
+      const url = `${this.baseUrl}/payments/capture-paypal-order?orderId=${encodeURIComponent(orderId)}${ticketId ? `&ticketId=${encodeURIComponent(ticketId)}` : ''}`;
+      const response = await fetch(url, { method: 'POST' });
+      if (response.ok) return await response.json();
+      const err = await response.json().catch(() => ({}));
+      return { success: false, error: err.error || `Capture failed (${response.status})` };
+    } catch (e) {
+      console.warn("Capture PayPal order failed:", e);
+      return { success: false, error: e.message };
+    }
+  },
+
   async createDonationCheckout(donationData) {
     try {
       const response = await fetch(`${this.baseUrl}/donations/create-checkout`, {
@@ -5805,46 +5818,51 @@ function bindCustomEventPage() {
         // --- SECURE PAYPAL CHECKOUT ---
         if (selectedPaymentMethod === 'PAYPAL' && totalPrice > 0) {
           if (submitBtn) {
-            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing with PayPal...';
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting to PayPal Checkout...';
           }
+          const pendingOrder = {
+            masterNumber,
+            tierName,
+            attendees,
+            qty,
+            unitPrice,
+            totalPrice,
+            planType,
+            planLabel,
+            installmentFreq,
+            cycles,
+            perPaymentAmount,
+            isSplit,
+            name,
+            email,
+            phone,
+            date: state.customPage.date,
+            location: state.customPage.location,
+            eventTitle: `${state.customPage.title} - ${tierName}`
+          };
+          try {
+            sessionStorage.setItem('h4h_pending_gala_order', JSON.stringify(pendingOrder));
+          } catch(e) {}
+
           const paypalRes = await API.createPayPalOrder({
             eventId: 9999,
             quantity: qty,
+            unitPrice: unitPrice,
+            eventTitle: `${state.customPage.title} - ${tierName}`,
+            eventDate: state.customPage.date,
             guestEmail: email,
             guestName: name
           });
 
-          attendees.forEach((attObj, idx) => {
-            const dedicatedNumber = `${masterNumber}-${String(idx + 1).padStart(2, '0')}`;
-            const galaTicket = {
-              id: Math.floor(100000 + Math.random() * 900000),
-              ticketId: dedicatedNumber,
-              masterConfirmation: masterNumber,
-              attendeeIndex: idx + 1,
-              totalAttendees: qty,
-              eventId: 9999,
-              eventTitle: `${state.customPage.title} - ${tierName}`,
-              tierName: tierName,
-              eventDate: state.customPage.date,
-              eventLocation: state.customPage.location,
-              guestName: attObj.name,
-              primaryPurchaser: name,
-              userEmail: attObj.email,
-              phone: phone,
-              quantity: 1,
-              pricePaid: unitPrice,
-              unitPrice: unitPrice,
-              paymentMethod: 'PAYPAL',
-              paymentStatus: 'CONFIRMED',
-              purchaseDate: new Date().toISOString().split('T')[0]
-            };
-            state.myTickets.unshift(galaTicket);
-          });
-          saveMyTickets();
-
-          showToast('success', 'Order Confirmed', 'Your Gala tickets have been confirmed via PayPal. Confirmation email dispatched!');
-          window.location.hash = `#/my-tickets?ticket=${masterNumber}-01`;
-          return;
+          if (paypalRes && paypalRes.checkoutUrl && paypalRes.checkoutUrl.startsWith('http')) {
+            if (submitBtn) {
+              submitBtn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Redirecting to PayPal...';
+            }
+            window.location.href = paypalRes.checkoutUrl;
+            return;
+          } else {
+            throw new Error(paypalRes?.error || "PayPal checkout session could not be established. Please try again or select Credit / Debit Card.");
+          }
         }
 
         // --- PAY AT GALA DOOR or FREE TICKETS ONLY ---
@@ -8862,6 +8880,91 @@ function bindMyTicketsEvents() {
           icon: 'fa-triangle-exclamation',
           iconColor: '#d97706',
           message: 'Your payment was not completed or is still processing. If your card was charged, your ticket will appear shortly.',
+          buttonText: 'OK'
+        });
+      }
+    });
+  }
+
+  // Handle return from PayPal Checkout
+  const paypalToken = urlParams.get('token');
+  const paypalTicketId = urlParams.get('ticketId') || sessionTicketId;
+
+  if (paypalToken && urlParams.get('paypal_status') === 'success') {
+    showToast('info', 'Verifying PayPal Payment...', 'Capturing transaction details with PayPal...');
+    API.capturePayPalOrder(paypalToken, paypalTicketId).then(res => {
+      if (res && (res.success || res.status === 'COMPLETED')) {
+        try {
+          const rawPending = sessionStorage.getItem('h4h_pending_gala_order');
+          if (rawPending) {
+            const pending = JSON.parse(rawPending);
+            (pending.attendees || []).forEach((attObj, idx) => {
+              const dedicatedNumber = `${pending.masterNumber}-${String(idx + 1).padStart(2, '0')}`;
+              const galaTicket = {
+                id: Math.floor(100000 + Math.random() * 900000),
+                ticketId: dedicatedNumber,
+                masterConfirmation: pending.masterNumber,
+                confirmationToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                attendeeIndex: idx + 1,
+                totalAttendees: pending.qty,
+                eventId: 9999,
+                eventTitle: pending.eventTitle,
+                tierName: pending.tierName,
+                eventDate: pending.date,
+                eventLocation: pending.location,
+                guestName: attObj.name,
+                primaryPurchaser: pending.name,
+                userEmail: attObj.email,
+                phone: pending.phone,
+                quantity: 1,
+                pricePaid: pending.isSplit ? (pending.perPaymentAmount / pending.qty) : pending.unitPrice,
+                unitPrice: pending.unitPrice,
+                totalOrderPrice: pending.totalPrice,
+                paymentMethod: 'PAYPAL',
+                status: 'CONFIRMED',
+                paymentPlanType: pending.planType,
+                paymentPlanLabel: pending.planLabel,
+                installmentFrequency: pending.installmentFreq,
+                installmentCycles: pending.cycles,
+                installmentAmount: pending.perPaymentAmount,
+                installmentsPaid: 1,
+                remainingBalance: pending.isSplit ? (pending.totalPrice - pending.perPaymentAmount) : 0,
+                dietaryPreference: attObj.dietaryPreference,
+                allergyNotes: attObj.allergyNotes,
+                hasAllergy: attObj.hasAllergy,
+                purchaseDate: new Date().toISOString().split('T')[0]
+              };
+              saveTicketRecord(galaTicket);
+            });
+            sessionStorage.removeItem('h4h_pending_gala_order');
+          }
+        } catch(e) {
+          console.warn("PayPal pending order finalization notice:", e);
+        }
+
+        showStatusModal({
+          title: '🎉 Payment Verified & Tickets Confirmed!',
+          icon: 'fa-circle-check',
+          iconColor: '#0070ba',
+          message: 'Your payment was successfully processed by PayPal! Your tickets have been confirmed and receipt dispatched.',
+          buttonText: 'View My Tickets',
+          onConfirm: () => {
+            if (queryInput && (paypalTicketId || masterNumber)) {
+              queryInput.value = paypalTicketId || masterNumber;
+              lookupBtn.click();
+            }
+          }
+        });
+        if (queryInput && (paypalTicketId || masterNumber)) {
+          queryInput.value = paypalTicketId || masterNumber;
+          lookupBtn.click();
+        }
+      } else {
+        showStatusModal({
+          title: 'PayPal Payment Notice',
+          icon: 'fa-triangle-exclamation',
+          iconColor: '#d97706',
+          message: res?.error || 'PayPal payment was not completed.',
           buttonText: 'OK'
         });
       }
