@@ -45,6 +45,9 @@ public class TicketController {
         public String guestName;
         public String paymentPlanType = "FULL"; // "FULL" or "INSTALLMENT"
         public int installmentCycles = 1;
+        public Double unitPrice;
+        public String eventTitle;
+        public String eventDate;
     }
 
     private Event findOrResolveEvent(Long eventId) {
@@ -116,15 +119,19 @@ public class TicketController {
         Ticket savedTicket = ticketRepository.save(ticket);
 
         // Dispatch Email confirmation
-        emailService.sendTicketConfirmationEmail(
-            userEmail,
-            savedTicket.getGuestName(),
-            event.getTitle(),
-            event.getDate(),
-            qty,
-            savedTicket.getTicketId(),
-            firstPayment
-        );
+        try {
+            emailService.sendTicketConfirmationEmail(
+                userEmail,
+                savedTicket.getGuestName(),
+                event.getTitle(),
+                event.getDate(),
+                qty,
+                savedTicket.getTicketId(),
+                firstPayment
+            );
+        } catch (Exception ex) {
+            System.err.println("Ticket confirmation email dispatch error: " + ex.getMessage());
+        }
 
         return ResponseEntity.ok(savedTicket);
     }
@@ -141,29 +148,32 @@ public class TicketController {
         }
 
         Event event = findOrResolveEvent(request.eventId);
-        if (event == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Event not found.");
-        }
-
-        if (event.getPrice() > 0 && "FREE".equalsIgnoreCase(request.paymentMethod)) {
-            return ResponseEntity.badRequest().body("This is a paid event. Payment method cannot be FREE.");
-        }
+        String eventTitle = (request.eventTitle != null && !request.eventTitle.trim().isEmpty()) 
+            ? request.eventTitle 
+            : (event != null ? event.getTitle() : "Howards 4 Hope Special Event");
+        String eventDate = (request.eventDate != null && !request.eventDate.trim().isEmpty()) 
+            ? request.eventDate 
+            : (event != null ? event.getDate() : LocalDate.now().toString());
 
         int qty = (request.quantity > 0) ? request.quantity : 1;
-        double totalPrice = event.getPrice() * qty;
-        boolean isInstallment = "INSTALLMENT".equalsIgnoreCase(request.paymentPlanType) && request.installmentCycles > 1;
+        double unitPrice = (request.unitPrice != null) 
+            ? request.unitPrice 
+            : (event != null ? event.getPrice() : 0.0);
+        double totalPrice = unitPrice * qty;
+
+        boolean isInstallment = !"FULL".equalsIgnoreCase(request.paymentPlanType) && request.installmentCycles > 1;
         int cycles = isInstallment ? request.installmentCycles : 1;
         double firstPayment = isInstallment ? (totalPrice / cycles) : totalPrice;
         double remainingBalance = isInstallment ? (totalPrice - firstPayment) : 0.0;
 
         Ticket ticket = new Ticket(
-                request.eventId,
-                event.getTitle(),
-                event.getDate(),
+                request.eventId != null ? request.eventId : 9999L,
+                eventTitle,
+                eventDate,
                 request.guestEmail.trim(),
                 qty,
                 firstPayment,
-                request.paymentMethod,
+                request.paymentMethod != null ? request.paymentMethod : "CONFIRMED",
                 "CONFIRMED",
                 LocalDate.now().toString(),
                 isInstallment ? "INSTALLMENT" : "FULL",
@@ -176,15 +186,19 @@ public class TicketController {
         Ticket savedTicket = ticketRepository.save(ticket);
 
         // Dispatch Email confirmation
-        emailService.sendTicketConfirmationEmail(
-            savedTicket.getUserEmail(),
-            savedTicket.getGuestName(),
-            event.getTitle(),
-            event.getDate(),
-            qty,
-            savedTicket.getTicketId(),
-            firstPayment
-        );
+        try {
+            emailService.sendTicketConfirmationEmail(
+                savedTicket.getUserEmail(),
+                savedTicket.getGuestName(),
+                eventTitle,
+                eventDate,
+                qty,
+                savedTicket.getTicketId(),
+                firstPayment
+            );
+        } catch (Exception ex) {
+            System.err.println("Ticket confirmation email dispatch error: " + ex.getMessage());
+        }
 
         return ResponseEntity.ok(savedTicket);
     }

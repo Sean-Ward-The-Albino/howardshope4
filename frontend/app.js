@@ -351,17 +351,36 @@ function safeUrl(url) {
   return '#';
 }
 
-function formatGalaAnimatedTitle(title) {
+function formatGalaHeroBannerTitle(title) {
   if (!title) return '';
-  let text = String(title);
-  // Strip any existing animation spans first to prevent double-wrapping
-  text = text.replace(/<span class="gala-anim-frost">([^<]+)<\/span>/gi, '$1');
-  text = text.replace(/<span class="gala-anim-flame">([^<]+)<\/span>/gi, '$1');
-  text = text.replace(/<span class="gala-anim-fusion"[^>]*>([^<]+)<\/span>/gi, '$1');
-  return text
-    .replace(/\b(frost)\b/gi, '<span class="gala-anim-frost">$1</span>')
-    .replace(/\b(flames?)\b/gi, '<span class="gala-anim-flame">$1</span>')
-    .replace(/(\s+)(&|and)(\s+)/gi, '$1<span class="gala-anim-fusion" title="Elemental Fusion">$2</span>$3');
+  let str = String(title)
+    .replace(/<span class="gala-anim-[^"]+">([\s\S]*?)<\/span>/gi, '$1')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+
+  // Match ONLY the primary theme motif: "Frost", followed by "&" or "and", followed by "Flame" or "Flames"
+  // This ensures ONLY the hero banner's main title gets transformed, and never any random "and", "frost", or "flame" anywhere else!
+  const themeRegex = /^(.*?\b)(Frost)(\b\s*)(&|and|&amp;)(\s*\b)(Flames?)(\b.*)$/i;
+  const match = str.match(themeRegex);
+
+  if (match) {
+    const prefix = escapeHtml(match[1]);
+    const frostWord = escapeHtml(match[2]);
+    const space1 = match[3] || ' ';
+    const rawAmp = match[4].toLowerCase() === '&amp;' ? '&' : match[4];
+    const ampWord = escapeHtml(rawAmp);
+    const space2 = match[5] || ' ';
+    const flameWord = escapeHtml(match[6]);
+    const suffix = escapeHtml(match[7]);
+
+    return `${prefix}<span class="gala-anim-frost">${frostWord}</span>${space1}<span class="gala-anim-fusion" title="Elemental Fusion" aria-label="Fusion">${ampWord}</span>${space2}<span class="gala-anim-flame">${flameWord}</span>${suffix}`;
+  }
+
+  return escapeHtml(str);
+}
+
+function formatGalaAnimatedTitle(title) {
+  return formatGalaHeroBannerTitle(title);
 }
 
 function formatGalaDisplayDate(dateStr) {
@@ -1448,7 +1467,7 @@ const API = {
     return ticket;
   },
 
-  async bookTicketGuest(eventId, quantity = 1, paymentMethod = 'FREE', guestEmail, guestName, paymentPlanType = 'FULL', installmentCycles = 1) {
+  async bookTicketGuest(eventId, quantity = 1, paymentMethod = 'FREE', guestEmail, guestName, paymentPlanType = 'FULL', installmentCycles = 1, options = {}) {
     try {
       const response = await fetchWithTimeout(`${this.baseUrl}/tickets/book-guest`, {
         method: 'POST',
@@ -1460,9 +1479,12 @@ const API = {
           guestEmail,
           guestName,
           paymentPlanType,
-          installmentCycles
+          installmentCycles,
+          unitPrice: options.unitPrice,
+          eventTitle: options.eventTitle,
+          eventDate: options.eventDate
         })
-      }, 3000);
+      }, 15000);
       if (response.ok) {
         const ticket = await response.json();
         saveTicketRecord(ticket);
@@ -2993,8 +3015,9 @@ const templates = {
             <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 10px; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.6;">
               This is what happens when our community shows up. Relive the unforgettable moments from last year's gala.
             </p>
-            <p style="color: var(--primary); font-size: 1.1rem; font-weight: 700; margin-bottom: 28px; max-width: 700px; margin-left: auto; margin-right: auto;">
-              Purchase your ticket now for this year’s Frost &amp; Flame: Reign of Hope on January 30, 2027!
+            <p style="color: var(--primary); font-size: 1.15rem; font-weight: 700; margin-bottom: 28px; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+              Purchase your ticket now for this year’s Frost &amp; Flame: Reign of Hope<br>
+              <span style="display: inline-block; margin-top: 4px;">on January&nbsp;30,&nbsp;2027!</span>
             </p>
             
             <div class="gala-video-wrapper">
@@ -5695,8 +5718,25 @@ function bindCustomEventPage() {
           createdTickets.push(galaTicket);
         });
 
-        // Backend sync if available
-        API.bookTicketGuest(9999, qty, selectedPaymentMethod, email, name, planType, cycles).catch(() => {});
+        // Backend sync & email dispatch
+        try {
+          await API.bookTicketGuest(
+            9999, 
+            qty, 
+            selectedPaymentMethod, 
+            email, 
+            name, 
+            planType, 
+            cycles, 
+            {
+              unitPrice: unitPrice,
+              eventTitle: `${state.customPage.title} - ${tierName}`,
+              eventDate: state.customPage.date
+            }
+          );
+        } catch (e) {
+          console.warn("Backend ticket sync deferred:", e);
+        }
 
         const ticketSummary = attendees.length > 1
           ? `All ${attendees.length} tickets have been issued with unique ticket numbers:\n${masterNumber}-01 through ${masterNumber}-${String(attendees.length).padStart(2, '0')}.`

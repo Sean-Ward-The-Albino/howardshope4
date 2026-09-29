@@ -6291,264 +6291,124 @@ input:checked+.admin-slider:before {
 /* --- GALA FROST, FLAME & FUSION DYNAMIC TEXT ANIMATIONS -- */
 /* ========================================================= */
 
-/* Frost: Glacial crystalline refraction, sub-zero aura, frosty ice breath */
+/* ========================================================= */
+/* --- GALA HERO BANNER: FROST, FLAME & FUSION TYPOGRAPHY -- */
+/* ========================================================= */
+
+/* Frost: Razor-sharp crystalline diamond text with specular light refraction */
 .gala-anim-frost {
   display: inline-block;
-  background: linear-gradient(135deg, #FFFFFF 0%, #E0F2FE 20%, #BAE6FD 45%, #38BDF8 70%, #0284C7 90%, #0369A1 100%);
-  background-size: 250% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: #BAE6FD;
   position: relative;
   font-weight: 900;
+  color: #FFFFFF;
+  background: linear-gradient(
+    115deg,
+    #FFFFFF 0%,
+    #E0F2FE 20%,
+    #BAE6FD 38%,
+    #38BDF8 58%,
+    #FFFFFF 74%,
+    #7DD3FC 88%,
+    #0284C7 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 0.5px rgba(255, 255, 255, 0.95);
   letter-spacing: 0.5px;
-  animation: frostTextIn 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards, frostGlacierShimmer 4s ease-in-out infinite alternate 1.4s;
-  text-shadow: 0 0 14px rgba(186, 230, 253, 0.85), 0 0 28px rgba(56, 189, 248, 0.6);
-  filter: drop-shadow(0 2px 8px rgba(2, 132, 199, 0.5)) drop-shadow(0 0 1px #FFFFFF);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 2px rgba(56, 189, 248, 0.6));
+  animation: frostGlacierSheen 4.2s ease-in-out infinite alternate;
+  transition: transform 0.25s ease, filter 0.25s ease;
+  vertical-align: baseline;
 }
+
 .gala-anim-frost:hover {
-  transform: translateY(-2px) scale(1.04);
-  filter: drop-shadow(0 0 16px rgba(186, 230, 253, 1)) drop-shadow(0 0 30px rgba(56, 189, 248, 0.8));
+  transform: translateY(-2px);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 6px rgba(56, 189, 248, 0.85));
 }
 
-@keyframes frostTextIn {
-  0% {
-    opacity: 0;
-    transform: translateY(-12px) scale(0.9);
-    filter: blur(10px) drop-shadow(0 0 25px rgba(186, 230, 253, 1));
-    letter-spacing: 5px;
-  }
-  60% {
-    opacity: 0.95;
-    filter: blur(2px) drop-shadow(0 0 18px rgba(56, 189, 248, 0.9));
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0px) drop-shadow(0 2px 8px rgba(2, 132, 199, 0.5)) drop-shadow(0 0 1px #FFFFFF);
-    letter-spacing: 0.5px;
-  }
-}
-
-@keyframes frostGlacierShimmer {
+@keyframes frostGlacierSheen {
   0% {
     background-position: 0% 50%;
-    text-shadow: 0 0 12px rgba(186, 230, 253, 0.85), 0 0 24px rgba(56, 189, 248, 0.5);
   }
-  50% {
+  100% {
     background-position: 100% 50%;
-    text-shadow: 0 0 20px rgba(255, 255, 255, 1), 0 0 32px rgba(125, 211, 252, 0.9), 0 0 45px rgba(56, 189, 248, 0.7);
-  }
-  100% {
-    background-position: 0% 50%;
-    text-shadow: 0 0 12px rgba(186, 230, 253, 0.85), 0 0 24px rgba(56, 189, 248, 0.5);
   }
 }
 
-/* Flame: Convective turbulent combustion, radiant core, soaring ember glow */
+/* Flame: Razor-sharp solar core ember text with convective heat refraction */
 .gala-anim-flame {
   display: inline-block;
-  background: linear-gradient(135deg, #FFFBEB 0%, #FEF08A 15%, #FBBF24 35%, #F97316 60%, #EF4444 85%, #B91C1C 100%);
-  background-size: 250% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: #F97316;
   position: relative;
   font-weight: 900;
+  color: #FFFBEB;
+  background: linear-gradient(
+    115deg,
+    #FFFBEB 0%,
+    #FEF08A 18%,
+    #F59E0B 42%,
+    #EF4444 65%,
+    #FFFBEB 80%,
+    #EA580C 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 0.5px rgba(254, 240, 138, 0.95);
   letter-spacing: 0.5px;
-  animation: flameBurnIn 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards, flameBurnFlicker 2.8s ease-in-out infinite alternate 1.4s;
-  text-shadow: 0 0 14px rgba(249, 115, 22, 0.9), 0 -2px 22px rgba(239, 68, 68, 0.75), 0 -6px 30px rgba(220, 38, 38, 0.55);
-  filter: drop-shadow(0 2px 8px rgba(185, 28, 28, 0.6)) drop-shadow(0 0 1px #FEF08A);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 2px rgba(245, 158, 11, 0.6));
+  animation: flameCoreSheen 3.6s ease-in-out infinite alternate;
+  transition: transform 0.25s ease, filter 0.25s ease;
+  vertical-align: baseline;
 }
+
 .gala-anim-flame:hover {
-  transform: translateY(-2px) scale(1.04);
-  filter: drop-shadow(0 0 20px rgba(249, 115, 22, 1)) drop-shadow(0 -4px 35px rgba(239, 68, 68, 0.9));
+  transform: translateY(-2px);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.85));
 }
 
-@keyframes flameBurnIn {
+@keyframes flameCoreSheen {
   0% {
-    opacity: 0;
-    transform: translateY(14px) scale(0.86);
-    filter: blur(12px) brightness(2.2) drop-shadow(0 -8px 30px rgba(239, 68, 68, 1));
-    letter-spacing: -2px;
-  }
-  50% {
-    opacity: 0.9;
-    transform: translateY(-3px) scale(1.05);
-    filter: blur(3px) brightness(1.6) drop-shadow(0 -4px 22px rgba(249, 115, 22, 0.95));
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0px) brightness(1) drop-shadow(0 2px 8px rgba(185, 28, 28, 0.6)) drop-shadow(0 0 1px #FEF08A);
-    letter-spacing: 0.5px;
-  }
-}
-
-@keyframes flameBurnFlicker {
-  0% {
-    background-position: 0% 50%;
-    transform: translateY(0) scale(1);
-    text-shadow: 0 0 12px rgba(249, 115, 22, 0.85), 0 -3px 20px rgba(239, 68, 68, 0.75);
-  }
-  25% {
-    transform: translateY(-1.5px) scale(1.02);
-    text-shadow: 0 0 18px rgba(254, 240, 138, 0.95), 0 -6px 26px rgba(234, 88, 12, 0.9);
-  }
-  50% {
     background-position: 100% 50%;
-    transform: translateY(0.8px) scale(0.99);
-    text-shadow: 0 0 14px rgba(249, 115, 22, 0.8), 0 -2px 18px rgba(220, 38, 38, 0.7);
-  }
-  75% {
-    transform: translateY(-2px) scale(1.025);
-    text-shadow: 0 0 22px rgba(254, 240, 138, 1), 0 -7px 30px rgba(239, 68, 68, 0.95);
   }
   100% {
     background-position: 0% 50%;
-    transform: translateY(0) scale(1);
-    text-shadow: 0 0 12px rgba(249, 115, 22, 0.85), 0 -3px 20px rgba(239, 68, 68, 0.75);
   }
 }
 
 /* ========================================================= */
-/* --- THE FUSION "&" ELEMENTAL COLLISION ANIMATION -------- */
+/* --- THE FUSION "&" DUAL-ORBITAL ATOMIC ACCELERATOR ------ */
 /* ========================================================= */
-/* The epicenter where Absolute Zero Glacial Ice meets Pure Solar Inferno! */
+/* Crisp, 100% readable foreground & glyph with high-precision orbital particle rings behind it */
 .gala-anim-fusion {
   display: inline-block;
   position: relative;
   font-weight: 900;
-  padding: 0 6px;
-  margin: 0 2px;
-  vertical-align: middle;
-  background: linear-gradient(135deg, 
+  padding: 0 10px;
+  margin: 0 4px;
+  vertical-align: baseline;
+  z-index: 2;
+  color: #FFFFFF;
+  background: linear-gradient(
+    135deg, 
     #38BDF8 0%, 
-    #60A5FA 18%, 
-    #A855F7 38%, 
-    #EC4899 55%, 
-    #F59E0B 75%, 
-    #EF4444 90%, 
-    #FFFBEB 100%
+    #7DD3FC 28%,
+    #FFFFFF 47%, 
+    #FFFFFF 53%, 
+    #FEF08A 72%, 
+    #F59E0B 100%
   );
-  background-size: 300% 300%;
+  background-size: 100% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  color: #EC4899;
-  animation: 
-    fusionPlasmaShift 3.6s ease-in-out infinite,
-    fusionPulseBreath 2.2s ease-in-out infinite alternate;
-  text-shadow: 
-    0 0 16px rgba(168, 85, 247, 0.8),
-    -3px 0 14px rgba(56, 189, 248, 0.9),
-    3px 0 14px rgba(249, 115, 22, 0.9);
-  filter: drop-shadow(0 0 10px rgba(236, 72, 153, 0.65));
-  cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Micro Plasma Halo behind the fusion & symbol */
-.gala-anim-fusion::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 140%;
-  height: 140%;
-  transform: translate(-50%, -50%) rotate(0deg);
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, 
-    rgba(56, 189, 248, 0.35) 0deg, 
-    rgba(168, 85, 247, 0.3) 90deg, 
-    rgba(239, 68, 68, 0.35) 180deg, 
-    rgba(245, 158, 11, 0.35) 270deg, 
-    rgba(56, 189, 248, 0.35) 360deg
-  );
-  filter: blur(6px);
-  z-index: -1;
-  pointer-events: none;
-  animation: fusionOrbitSpin 6s linear infinite;
-  opacity: 0.85;
-}
-
-/* Radiant Center Flare */
-.gala-anim-fusion::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 50%;
-  height: 50%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(168,85,247,0.4) 60%, transparent 100%);
-  filter: blur(3px);
-  z-index: -1;
-  pointer-events: none;
-  animation: fusionCorePulse 1.8s ease-in-out infinite alternate;
+  -webkit-text-stroke: 0.75px rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9));
+  transition: transform 0.25s ease;
 }
 
 .gala-anim-fusion:hover {
-  transform: scale(1.22) rotate(6deg);
-  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 1)) drop-shadow(0 0 35px rgba(236, 72, 153, 0.9));
-}
-
-@keyframes fusionPlasmaShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes fusionPulseBreath {
-  0% {
-    transform: scale(1) translateY(0);
-    text-shadow: 
-      0 0 12px rgba(168, 85, 247, 0.7),
-      -4px 0 14px rgba(56, 189, 248, 0.85),
-      4px 0 14px rgba(239, 68, 68, 0.85);
-  }
-  50% {
-    transform: scale(1.08) translateY(-1px);
-    text-shadow: 
-      0 0 24px rgba(255, 255, 255, 0.95),
-      -6px 0 22px rgba(56, 189, 248, 1),
-      6px 0 22px rgba(249, 115, 22, 1);
-  }
-  100% {
-    transform: scale(1) translateY(0);
-    text-shadow: 
-      0 0 12px rgba(168, 85, 247, 0.7),
-      -4px 0 14px rgba(56, 189, 248, 0.85),
-      4px 0 14px rgba(239, 68, 68, 0.85);
-  }
-}
-
-@keyframes fusionOrbitSpin {
-  0% {
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
-  100% {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
-}
-
-@keyframes fusionCorePulse {
-  0% {
-    transform: translate(-50%, -50%) scale(0.7);
-    opacity: 0.5;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1.3);
-    opacity: 0.9;
-  }
+  transform: translateY(-2px) scale(1.08);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
 }
 
 /* ========================================================= */
